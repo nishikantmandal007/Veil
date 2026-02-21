@@ -24,6 +24,315 @@ const DEFAULT_MONITORED_SELECTORS = [
 ];
 
 const NATIVE_HOST_NAME = 'com.privacyshield.gliner2';
+const MDP_DEFAULT_SEED = 'org_or_project_seed';
+
+const MDP_LABEL_CONFIG = Object.freeze({
+  person: Object.freeze({
+    columnName: 'Names',
+    utilityParameter: 'NAME',
+    utilityParameterConditions: Object.freeze(['NAME', 'REMOVE_UNDERSCORE'])
+  }),
+  email: Object.freeze({
+    columnName: 'Emails',
+    utilityParameter: 'EMAIL',
+    utilityParameterConditions: Object.freeze(['KEEP_DOMAIN'])
+  }),
+  phone: Object.freeze({
+    columnName: 'Phone',
+    utilityParameter: 'PHONE',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  address: Object.freeze({
+    columnName: 'Address',
+    utilityParameter: 'ADDRESS',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  ssn: Object.freeze({
+    columnName: 'SSN',
+    utilityParameter: 'SSN',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  credit_card: Object.freeze({
+    columnName: 'Credit Card',
+    utilityParameter: 'CARD',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  date_of_birth: Object.freeze({
+    columnName: 'Date Of Birth',
+    utilityParameter: 'DATE',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  location: Object.freeze({
+    columnName: 'Location',
+    utilityParameter: 'LOCATION',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  organization: Object.freeze({
+    columnName: 'Organization',
+    utilityParameter: 'ORG',
+    utilityParameterConditions: Object.freeze([])
+  })
+});
+
+class MayaDataAnonymizer {
+  constructor() {
+    this.timeoutMs = 6000;
+    this.localServerUrl = 'http://127.0.0.1:8765';
+  }
+
+  async enrichDetections(detections, options = {}) {
+    if (options?.redactionMode !== 'anonymize') {
+      return detections;
+    }
+    if (!Array.isArray(detections) || detections.length === 0) {
+      return detections;
+    }
+
+    const supportedDetections = detections.filter((item) => MDP_LABEL_CONFIG[String(item?.label || '').toLowerCase()]);
+    if (supportedDetections.length === 0) {
+      return detections;
+    }
+
+    const credentials = await this.getCredentials();
+    if (!credentials.jwtToken) {
+      return detections;
+    }
+
+    const payload = this.buildPayload(supportedDetections, credentials.seed);
+    if (payload.length === 0) {
+      return detections;
+    }
+
+    try {
+      const apiResponse = await this.callApi(credentials.jwtToken, payload);
+      const replacements = this.extractReplacementMap(payload, apiResponse);
+      return detections.map((item) => this.applyReplacement(item, replacements));
+    } catch (error) {
+      console.warn('[Privacy Shield] anonymization request failed:', error?.message || String(error));
+      return detections;
+    }
+  }
+
+  async getCredentials() {
+    const result = await new Promise((resolve) => {
+      chrome.storage.local.get(['mdpJwtToken'], resolve);
+    });
+
+    return {
+      jwtToken: String(result?.mdpJwtToken || '').trim(),
+      seed: MDP_DEFAULT_SEED
+    };
+  }
+
+  buildPayload(detections, seed) {
+    const grouped = new Map();
+
+    detections.forEach((item) => {
+      const label = String(item?.label || '').toLowerCase();
+      const config = MDP_LABEL_CONFIG[label];
+      if (!config) return;
+      const value = String(item?.text || '').trim();
+      if (!value) return;
+
+      let entry = grouped.get(label);
+      if (!entry) {
+        entry = {
+          column_name: config.columnName,
+          utilityParameter: config.utilityParameter,
+          utilityParameterConditions: [...config.utilityParameterConditions],
+          seed,
+          values: []
+        };
+        grouped.set(label, entry);
+      }
+
+      if (!entry.values.includes(value)) {
+        entry.values.push(value);
+      }
+    });
+
+    return Array.from(grouped.values());
+  }
+
+  async callApi(jwtToken, payload) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`${this.localServerUrl}/anonymize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ jwtToken, entries: payload }),
+        signal: controller.signal
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Local anonymization proxy returned invalid JSON.');
+      }
+
+      if (data?.ok === false) {
+        throw new Error(String(data.error || 'Local anonymization proxy failed.'));
+      }
+      if (!response.ok) {
+        throw new Error(`Local anonymization proxy returned status ${response.status}.`);
+      }
+
+      if (Array.isArray(data?.data)) return data.data;
+      if (Array.isArray(data?.result)) return data.result;
+
+      const upstream = data?.data;
+      if (Array.isArray(upstream?.data)) return upstream.data;
+      if (Array.isArray(upstream?.result)) return upstream.result;
+      if (Array.isArray(upstream?.results)) return upstream.results;
+      if (Array.isArray(upstream)) return upstream;
+
+      if (Array.isArray(data)) return data;
+      return [];
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  extractReplacementMap(payload, apiResponse) {
+    const replacementMap = new Map();
+    const rows = this.extractRows(apiResponse);
+
+    // MayaData format:
+    // [{ column_name, anonymizedValues: { "John Doe": { anonymizedValue: "..." } } }, ...]
+    rows.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      const map = row.anonymizedValues;
+      if (!map || typeof map !== 'object' || Array.isArray(map)) return;
+      Object.entries(map).forEach(([sourceValue, detail]) => {
+        const source = String(sourceValue || '').trim();
+        const replacement = this.normalizeResponseValue(detail?.anonymizedValue ?? detail).trim();
+        if (!source || !replacement || replacement === source) return;
+        replacementMap.set(this.makeAnyMapKey(source), replacement);
+      });
+    });
+
+    payload.forEach((requestRow, index) => {
+      const sourceValues = Array.isArray(requestRow.values) ? requestRow.values : [];
+      const responseRow = rows[index];
+      const mappedValues = this.extractValuesArray(responseRow);
+
+      sourceValues.forEach((sourceValue, valueIndex) => {
+        const replacement = String(mappedValues[valueIndex] || '').trim();
+        if (!replacement || replacement === sourceValue) return;
+        replacementMap.set(this.makeMapKey(requestRow.utilityParameter, sourceValue), replacement);
+      });
+    });
+
+    return replacementMap;
+  }
+
+  extractRows(apiResponse) {
+    if (Array.isArray(apiResponse)) return apiResponse;
+    if (!apiResponse || typeof apiResponse !== 'object') return [];
+
+    const candidates = [
+      apiResponse.data,
+      apiResponse.results,
+      apiResponse.result,
+      apiResponse.outputs
+    ];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) return candidate;
+    }
+    return [];
+  }
+
+  extractValuesArray(responseRow) {
+    if (Array.isArray(responseRow)) {
+      return responseRow.map((item) => this.normalizeResponseValue(item));
+    }
+    if (!responseRow || typeof responseRow !== 'object') {
+      return [];
+    }
+
+    const keys = [
+      'values',
+      'anonymized_values',
+      'anonymizedValues',
+      'outputValues',
+      'outputs',
+      'result',
+      'results'
+    ];
+
+    for (const key of keys) {
+      if (Array.isArray(responseRow[key])) {
+        return responseRow[key].map((item) => this.normalizeResponseValue(item));
+      }
+    }
+
+    if (responseRow.data && typeof responseRow.data === 'object') {
+      for (const key of keys) {
+        if (Array.isArray(responseRow.data[key])) {
+          return responseRow.data[key].map((item) => this.normalizeResponseValue(item));
+        }
+      }
+    }
+
+    return [];
+  }
+
+  normalizeResponseValue(item) {
+    if (typeof item === 'string' || typeof item === 'number') {
+      return String(item);
+    }
+    if (!item || typeof item !== 'object') {
+      return '';
+    }
+
+    const keys = [
+      'anonymized',
+      'anonymizedValue',
+      'anonymized_value',
+      'output',
+      'value',
+      'masked',
+      'maskedValue'
+    ];
+
+    for (const key of keys) {
+      if (item[key] == null) continue;
+      return String(item[key]);
+    }
+
+    return '';
+  }
+
+  applyReplacement(item, replacementMap) {
+    const label = String(item?.label || '').toLowerCase();
+    const config = MDP_LABEL_CONFIG[label];
+    if (!config) return item;
+
+    const sourceValue = String(item?.text || '').trim();
+    if (!sourceValue) return item;
+
+    const replacement = replacementMap.get(this.makeMapKey(config.utilityParameter, sourceValue))
+      || replacementMap.get(this.makeAnyMapKey(sourceValue));
+    if (!replacement) return item;
+
+    return {
+      ...item,
+      anonymizedText: replacement
+    };
+  }
+
+  makeMapKey(utilityParameter, value) {
+    return `${utilityParameter}\u0000${value}`;
+  }
+
+  makeAnyMapKey(value) {
+    return `*\u0000${value}`;
+  }
+}
 
 function getDefaultCustomPatterns() {
   return [
@@ -502,6 +811,7 @@ class GLiNERDetector {
 }
 
 const detector = new GLiNERDetector();
+const anonymizer = new MayaDataAnonymizer();
 
 async function handleServerControl(command, options = {}) {
   try {
@@ -561,6 +871,7 @@ async function handleServerControl(command, options = {}) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'detectPII') {
     detector.detectPII(request.text, request.options)
+      .then((detections) => anonymizer.enrichDetections(detections, request.options))
       .then((detections) => {
         sendResponse({
           success: true,

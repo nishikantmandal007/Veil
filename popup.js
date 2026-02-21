@@ -100,7 +100,10 @@ class SettingsManager {
   constructor() {
     this.settings = {};
     this.stats = { detections: 0, redactions: 0 };
-    this.localSecrets = { hfToken: '' };
+    this.localSecrets = {
+      hfToken: '',
+      mdpJwtToken: ''
+    };
     this.serverBusy = false;
     this.serverPhase = 'disconnected';
     this.terminalVisible = false;
@@ -191,9 +194,10 @@ class SettingsManager {
 
   loadLocalSecrets() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['hfToken'], (result) => {
+      chrome.storage.local.get(['hfToken', 'mdpJwtToken'], (result) => {
         this.localSecrets = {
-          hfToken: typeof result.hfToken === 'string' ? result.hfToken : ''
+          hfToken: typeof result.hfToken === 'string' ? result.hfToken : '',
+          mdpJwtToken: typeof result.mdpJwtToken === 'string' ? result.mdpJwtToken : ''
         };
         resolve();
       });
@@ -271,6 +275,14 @@ class SettingsManager {
         this.saveHfToken();
       }
     });
+    document.getElementById('saveMdpCredsButton').addEventListener('click', () => this.saveMdpCredentials());
+    document.getElementById('clearMdpJwtButton').addEventListener('click', () => this.clearMdpJwt());
+    document.getElementById('mdpJwtInput').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        this.saveMdpCredentials();
+      }
+    });
 
     window.addEventListener('unload', () => {
       if (this.serverPollTimer) {
@@ -305,6 +317,7 @@ class SettingsManager {
     document.getElementById('selectorsInput').value = (this.settings.monitoredSelectors || []).join('\n');
     document.getElementById('patternsInput').value = JSON.stringify(this.settings.customPatterns || [], null, 2);
     document.getElementById('hfTokenInput').value = this.localSecrets.hfToken || '';
+    document.getElementById('mdpJwtInput').value = this.localSecrets.mdpJwtToken || '';
 
     this.renderStatus();
     this.renderStats();
@@ -385,7 +398,7 @@ class SettingsManager {
     const mode = this.settings.redactionMode === 'mask' ? 'Mask' : 'Anonymize';
     const modeBehavior = mode === 'Mask'
       ? 'Output format: [TYPE REDACTED].'
-      : 'Output format: <TYPE_N>.';
+      : 'Output format: API anonymized values (fallback: <TYPE_N>).';
 
     const sensitivityMap = {
       low: 'Low = strict precision mode (fewer detections).',
@@ -639,6 +652,11 @@ class SettingsManager {
     return String(node?.value || '').trim();
   }
 
+  getInputMdpJwtToken() {
+    const node = document.getElementById('mdpJwtInput');
+    return String(node?.value || '').trim();
+  }
+
   async saveHfToken() {
     const hfToken = this.getInputHfToken();
     await new Promise((resolve) => {
@@ -656,6 +674,25 @@ class SettingsManager {
     const input = document.getElementById('hfTokenInput');
     if (input) input.value = '';
     this.setMessage('HF token cleared.');
+  }
+
+  async saveMdpCredentials() {
+    const mdpJwtToken = this.getInputMdpJwtToken();
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ mdpJwtToken }, resolve);
+    });
+    this.localSecrets.mdpJwtToken = mdpJwtToken;
+    this.setMessage(mdpJwtToken ? 'Anonymization JWT saved locally.' : 'Anonymization JWT cleared.');
+  }
+
+  async clearMdpJwt() {
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ mdpJwtToken: '' }, resolve);
+    });
+    this.localSecrets.mdpJwtToken = '';
+    const input = document.getElementById('mdpJwtInput');
+    if (input) input.value = '';
+    this.setMessage('Anonymization JWT cleared.');
   }
 
   updateServerState(payload = {}) {

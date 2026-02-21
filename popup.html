@@ -76,6 +76,17 @@
                 <button id="clearHfTokenButton" type="button" class="secondary">Clear Token</button>
               </div>
               <p class="hint install-note">Stored locally in this browser profile only (`chrome.storage.local`).</p>
+
+              <p class="panel-title panel-subtitle">Anonymization API Credentials</p>
+              <label class="field field-tight" for="mdpJwtInput">
+                <span>MayaData JWT (used for anonymization API auth)</span>
+                <input id="mdpJwtInput" type="password" autocomplete="off" spellcheck="false" placeholder="Paste JWT token">
+              </label>
+              <div class="button-row">
+                <button id="saveMdpCredsButton" type="button" class="ghost">Save JWT</button>
+                <button id="clearMdpJwtButton" type="button" class="secondary">Clear JWT</button>
+              </div>
+              <p class="hint install-note">Used only when Redaction Mode is set to Anonymize.</p>
             </section>
             <section class="server-tool-panel">
               <p class="panel-title">Diagnostics</p>

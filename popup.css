@@ -280,6 +280,10 @@ body {
   color: #3f362a;
 }
 
+.panel-subtitle {
+  margin-top: 10px;
+}
+
 .diag-row {
   margin-top: 7px;
   display: grid;
@@ -397,7 +401,8 @@ button {
 
 select,
 textarea,
-.field input[type="password"] {
+.field input[type="password"],
+.field input[type="text"] {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -413,6 +418,7 @@ textarea {
 select:focus,
 textarea:focus,
 .field input[type="password"]:focus,
+.field input[type="text"]:focus,
 button:focus {
   outline: 2px solid #cbb89c;
   outline-offset: 1px;

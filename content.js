@@ -99,6 +99,8 @@ class PrivacyShield {
     this.lastDetectionSignature = new Map();
     this.debounceTimers = new Map();
     this.inputRevisions = new Map();
+    this.lastAnalyzedSnapshot = new Map();
+    this.postInteractionTimers = new Map();
     this.suppressedInput = new WeakSet();
     this.tokenTrays = new Map();
     this.scanningPills = new WeakMap();
@@ -110,6 +112,7 @@ class PrivacyShield {
     this.activePopoverHideTimer = null;
 
     this.domObserver = null;
+    this.stateReconcileTimer = null;
     this.handleViewportChange = () => this.repositionTokenTrays();
     this.handleRuntimeMessage = this.handleRuntimeMessage.bind(this);
     chrome.runtime.onMessage.addListener(this.handleRuntimeMessage);
@@ -226,8 +229,29 @@ class PrivacyShield {
 
   startMonitoring() {
     this.findInputElements();
+    this.startStateReconciler();
 
-    this.domObserver = new MutationObserver(() => this.findInputElements());
+    this.domObserver = new MutationObserver((mutations) => {
+      // Immediately clean up state for tracked elements that were removed from DOM
+      for (const mutation of mutations) {
+        for (const removed of mutation.removedNodes) {
+          if (!(removed instanceof HTMLElement)) continue;
+          // Check if the removed node itself is tracked
+          if (this.redactions.has(removed)) {
+            this.clearElementState(removed);
+          }
+          // Check children of the removed subtree
+          if (removed.querySelectorAll) {
+            this.monitoredElements.forEach((_listeners, element) => {
+              if (removed.contains(element)) {
+                this.clearElementState(element);
+              }
+            });
+          }
+        }
+      }
+      this.findInputElements();
+    });
     this.domObserver.observe(document.body, { childList: true, subtree: true });
 
     window.addEventListener('scroll', this.handleViewportChange, true);
@@ -258,6 +282,8 @@ class PrivacyShield {
   }
 
   findInputElements() {
+    this.pruneDisconnectedMonitoredElements();
+
     this.settings.monitoredSelectors.forEach((selector) => {
       const elements = document.querySelectorAll(selector);
       elements.forEach((element) => {
@@ -267,6 +293,129 @@ class PrivacyShield {
         }
       });
     });
+
+    // Some editors clear content programmatically after send without emitting
+    // input/blur. Ensure stale highlights are removed.
+    this.monitoredElements.forEach((_listeners, element) => {
+      if (!this.redactions.has(element)) return;
+      const text = this.getRawElementText(element);
+      if (!text || text.trim().length < 1) {
+        this.clearElementState(element);
+        // Clear stale caches to prevent cross-contamination with new composer elements
+        this.dismissedDetections.delete(element);
+        this.aliasLedgers.delete(element);
+      }
+    });
+  }
+
+  startStateReconciler() {
+    if (this.stateReconcileTimer) {
+      clearInterval(this.stateReconcileTimer);
+      this.stateReconcileTimer = null;
+    }
+    this.stateReconcileTimer = setInterval(() => this.reconcileElementStates(), 700);
+  }
+
+  reconcileElementStates() {
+    this.redactions.forEach((_state, element) => {
+      if (!element?.isConnected) {
+        this.clearElementState(element);
+        return;
+      }
+      if (this.isResponseArea(element)) {
+        this.clearElementState(element);
+        return;
+      }
+      if (!this.monitoredElements.has(element)) {
+        this.clearElementState(element);
+        return;
+      }
+
+      const raw = this.getRawElementText(element);
+      if (!raw || raw.trim().length < 1) {
+        this.clearElementState(element);
+      }
+    });
+
+    // ── Global orphan sweep: remove UI elements whose tracked element is gone ──
+    this.cleanupOrphanedUIElements();
+  }
+
+  cleanupOrphanedUIElements() {
+    const trackedIds = new Set();
+    this.monitoredElements.forEach((_listeners, element) => {
+      if (element?.isConnected && element.dataset?.psId) {
+        trackedIds.add(element.dataset.psId);
+      }
+    });
+
+    // Remove orphaned highlight overlays
+    document.querySelectorAll('.ps-highlight[data-element-id]').forEach((node) => {
+      const id = node.getAttribute('data-element-id');
+      if (!id || !trackedIds.has(id)) {
+        node.remove();
+      }
+    });
+
+    // Remove orphaned action bars, scanning pills, token trays
+    // (These are tracked in WeakMaps/Maps but may leak if element is GC'd)
+    this.actionBars.forEach?.((bar, element) => {
+      if (!element?.isConnected) {
+        bar.remove();
+        this.actionBars.delete(element);
+      }
+    });
+    this.tokenTrays.forEach((tray, element) => {
+      if (!element?.isConnected) {
+        tray.remove();
+        this.tokenTrays.delete(element);
+      }
+    });
+  }
+
+  pruneDisconnectedMonitoredElements() {
+    this.monitoredElements.forEach((listeners, element) => {
+      if (element?.isConnected) return;
+      this.cancelPostInteractionCleanup(element);
+      element.removeEventListener('input', listeners.handleInput);
+      element.removeEventListener('paste', listeners.handlePaste);
+      element.removeEventListener('blur', listeners.handleBlur);
+      element.removeEventListener('keydown', listeners.handleKeydown);
+      element.removeEventListener('compositionstart', listeners.handleCompositionStart);
+      element.removeEventListener('compositionend', listeners.handleCompositionEnd);
+      if (listeners.form && listeners.handleSubmit) {
+        listeners.form.removeEventListener('submit', listeners.handleSubmit);
+      }
+      this.clearElementState(element);
+      this.monitoredElements.delete(element);
+      this.inputRevisions.delete(element);
+      this.lastAnalyzedSnapshot.delete(element);
+    });
+  }
+
+  schedulePostInteractionCleanup(element) {
+    this.cancelPostInteractionCleanup(element);
+
+    const timers = [];
+    [180, 700, 1400].forEach((delay) => {
+      const timer = setTimeout(() => {
+        if (!this.redactions.has(element)) return;
+        const raw = this.getRawElementText(element);
+        if (!raw || raw.trim().length < 1 || this.isResponseArea(element)) {
+          this.clearElementState(element);
+        }
+      }, delay);
+      timers.push(timer);
+    });
+
+    this.postInteractionTimers.set(element, timers);
+  }
+
+  cancelPostInteractionCleanup(element) {
+    const timers = this.postInteractionTimers.get(element);
+    if (!timers) return;
+    timers.forEach((timer) => clearTimeout(timer));
+    this.postInteractionTimers.delete(element);
   }
 
   isElementEligible(element) {
@@ -298,12 +447,16 @@ class PrivacyShield {
   attachListeners(element) {
     const bumpAndSchedule = (reason) => {
       if (this.suppressedInput.has(element)) return;
+      this.cancelPostInteractionCleanup(element);
       this.bumpInputRevision(element);
       this.scheduleDetection(element, reason);
     };
     const handleInput = () => bumpAndSchedule('typing');
     const handlePaste = () => bumpAndSchedule('paste');
-    const handleBlur = () => this.scheduleDetection(element, 'blur');
+    const handleBlur = () => {
+      this.scheduleDetection(element, 'blur');
+      this.schedulePostInteractionCleanup(element);
+    };
     const handleCompositionStart = () => { element.dataset.psComposing = '1'; };
     const handleCompositionEnd = () => {
       element.dataset.psComposing = '';
@@ -314,6 +467,13 @@ class PrivacyShield {
       if (event.key === 'Enter' && !event.shiftKey && this.hasUnreviewedRedactions(element)) {
         event.preventDefault();
         this.showNotification('Review pending redactions before sending.', 'warning');
+      }
+      if (event.key === 'Enter' && !event.shiftKey && !event.defaultPrevented) {
+        // Immediately remove the highlight overlay so it doesn't linger
+        this.clearHighlights(element);
+        this.removeActionBar(element);
+        this.hideScanningPill(element);
+        this.schedulePostInteractionCleanup(element);
       }
     };
 
@@ -332,6 +492,7 @@ class PrivacyShield {
           event.preventDefault();
           this.showNotification('Review pending redactions before sending.', 'warning');
         }
+        this.schedulePostInteractionCleanup(element);
       };
       form.addEventListener('submit', handleSubmit);
     }
@@ -388,7 +549,7 @@ class PrivacyShield {
 
     const timer = setTimeout(() => {
       const currentRevision = this.getInputRevision(element);
-      if (reason !== 'blur' && currentRevision !== targetRevision) return;
+      if (currentRevision !== targetRevision) return;
       element.classList.remove('ps-awaiting-idle');
       this.detectAndHighlight(element, currentRevision);
     }, delay);
@@ -432,12 +593,23 @@ class PrivacyShield {
   // ═══════════════════════════════════════════════════════════
 
   async detectAndHighlight(element, expectedRevision = null) {
-    if (expectedRevision !== null && expectedRevision !== this.getInputRevision(element)) return;
+    const currentRevision = this.getInputRevision(element);
+    if (expectedRevision !== null && expectedRevision !== currentRevision) return;
 
     const sourceText = this.getElementText(element);
+    const snapshotKey = `${currentRevision}:${this.hashString(sourceText)}`;
+    if (this.lastAnalyzedSnapshot.get(element) === snapshotKey) return;
+    const currentState = this.redactions.get(element);
+
+    // Prevent re-detect loops when the semantic source text has not changed.
+    if (currentState?.sourceText === sourceText) {
+      this.lastAnalyzedSnapshot.set(element, snapshotKey);
+      return;
+    }
 
     if (!sourceText || sourceText.trim().length < 3) {
       this.clearElementState(element);
+      this.lastAnalyzedSnapshot.set(element, snapshotKey);
       return;
     }
 
@@ -449,6 +621,7 @@ class PrivacyShield {
         action: 'detectPII',
         text: sourceText,
         options: {
+          redactionMode: this.settings.redactionMode,
           threshold: this.getSensitivityThreshold(),
           enabledTypes: this.settings.enabledTypes,
           customPatterns: this.settings.customPatterns,
@@ -458,6 +631,7 @@ class PrivacyShield {
 
       if (!response?.success || !Array.isArray(response.detections) || response.detections.length === 0) {
         this.clearElementState(element);
+        this.lastAnalyzedSnapshot.set(element, snapshotKey);
         return;
       }
 
@@ -471,8 +645,27 @@ class PrivacyShield {
         const key = `${d.start}:${d.end}:${d.label}`;
         return !dismissed.has(key);
       });
+      detections = detections.filter((d) => !this.isSyntheticReplacementToken(d.text));
 
-      const existingState = this.redactions.get(element);
+      // ── Prevent re-anonymisation of already-treated text ──
+      // If there is existing state, filter out detections whose text matches
+      // any known replacement token or alias from the current redactions.
+      if (currentState && currentState.items.length > 0) {
+        const knownReplacements = new Set();
+        currentState.items.forEach((item) => {
+          if (item.alias) knownReplacements.add(`<${item.alias}>`);
+          if (item.anonymizedText) knownReplacements.add(item.anonymizedText);
+          if (item.replacement) knownReplacements.add(item.replacement);
+          // Also add the mask text variants
+          knownReplacements.add(this.getMaskText(item.label));
+        });
+        detections = detections.filter((d) => {
+          const text = String(d.text || '').trim();
+          return !knownReplacements.has(text);
+        });
+      }
+
+      const existingState = currentState;
       let newDetections = detections;
       if (existingState) {
         newDetections = this.mergeWithExistingDetections(existingState, detections);
@@ -543,9 +736,11 @@ class PrivacyShield {
         this.scheduleAutoRedact(element);
       }
 
-      this.updateStats(items.filter((i) => !i.redacted).length, 0);
+      this.updateStats(newItems.filter((i) => !i.redacted).length, 0);
+      this.lastAnalyzedSnapshot.set(element, snapshotKey);
     } catch (error) {
       console.error('[Privacy Shield] detection error:', error);
+      this.lastAnalyzedSnapshot.set(element, snapshotKey);
     } finally {
       this.hideScanningPill(element);
       this.setAnalyzingState(element, false);
@@ -580,6 +775,8 @@ class PrivacyShield {
   }
 
   getElementText(element) {
+    const state = this.redactions.get(element);
+
     if (element.isContentEditable || element.hasAttribute('contenteditable')) {
       // Reconstruct the TRUE user text by replacing redaction/underline
       // spans with their original values. This ensures the model always
@@ -591,13 +788,74 @@ class PrivacyShield {
         span.replaceWith(document.createTextNode(original));
       });
       const raw = clone.textContent || clone.innerText || '';
+      const normalized = raw
+        .replace(/\u00a0/g, ' ')
+        .replace(/\r/g, '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/\n{3,}/g, '\n\n');
+      return this.restoreKnownRedactions(normalized, state);
+    }
+
+    const rawValue = element.value || '';
+    if (!state || !Array.isArray(state.items) || state.items.length === 0) {
+      return rawValue;
+    }
+
+    const hasRedactedItems = state.items.some((item) => item.redacted);
+    if (!hasRedactedItems) return rawValue;
+
+    const renderedFromState = this.buildRenderedText(state);
+    if (rawValue === renderedFromState) {
+      return state.sourceText || rawValue;
+    }
+
+    return this.restoreKnownRedactions(rawValue, state);
+  }
+
+  getRawElementText(element) {
+    if (!element) return '';
+
+    if (this.isContentEditableElement(element)) {
+      const raw = element.textContent || element.innerText || '';
       return raw
         .replace(/\u00a0/g, ' ')
         .replace(/\r/g, '')
         .replace(/[ \t]{2,}/g, ' ')
         .replace(/\n{3,}/g, '\n\n');
     }
-    return element.value || '';
+
+    return String(element.value || '');
+  }
+
+  restoreKnownRedactions(rawValue, state) {
+    if (!state || !Array.isArray(state.items) || state.items.length === 0) {
+      return String(rawValue || '');
+    }
+
+    let restored = String(rawValue || '');
+    const redactedItems = state.items
+      .filter((item) => item.redacted)
+      .slice()
+      .sort((a, b) => this.getReplacementText(b, state.mode).length - this.getReplacementText(a, state.mode).length);
+
+    redactedItems.forEach((item) => {
+      const replacement = this.getReplacementText(item, state.mode);
+      if (!replacement || replacement === item.text) return;
+      if (!restored.includes(replacement)) return;
+      restored = restored.split(replacement).join(item.text);
+    });
+
+    return restored;
+  }
+
+  isSyntheticReplacementToken(value) {
+    const text = String(value || '').trim();
+    if (!text) return true;
+    if (/^<\s*[A-Z][A-Z0-9_]{1,40}\s*>$/.test(text)) return true;
+    if (/^\[[^\]]*redacted[^\]]*\]$/i.test(text)) return true;
+    if (/<\s*[A-Z][A-Z0-9_]{1,40}\s*>/.test(text)) return true;
+    if (/\[[^\]]*redacted[^\]]*\]/i.test(text)) return true;
+    return false;
   }
 
   setAnalyzingState(element, isAnalyzing) {
@@ -660,6 +918,7 @@ class PrivacyShield {
     return {
       ...detection,
       alias,
+      anonymizedText: detection.anonymizedText ? String(detection.anonymizedText) : null,
       replacement: detection.replacement ? String(detection.replacement) : null,
       redacted: false,   // Start as underlined, NOT redacted
       reviewed: false
@@ -939,7 +1198,6 @@ class PrivacyShield {
     span.setAttribute('data-ps-original', String(item.text || ''));
     span.style.setProperty('--detection-color', this.getTypeColor(item.label));
     span.style.setProperty('--stagger', `${Math.min(index * 40, 300)}ms`);
-    span.contentEditable = 'false';
     span.textContent = item.text;
 
     span.addEventListener('mouseenter', () => {
@@ -966,7 +1224,6 @@ class PrivacyShield {
     span.setAttribute('data-ps-original', String(item.text || ''));
     span.style.setProperty('--redaction-color', this.getTypeColor(item.label));
     span.style.setProperty('--stagger', `${Math.min(index * 30, 280)}ms`);
-    span.contentEditable = 'false';
 
     if (item.redacted) {
       span.classList.add('ps-redaction-active');
@@ -1030,9 +1287,10 @@ class PrivacyShield {
     return output;
   }
 
-  getReplacementText(item) {
+  getReplacementText(item, modeOverride = this.settings.redactionMode) {
     if (!item.redacted) return item.text;
-    if (this.settings.redactionMode === 'anonymize') {
+    if (modeOverride === 'anonymize') {
+      if (item.anonymizedText) return item.anonymizedText;
       return `<${item.alias}>`;
     }
     if (item.replacement) return item.replacement;
@@ -1404,6 +1662,7 @@ class PrivacyShield {
           start: i.start,
           end: i.end,
           alias: i.alias,
+          anonymizedText: i.anonymizedText || null,
           replacement: i.replacement,
           redacted: i.redacted,
           reviewed: i.reviewed,
@@ -1450,22 +1709,35 @@ class PrivacyShield {
   }
 
   playCommitAnimation(element) {
-    element.classList.remove('ps-redaction-commit');
-    requestAnimationFrame(() => {
-      element.classList.add('ps-redaction-commit');
-      setTimeout(() => element.classList.remove('ps-redaction-commit'), 520);
-    });
+    // Disabled intentionally: the commit animation feels noisy and can make
+    // repeated reflows more noticeable on chat composer UIs.
+    return;
   }
 
   clearElementState(element) {
     this.clearHighlights(element);
     this.redactions.delete(element);
     this.lastDetectionSignature.delete(element);
+    this.lastAnalyzedSnapshot.delete(element);
+    this.cancelPostInteractionCleanup(element);
     element.classList.remove('ps-awaiting-idle', 'ps-analyzing', 'ps-redaction-commit');
     this.removeTokenTray(element);
     this.removeActionBar(element);
     this.hideScanningPill(element);
     this.cancelAutoRedact(element);
+
+    // Strip injected PII spans from contenteditable elements to avoid visual artifacts
+    if (this.isContentEditableElement(element) && element.isConnected) {
+      const spans = element.querySelectorAll('.ps-pii-underline, .ps-redaction');
+      if (spans.length > 0) {
+        this.withSuppressedInput(element, () => {
+          spans.forEach((span) => {
+            const original = span.getAttribute('data-ps-original') || span.textContent || '';
+            span.replaceWith(document.createTextNode(original));
+          });
+        });
+      }
+    }
   }
 
   clearHighlights(element) {
@@ -1571,7 +1843,12 @@ class PrivacyShield {
     this.monitoredElements.clear();
     this.redactions.clear();
     this.inputRevisions.clear();
+    this.lastAnalyzedSnapshot.clear();
     this.lastDetectionSignature.clear();
+    this.postInteractionTimers.forEach((timers) => {
+      timers.forEach((timer) => clearTimeout(timer));
+    });
+    this.postInteractionTimers.clear();
 
     this.debounceTimers.forEach((timer) => clearTimeout(timer));
     this.debounceTimers.clear();
@@ -1584,6 +1861,10 @@ class PrivacyShield {
     if (this.domObserver) {
       this.domObserver.disconnect();
       this.domObserver = null;
+    }
+    if (this.stateReconcileTimer) {
+      clearInterval(this.stateReconcileTimer);
+      this.stateReconcileTimer = null;
     }
 
     window.removeEventListener('scroll', this.handleViewportChange, true);

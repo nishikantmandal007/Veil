@@ -81,6 +81,12 @@ You can also set the token directly in the extension popup:
 curl http://127.0.0.1:8765/health
 ```
 
+If you use anonymization mode with MayaData proxying, set endpoint in local `.env`:
+
+```bash
+MDP_ANONYMIZATION_ENDPOINT=https://app.mayadataprivacy.in/mdp/engine/anonymization
+```
+
 5. Load extension:
 1. Open `chrome://extensions/`
 2. Enable Developer Mode
@@ -157,7 +163,10 @@ Set which fields are inspected, for example:
 
 ## Notes
 
-- All prompt analysis remains local to your machine.
+- GLiNER2 detection runs locally on your machine.
+- In anonymize mode, the browser sends text only to local server (`127.0.0.1`);
+  server-side proxy forwards anonymization requests to
+  `MDP_ANONYMIZATION_ENDPOINT` from `.env`.
 - If local GLiNER2 is down, extension falls back to regex detections.
 - Native host manifest still lives under Chrome's native messaging directory
   (for example `~/.config/google-chrome/NativeMessagingHosts/`), as required by Chrome.

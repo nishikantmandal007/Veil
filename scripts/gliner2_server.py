@@ -3,7 +3,8 @@
 Local GLiNER2 inference bridge for the Privacy Shield extension.
 
 The service binds to localhost by default and never forwards prompt text to any
-external API.
+external API except optional anonymization proxy requests made to a configured
+endpoint from local `.env`.
 """
 
 import argparse
@@ -11,9 +12,12 @@ import json
 import os
 import sys
 import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from urllib.parse import urlparse
 
 DEFAULT_MODEL = "fastino/gliner2-base-v1"
@@ -33,6 +37,166 @@ DEFAULT_LABELS = [
     "location",
     "organization",
 ]
+REPO_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE = REPO_DIR / ".env"
+ANON_ENDPOINT_ENV_KEY = "MDP_ANONYMIZATION_ENDPOINT"
+ANON_REQUEST_TIMEOUT_SEC = 10.0
+
+
+def parse_simple_env_file(path: Path) -> Dict[str, str]:
+    values: Dict[str, str] = {}
+    if not path.exists():
+        return values
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return values
+
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key.startswith("export "):
+            key = key[len("export "):].strip()
+        if not key:
+            continue
+
+        cleaned = value.strip()
+        if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in {"'", '"'}:
+            cleaned = cleaned[1:-1]
+        values[key] = cleaned
+
+    return values
+
+
+def resolve_anonymization_endpoint() -> str:
+    direct = str(os.environ.get(ANON_ENDPOINT_ENV_KEY, "")).strip()
+    if direct:
+        return direct
+
+    file_values = parse_simple_env_file(ENV_FILE)
+    return str(file_values.get(ANON_ENDPOINT_ENV_KEY, "")).strip()
+
+
+def extract_bearer_token(header_value: str) -> str:
+    raw = str(header_value or "").strip()
+    if not raw:
+        return ""
+    lower = raw.lower()
+    if lower.startswith("bearer "):
+        return raw[7:].strip()
+    return raw
+
+
+def mask_token(token: str) -> str:
+    value = str(token or "")
+    if not value:
+        return "<empty>"
+    if len(value) <= 12:
+        return f"{value[:2]}***{value[-2:]}"
+    return f"{value[:6]}...{value[-6:]}"
+
+
+def compact_json(value: Any, max_chars: int = 6000) -> str:
+    try:
+        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        encoded = repr(value)
+    if len(encoded) <= max_chars:
+        return encoded
+    return f"{encoded[:max_chars]}...<truncated {len(encoded) - max_chars} chars>"
+
+
+def log_anonymization(event: str, request_id: str, **fields: Any) -> None:
+    payload = {"event": event, "request_id": request_id, **fields}
+    print(f"[anonymize] {compact_json(payload)}", flush=True)
+
+
+def proxy_anonymization(entries: List[Any], jwt_token: str, request_id: str) -> Any:
+    if not isinstance(entries, list):
+        raise ValueError("entries must be a JSON array.")
+    if not entries:
+        log_anonymization("skip.empty_entries", request_id, entries_count=0)
+        return []
+
+    token = str(jwt_token or "").strip()
+    if not token:
+        log_anonymization("error.missing_jwt", request_id, entries_count=len(entries))
+        raise ValueError("Missing anonymization JWT token.")
+
+    endpoint = resolve_anonymization_endpoint()
+    if not endpoint:
+        log_anonymization("error.missing_endpoint", request_id, env_key=ANON_ENDPOINT_ENV_KEY)
+        raise RuntimeError(
+            f"Missing {ANON_ENDPOINT_ENV_KEY}. Set it in .env or process environment."
+        )
+
+    log_anonymization(
+        "request.outbound",
+        request_id,
+        endpoint=endpoint,
+        jwt=mask_token(token),
+        entries_count=len(entries),
+        entries=entries,
+    )
+
+    request_body = json.dumps(entries).encode("utf-8")
+    upstream = urlrequest.Request(
+        endpoint,
+        data=request_body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    try:
+        with urlrequest.urlopen(upstream, timeout=ANON_REQUEST_TIMEOUT_SEC) as response:
+            status_code = int(getattr(response, "status", 200))
+            raw = response.read().decode("utf-8")
+    except urlerror.HTTPError as exc:
+        try:
+            body = exc.read().decode("utf-8", errors="replace").strip()
+        except Exception:
+            body = ""
+        log_anonymization(
+            "response.http_error",
+            request_id,
+            status=int(getattr(exc, "code", 0) or 0),
+            body_preview=body[:1200],
+        )
+        detail = body[:320] if body else str(exc)
+        raise RuntimeError(f"Upstream anonymization failed ({exc.code}): {detail}") from exc
+    except urlerror.URLError as exc:
+        log_anonymization("response.network_error", request_id, reason=str(exc.reason))
+        raise RuntimeError(f"Unable to reach anonymization endpoint: {exc.reason}") from exc
+
+    if not raw.strip():
+        log_anonymization("response.empty", request_id, status=status_code)
+        return []
+
+    try:
+        parsed = json.loads(raw)
+        log_anonymization(
+            "response.inbound",
+            request_id,
+            status=status_code,
+            response=parsed,
+        )
+        return parsed
+    except json.JSONDecodeError as exc:
+        log_anonymization(
+            "response.non_json",
+            request_id,
+            status=status_code,
+            body_preview=raw[:1200],
+        )
+        raise RuntimeError("Anonymization endpoint returned non-JSON response.") from exc
 
 
 def flatten_gliner2_output(raw_items: Any) -> List[Dict[str, Any]]:
@@ -333,14 +497,14 @@ class GLiNERService:
 
 def make_handler(service: GLiNERService, max_chars: int):
     class Handler(BaseHTTPRequestHandler):
-        def _write_json(self, payload: Dict[str, Any], status_code: int = 200) -> None:
+        def _write_json(self, payload: Any, status_code: int = 200) -> None:
             body = json.dumps(payload).encode("utf-8")
             try:
                 self.send_response(status_code)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -348,7 +512,7 @@ def make_handler(service: GLiNERService, max_chars: int):
                 # Browser disconnected while we were sending response.
                 pass
 
-        def _read_json(self) -> Dict[str, Any]:
+        def _read_json(self) -> Any:
             content_length = int(self.headers.get("Content-Length", "0"))
             if content_length <= 0:
                 return {}
@@ -371,6 +535,8 @@ def make_handler(service: GLiNERService, max_chars: int):
                         "model_source": service.model_source,
                         "backend": service.backend,
                         "loaded": service.model is not None,
+                        "anonymizationProxy": True,
+                        "anonymizationEndpointConfigured": bool(resolve_anonymization_endpoint()),
                     }
                 )
                 return
@@ -378,29 +544,58 @@ def make_handler(service: GLiNERService, max_chars: int):
 
         def do_POST(self) -> None:  # noqa: N802
             path = urlparse(self.path).path
-            if path != "/detect":
-                self._write_json({"ok": False, "error": "Not found"}, status_code=404)
-                return
 
             try:
                 payload = self._read_json()
-                text = str(payload.get("text", ""))
-                labels = payload.get("labels", DEFAULT_LABELS)
-                threshold = payload.get("threshold", service.default_threshold)
+                if path == "/detect":
+                    text = str(payload.get("text", ""))
+                    labels = payload.get("labels", DEFAULT_LABELS)
+                    threshold = payload.get("threshold", service.default_threshold)
 
-                try:
-                    threshold = float(threshold)
-                except (TypeError, ValueError):
-                    threshold = service.default_threshold
+                    try:
+                        threshold = float(threshold)
+                    except (TypeError, ValueError):
+                        threshold = service.default_threshold
 
-                if len(text) > max_chars:
-                    text = text[:max_chars]
+                    if len(text) > max_chars:
+                        text = text[:max_chars]
 
-                detections = service.detect(text, labels, threshold)
-                self._write_json({"ok": True, "detections": detections}, status_code=200)
+                    detections = service.detect(text, labels, threshold)
+                    self._write_json({"ok": True, "detections": detections}, status_code=200)
+                    return
+
+                if path == "/anonymize":
+                    request_id = uuid.uuid4().hex[:10]
+                    entries = payload
+                    jwt_token = ""
+                    if isinstance(payload, dict):
+                        entries = payload.get("entries", payload.get("payload", []))
+                        jwt_token = str(payload.get("jwtToken", "")).strip()
+                    if not jwt_token:
+                        jwt_token = extract_bearer_token(self.headers.get("Authorization", ""))
+
+                    input_count = len(entries) if isinstance(entries, list) else None
+                    log_anonymization(
+                        "route.inbound",
+                        request_id,
+                        has_inline_jwt=bool(jwt_token),
+                        entries_count=input_count,
+                    )
+
+                    result = proxy_anonymization(entries, jwt_token, request_id)
+                    self._write_json({"ok": True, "data": result}, status_code=200)
+                    return
+
+                self._write_json({"ok": False, "error": "Not found"}, status_code=404)
             except (BrokenPipeError, ConnectionResetError):
                 # Client disconnected before receiving server output.
                 return
+            except json.JSONDecodeError:
+                self._write_json({"ok": False, "error": "Invalid JSON body."}, status_code=400)
+            except ValueError as exc:
+                self._write_json({"ok": False, "error": str(exc)}, status_code=400)
+            except RuntimeError as exc:
+                self._write_json({"ok": False, "error": str(exc)}, status_code=502)
             except Exception as exc:
                 self._write_json({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -452,7 +647,7 @@ def main() -> None:
     handler = make_handler(service, args.max_chars)
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"GLiNER2 local server listening on http://{args.host}:{args.port}")
-    print("Endpoints: GET /health, POST /detect")
+    print("Endpoints: GET /health, POST /detect, POST /anonymize")
     server.serve_forever()
 
 
