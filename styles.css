@@ -14,39 +14,19 @@
   pointer-events: none;
   border-radius: 12px;
   opacity: 0;
-  transform: scale(0.995);
   border: 1px solid color-mix(in srgb, var(--detection-color, #00796b) 55%, white);
   background: linear-gradient(120deg,
       color-mix(in srgb, var(--detection-color, #00796b) 4%, transparent),
       color-mix(in srgb, var(--detection-color, #00796b) 8%, transparent));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--detection-color, #00796b) 16%, transparent);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition: opacity 150ms ease;
 }
 
 .ps-highlight.ps-visible {
   opacity: 1;
-  transform: scale(1);
 }
 
-.ps-highlight.ps-pulse {
-  animation: ps-soft-breathe 3s ease-in-out 1;
-}
-
-@keyframes ps-soft-breathe {
-
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--detection-color, #00796b) 20%, transparent),
-      0 8px 18px color-mix(in srgb, var(--detection-color, #00796b) 12%, transparent);
-  }
-
-  50% {
-    box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--detection-color, #00796b) 30%, transparent),
-      0 10px 24px color-mix(in srgb, var(--detection-color, #00796b) 18%, transparent);
-  }
-}
+/* ps-pulse: no animation — static highlight is sufficient */
 
 /* ─── Detection label pill above the field ─── */
 .ps-label {
@@ -65,18 +45,16 @@
       color-mix(in srgb, var(--detection-color, #00796b) 78%, black),
       color-mix(in srgb, var(--detection-color, #00796b) 96%, black));
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
-  animation: ps-label-slide 280ms ease;
+  animation: ps-label-fade 180ms ease;
 }
 
-@keyframes ps-label-slide {
+@keyframes ps-label-fade {
   from {
     opacity: 0;
-    transform: translateY(4px) scale(0.98);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -96,35 +74,16 @@
   color: #f0f9ff;
   background: linear-gradient(135deg, rgba(14, 165, 233, 0.92), rgba(6, 95, 140, 0.94));
   border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.3), 0 0 0 1px rgba(14, 165, 233, 0.12);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
   pointer-events: none;
   opacity: 0;
   transform: translateY(3px);
-  transition: opacity 200ms ease, transform 200ms ease;
-  overflow: hidden;
-}
-
-.ps-scanning-pill::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
-  animation: ps-pill-shimmer 1.6s ease-in-out infinite;
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .ps-scanning-pill.ps-scanning-pill-visible {
   opacity: 1;
   transform: translateY(0);
-}
-
-@keyframes ps-pill-shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 /* ─── PII underline (Grammarly-style – before redaction) ─── */
@@ -137,17 +96,15 @@
   border-radius: 2px;
   padding: 0 1px;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    box-shadow 160ms ease;
-  animation: ps-underline-reveal 350ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+    border-color 120ms ease,
+    background-color 120ms ease;
+  animation: ps-underline-reveal 250ms ease both;
   animation-delay: var(--stagger, 0ms);
 }
 
 .ps-pii-underline:hover {
   border-bottom-style: solid;
   background: color-mix(in srgb, var(--detection-color, #D32F2F) 14%, transparent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--detection-color, #D32F2F) 20%, transparent);
 }
 
 @keyframes ps-underline-reveal {
@@ -177,15 +134,14 @@
   line-height: inherit;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition: color 120ms ease, background-color 120ms ease;
 }
 
 .ps-redaction-active {
   color: color-mix(in srgb, var(--redaction-color, #00695c) 85%, black);
   background: color-mix(in srgb, var(--redaction-color, #00695c) 12%, transparent);
   border-bottom: 2px solid color-mix(in srgb, var(--redaction-color, #00695c) 60%, transparent);
-  box-shadow: none;
-  animation: ps-redact-sweep 380ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation: ps-redact-sweep 280ms ease both;
   animation-delay: var(--stagger, 0ms);
 }
 
@@ -209,7 +165,6 @@
   color: inherit;
   background: color-mix(in srgb, #dbeafe 40%, transparent);
   border-bottom: 2px dashed color-mix(in srgb, var(--redaction-color, #00695c) 30%, transparent);
-  box-shadow: none;
 }
 
 /* Hover preview on redacted items – show original text underneath */
@@ -217,26 +172,6 @@
   color: #1f2937;
   background: color-mix(in srgb, #fde68a 50%, transparent);
   border-bottom-color: rgba(146, 64, 14, 0.3);
-  box-shadow: none;
-}
-
-/* Undo/redo ripple animation */
-.ps-undo-ripple {
-  animation: ps-undo-ripple 400ms ease-out;
-}
-
-@keyframes ps-undo-ripple {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-  }
-
-  50% {
-    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.15);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-  }
 }
 
 /* ─── Popover (per-span anchored tooltip) ─── */
@@ -254,16 +189,15 @@
   box-shadow: 0 8px 28px rgba(2, 6, 23, 0.36);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(6px) scale(0.96);
-  transition: opacity 180ms cubic-bezier(0.22, 0.8, 0.2, 1),
-    transform 180ms cubic-bezier(0.22, 0.8, 0.2, 1);
+  transform: translateY(4px);
+  transition: opacity 150ms ease, transform 150ms ease;
   font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .ps-popover.ps-popover-visible {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
 }
 
 /* Arrow */
@@ -315,12 +249,11 @@
   color: #f8fafc;
   background: rgba(148, 163, 184, 0.18);
   cursor: pointer;
-  transition: transform 140ms ease, background-color 140ms ease;
+  transition: background-color 120ms ease;
   text-align: center;
 }
 
 .ps-popover-btn:hover {
-  transform: translateY(-1px);
   background: rgba(148, 163, 184, 0.35);
 }
 
@@ -369,7 +302,7 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(4px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .ps-action-bar.ps-action-bar-visible {
@@ -388,11 +321,11 @@
   letter-spacing: 0.02em;
   color: #f8fafc;
   cursor: pointer;
-  transition: transform 120ms ease, background-color 120ms ease;
+  transition: background-color 120ms ease;
 }
 
 .ps-action-bar-btn:hover {
-  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
 .ps-action-bar-btn-redact {
@@ -431,8 +364,8 @@
   border: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
   opacity: 0;
-  transform: translateY(5px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transform: translateY(4px);
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .ps-token-tray-visible {
@@ -448,7 +381,7 @@
   font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
   padding: 6px 10px;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: background-color 120ms ease;
 }
 
 .ps-token-chip.is-redacted {
@@ -464,8 +397,7 @@
 }
 
 .ps-token-chip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+  opacity: 0.85;
 }
 
 .ps-token-chip.is-hover-preview {
@@ -473,73 +405,14 @@
   background: linear-gradient(135deg, #fef9c3, #fde68a);
 }
 
-/* ─── Analyzing / Idle states ─── */
+/* ─── Analyzing / Idle states (no animation — static hint only) ─── */
 .ps-analyzing {
   position: relative;
-  animation: ps-input-scan 1150ms ease-in-out infinite;
+  outline: 1px solid rgba(14, 165, 233, 0.12);
+  outline-offset: 2px;
 }
 
-.ps-awaiting-idle {
-  animation: ps-idle-await 980ms ease-in-out infinite;
-}
-
-@keyframes ps-input-scan {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
-  }
-
-  50% {
-    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.10);
-  }
-}
-
-@keyframes ps-idle-await {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
-  }
-
-  50% {
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.10);
-  }
-}
-
-/* Commit shimmer on the whole element */
-.ps-redaction-commit {
-  animation:
-    ps-redaction-commit 520ms cubic-bezier(0.22, 0.9, 0.24, 1),
-    ps-redaction-shimmer 900ms ease-out;
-}
-
-@keyframes ps-redaction-commit {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.18);
-    filter: saturate(1.05);
-  }
-
-  45% {
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.28);
-    filter: saturate(1.12);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-    filter: saturate(1);
-  }
-}
-
-@keyframes ps-redaction-shimmer {
-  0% {
-    background-position: 0% 50%;
-  }
-
-  100% {
-    background-position: -180% 50%;
-  }
-}
+/* .ps-awaiting-idle — no styles needed; typing state is implicit */
 
 /* ─── Toast notifications ─── */
 .ps-notification {
@@ -557,8 +430,8 @@
   font-size: 13px;
   line-height: 1.35;
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transform: translateY(6px);
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .ps-notification-visible {

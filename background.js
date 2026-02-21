@@ -74,6 +74,38 @@ const MDP_LABEL_CONFIG = Object.freeze({
   })
 });
 
+// ═══════════════════════════════════════════════════════════
+// JWT Utilities
+// ═══════════════════════════════════════════════════════════
+
+function decodeJwtPayload(token) {
+  try {
+    const raw = String(token || '').trim();
+    if (!raw) return null;
+    const parts = raw.split('.');
+    if (parts.length !== 3) return null;
+    // Base64url → Base64 → decode
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function isJwtExpired(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== 'number') return false;
+  // exp is seconds since epoch; add 30s grace
+  return (payload.exp + 30) * 1000 < Date.now();
+}
+
+function getJwtExpiryMs(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== 'number') return null;
+  return payload.exp * 1000;
+}
+
 class MayaDataAnonymizer {
   constructor() {
     this.timeoutMs = 6000;
@@ -82,34 +114,48 @@ class MayaDataAnonymizer {
 
   async enrichDetections(detections, options = {}) {
     if (options?.redactionMode !== 'anonymize') {
-      return detections;
+      return { detections, jwtExpired: false, jwtError: null };
     }
     if (!Array.isArray(detections) || detections.length === 0) {
-      return detections;
+      return { detections, jwtExpired: false, jwtError: null };
     }
 
     const supportedDetections = detections.filter((item) => MDP_LABEL_CONFIG[String(item?.label || '').toLowerCase()]);
     if (supportedDetections.length === 0) {
-      return detections;
+      return { detections, jwtExpired: false, jwtError: null };
     }
 
     const credentials = await this.getCredentials();
     if (!credentials.jwtToken) {
-      return detections;
+      return { detections, jwtExpired: false, jwtError: 'No JWT token configured.' };
+    }
+
+    // Check JWT expiry before making API call
+    if (isJwtExpired(credentials.jwtToken)) {
+      console.warn('[Privacy Shield] JWT token has expired.');
+      return { detections, jwtExpired: true, jwtError: 'JWT token has expired.' };
     }
 
     const payload = this.buildPayload(supportedDetections, credentials.seed);
     if (payload.length === 0) {
-      return detections;
+      return { detections, jwtExpired: false, jwtError: null };
     }
 
     try {
       const apiResponse = await this.callApi(credentials.jwtToken, payload);
       const replacements = this.extractReplacementMap(payload, apiResponse);
-      return detections.map((item) => this.applyReplacement(item, replacements));
+      const enriched = detections.map((item) => this.applyReplacement(item, replacements));
+      return { detections: enriched, jwtExpired: false, jwtError: null };
     } catch (error) {
-      console.warn('[Privacy Shield] anonymization request failed:', error?.message || String(error));
-      return detections;
+      const msg = error?.message || String(error);
+      console.warn('[Privacy Shield] anonymization request failed:', msg);
+      // Check if this is an auth/expiry error from upstream
+      const isAuthError = /401|403|unauthorized|expired|invalid.?token/i.test(msg);
+      return {
+        detections,
+        jwtExpired: isAuthError,
+        jwtError: msg
+      };
     }
   }
 
@@ -720,7 +766,8 @@ class GLiNERDetector {
     }
 
     if (enabledTypes.includes('credit_card')) {
-      const regex = /\b(?:\d[ -]*?){13,16}\b/g;
+      // Require grouped format to avoid matching phone numbers/timestamps
+      const regex = /\b(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))[- ]?\d{4}[- ]?\d{4}[- ]?\d{3,4}\b/g;
       let match;
       while ((match = regex.exec(text)) !== null) push(match, 'credit_card', 0.9);
     }
@@ -872,11 +919,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'detectPII') {
     detector.detectPII(request.text, request.options)
       .then((detections) => anonymizer.enrichDetections(detections, request.options))
-      .then((detections) => {
+      .then((result) => {
         sendResponse({
           success: true,
-          detections,
-          mode: detector.mode
+          detections: result.detections,
+          mode: detector.mode,
+          jwtExpired: result.jwtExpired || false,
+          jwtError: result.jwtError || null
         });
       })
       .catch((error) => {
@@ -908,6 +957,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       mode: detector.mode,
       localServerUrl: detector.localServerUrl
     });
+    return false;
+  }
+
+  if (request.action === 'checkJwtStatus') {
+    anonymizer.getCredentials().then((creds) => {
+      if (!creds.jwtToken) {
+        sendResponse({ configured: false, expired: false, expiresAt: null });
+        return;
+      }
+      const expired = isJwtExpired(creds.jwtToken);
+      const expiresAt = getJwtExpiryMs(creds.jwtToken);
+      sendResponse({ configured: true, expired, expiresAt });
+    }).catch(() => {
+      sendResponse({ configured: false, expired: false, expiresAt: null });
+    });
+    return true;
   }
 
   if (request.action === 'serverControl') {
@@ -938,9 +1003,69 @@ chrome.runtime.onInstalled.addListener(() => {
       'poe.com'
     ]
   });
-  detector.warmUpIfAvailable().catch(() => {});
+  detector.warmUpIfAvailable().catch(() => { });
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  detector.warmUpIfAvailable().catch(() => {});
+  detector.warmUpIfAvailable().catch(() => { });
+});
+
+// ═══════════════════════════════════════════════════════════
+// JWT Expiry Monitoring
+// ═══════════════════════════════════════════════════════════
+
+const JWT_CHECK_ALARM_NAME = 'ps-jwt-expiry-check';
+const JWT_EXPIRY_WARNING_MINUTES = 10;
+
+async function checkAndNotifyJwtExpiry() {
+  try {
+    const creds = await anonymizer.getCredentials();
+    if (!creds.jwtToken) return;
+
+    const expiresAt = getJwtExpiryMs(creds.jwtToken);
+    if (expiresAt === null) return;
+
+    const now = Date.now();
+    const minutesLeft = (expiresAt - now) / 60000;
+
+    if (minutesLeft <= 0) {
+      // Expired — notify all content scripts
+      broadcastToContentScripts({
+        action: 'jwtExpired',
+        message: 'Your anonymization JWT has expired. Please update it in extension settings.'
+      });
+    } else if (minutesLeft <= JWT_EXPIRY_WARNING_MINUTES) {
+      // Expiring soon — warn
+      broadcastToContentScripts({
+        action: 'jwtExpiringSoon',
+        message: `Your anonymization JWT expires in ${Math.ceil(minutesLeft)} minute(s).`,
+        minutesLeft: Math.ceil(minutesLeft)
+      });
+    }
+  } catch { /* best-effort */ }
+}
+
+function broadcastToContentScripts(message) {
+  chrome.tabs.query({}, (tabs) => {
+    (tabs || []).forEach((tab) => {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, message).catch(() => { });
+      }
+    });
+  });
+}
+
+// Check JWT every 5 minutes
+chrome.alarms.create(JWT_CHECK_ALARM_NAME, { periodInMinutes: 5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === JWT_CHECK_ALARM_NAME) {
+    checkAndNotifyJwtExpiry();
+  }
+});
+
+// Check immediately when JWT token is changed
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.mdpJwtToken) {
+    checkAndNotifyJwtExpiry();
+  }
 });
