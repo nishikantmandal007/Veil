@@ -107,7 +107,6 @@ class PrivacyShield {
     this.actionBars = new WeakMap();
     this.autoRedactTimers = new Map();
     this.dismissedDetections = new WeakMap(); // element → Set of "start:end:label"
-    this._lastJwtNotificationTs = 0; // cooldown timestamp for JWT expiry notifications
 
     this.activePopover = null;
     this.activePopoverHideTimer = null;
@@ -358,24 +357,14 @@ class PrivacyShield {
       }
     });
 
-    // Remove orphaned action bars by DOM selector
-    document.querySelectorAll('.ps-action-bar[data-element-id]').forEach((bar) => {
-      const id = bar.getAttribute('data-element-id');
-      if (!id || !trackedIds.has(id)) {
+    // Remove orphaned action bars, scanning pills, token trays
+    // (These are tracked in WeakMaps/Maps but may leak if element is GC'd)
+    this.actionBars.forEach?.((bar, element) => {
+      if (!element?.isConnected) {
         bar.remove();
+        this.actionBars.delete(element);
       }
     });
-
-    // Remove orphaned scanning pills (stale > 8s)
-    document.querySelectorAll('.ps-scanning-pill').forEach((pill) => {
-      if (pill.dataset.psCreated && Date.now() - Number(pill.dataset.psCreated) > 8000) {
-        pill.remove();
-      }
-    });
-
-    // actionBars and scanningPills are WeakMaps — they have no forEach.
-    // WeakMap will garbage-collect entries when the element is GC'd.
-    // Only tokenTrays (a regular Map) needs explicit cleanup.
     this.tokenTrays.forEach((tray, element) => {
       if (!element?.isConnected) {
         tray.remove();
@@ -639,15 +628,6 @@ class PrivacyShield {
           includeRegexWhenModelOnline: this.settings.includeRegexWhenModelOnline
         }
       });
-
-      // ── JWT expiry notification (inline, from detectPII response) ──
-      if (response?.jwtExpired || response?.jwtError) {
-        this.handleJwtExpiry(
-          response.jwtExpired
-            ? '⚠️ Anonymization JWT has expired. Update it in extension settings.'
-            : `⚠️ Anonymization error: ${response.jwtError}`
-        );
-      }
 
       if (!response?.success || !Array.isArray(response.detections) || response.detections.length === 0) {
         this.clearElementState(element);
@@ -1030,6 +1010,7 @@ class PrivacyShield {
       // ── Save cursor position ──
       const savedCaret = this.saveCaretPosition(element);
 
+      const allRestored = state.items.every((item) => !item.redacted);
       const allUnderlineOnly = state.items.every((item) => !item.redacted);
 
       const html = this.renderContentEditableHtml(element, state, flashIndex);
@@ -1818,37 +1799,13 @@ class PrivacyShield {
   }
 
   handleRuntimeMessage(request, _sender, sendResponse) {
-    if (request?.action === 'getPageStats') {
-      if (window !== window.top) return false;
-      sendResponse({
-        success: true,
-        stats: { ...this.pageStats }
-      });
-      return false;
-    }
-
-    if (request?.action === 'jwtExpired') {
-      this.handleJwtExpiry(request.message || '⚠️ Anonymization JWT has expired. Update it in extension settings.');
-      return false;
-    }
-
-    if (request?.action === 'jwtExpiringSoon') {
-      this.handleJwtExpiry(request.message || '⚠️ Your anonymization JWT is expiring soon.');
-      return false;
-    }
-
+    if (request?.action !== 'getPageStats') return false;
+    if (window !== window.top) return false;
+    sendResponse({
+      success: true,
+      stats: { ...this.pageStats }
+    });
     return false;
-  }
-
-  /**
-   * Show a JWT expiry notification, rate-limited to at most once every 5 minutes.
-   */
-  handleJwtExpiry(message) {
-    const now = Date.now();
-    const cooldownMs = 5 * 60 * 1000; // 5 minutes
-    if (now - this._lastJwtNotificationTs < cooldownMs) return;
-    this._lastJwtNotificationTs = now;
-    this.showNotification(message, 'warning');
   }
 
   showNotification(message, type = 'info') {
