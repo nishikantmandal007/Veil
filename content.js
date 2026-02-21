@@ -730,7 +730,6 @@ class PrivacyShield {
       }
 
       this.lastDetectionSignature.set(element, signature);
-      this.renderFieldHighlight(element, allDetectionsForSignature);
 
       const state = {
         sourceText,
@@ -745,7 +744,6 @@ class PrivacyShield {
 
       // Render: existing redacted items stay redacted, new items get underlines
       this.renderElement(element);
-      this.showActionBar(element, state);
 
       // Auto-redact after delay if setting is on
       if (this.settings.autoRedact) {
@@ -1008,7 +1006,6 @@ class PrivacyShield {
 
     if (changed) {
       this.renderElement(element);
-      this.showActionBar(element, state);
       this.persistCache(element);
       this.showNotification(`${count} item${count === 1 ? '' : 's'} protected`, 'info');
       this.updateStats(0, count);
@@ -1028,7 +1025,6 @@ class PrivacyShield {
     this.cancelAutoRedact(element);
 
     this.renderElement(element);
-    this.showActionBar(element, state);
     this.persistCache(element);
   }
 
@@ -1623,7 +1619,6 @@ class PrivacyShield {
     state.items[index].userRestored = false;  // User chose to re-redact
 
     this.renderElement(element, index);
-    this.showActionBar(element, state);
     this.persistCache(element);
   }
 
@@ -1639,7 +1634,6 @@ class PrivacyShield {
     this.cancelAutoRedact(element);
 
     this.renderElement(element, index);
-    this.showActionBar(element, state);
     this.persistCache(element);
   }
 
@@ -1662,7 +1656,6 @@ class PrivacyShield {
       this.clearElementState(element);
     } else {
       this.renderElement(element);
-      this.showActionBar(element, state);
     }
   }
 
@@ -1681,7 +1674,6 @@ class PrivacyShield {
     }
 
     this.renderElement(element, index);
-    this.showActionBar(element, state);
     this.persistCache(element);
   }
 

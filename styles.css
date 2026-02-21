@@ -167,24 +167,10 @@
 }
 
 .ps-redaction-active {
-  color: color-mix(in srgb, var(--redaction-color, #00695c) 85%, black);
-  background: color-mix(in srgb, var(--redaction-color, #00695c) 12%, transparent);
-  border-bottom: 2px solid color-mix(in srgb, var(--redaction-color, #00695c) 60%, transparent);
+  color: inherit;
+  background: color-mix(in srgb, var(--redaction-color, #D32F2F) 7%, transparent);
+  border-bottom: 2px dotted var(--redaction-color, #D32F2F);
   box-shadow: none;
-  animation: ps-redact-sweep 380ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
-  animation-delay: var(--stagger, 0ms);
-}
-
-@keyframes ps-redact-sweep {
-  from {
-    clip-path: inset(0 100% 0 0);
-    opacity: 0.4;
-  }
-
-  to {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
 }
 
 .ps-redaction-anonymized {
