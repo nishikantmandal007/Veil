@@ -16,7 +16,7 @@ const DEFAULT_CUSTOM_PATTERNS = [
   {
     id: 'openai_key',
     label: 'api_key',
-    pattern: '\\bsk-[A-Za-z0-9]{20,}\\b',
+    pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
     flags: 'g',
     score: 0.99,
     replacement: '[API KEY REDACTED]',
@@ -66,6 +66,7 @@ const BLUR_DELAY_MS = 80;
 const SUPPRESS_INPUT_MS = 300;
 const AUTO_REDACT_DELAY_MS = 1500;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
 
 // ── Selectors that identify known LLM response / output areas ──
 const RESPONSE_AREA_SELECTORS = [
@@ -74,8 +75,6 @@ const RESPONSE_AREA_SELECTORS = [
   '.assistant-message',
   '.markdown-body',
   '.response-container',
-  '[class*="response"]',
-  '[class*="answer"]',
   '.prose',                               // Claude response bodies
   '.result-streaming',                    // ChatGPT streaming
   '.agent-turn',                          // Gemini
@@ -85,6 +84,44 @@ const RESPONSE_AREA_SELECTORS = [
   '.ai-message',
   '.chat-answer'
 ];
+
+function normalizeCustomPatterns(storedPatterns, defaults) {
+  const defaultList = Array.isArray(defaults) ? defaults : [];
+  if (!Array.isArray(storedPatterns) || storedPatterns.length === 0) {
+    return defaultList.slice();
+  }
+
+  const storedById = new Map();
+  const extras = [];
+
+  storedPatterns.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const id = String(entry.id || '').trim();
+    if (!id) {
+      extras.push(entry);
+      return;
+    }
+    storedById.set(id, entry);
+  });
+
+  const mergedDefaults = defaultList.map((def) => {
+    const id = String(def?.id || '').trim();
+    if (!id || !storedById.has(id)) return def;
+    const stored = storedById.get(id);
+    if (id === 'openai_key' && String(stored.pattern || '') === LEGACY_OPENAI_KEY_PATTERN) {
+      return { ...def, ...stored, pattern: def.pattern };
+    }
+    return { ...def, ...stored };
+  });
+
+  const mergedIds = new Set(mergedDefaults.map((entry) => String(entry?.id || '').trim()).filter(Boolean));
+  const customOnly = storedPatterns.filter((entry) => {
+    const id = String(entry?.id || '').trim();
+    return !id || !mergedIds.has(id);
+  });
+
+  return [...mergedDefaults, ...extras, ...customOnly];
+}
 
 class PrivacyShield {
   constructor() {
@@ -165,9 +202,7 @@ class PrivacyShield {
           monitoredSelectors: Array.isArray(result.monitoredSelectors) && result.monitoredSelectors.length > 0
             ? result.monitoredSelectors
             : DEFAULT_MONITORED_SELECTORS,
-          customPatterns: Array.isArray(result.customPatterns) && result.customPatterns.length > 0
-            ? result.customPatterns
-            : DEFAULT_CUSTOM_PATTERNS
+          customPatterns: normalizeCustomPatterns(result.customPatterns, DEFAULT_CUSTOM_PATTERNS)
         };
         resolve();
       });
@@ -205,6 +240,11 @@ class PrivacyShield {
   isResponseArea(element) {
     if (!element) return false;
 
+    // Never treat editable user-input surfaces as response areas.
+    if (this.isEditableInputSurface(element)) {
+      return false;
+    }
+
     // Check the element itself and all ancestors
     for (const selector of RESPONSE_AREA_SELECTORS) {
       try {
@@ -220,6 +260,15 @@ class PrivacyShield {
       return true;
     }
 
+    return false;
+  }
+
+  isEditableInputSurface(element) {
+    if (!element || !(element instanceof HTMLElement)) return false;
+    if (element.matches('textarea, input')) return true;
+    if (element.isContentEditable) return true;
+    if (element.getAttribute('contenteditable') === 'true') return true;
+    if (element.getAttribute('role') === 'textbox') return true;
     return false;
   }
 
@@ -429,7 +478,7 @@ class PrivacyShield {
     if (style.display === 'none' || style.visibility === 'hidden') return false;
 
     const rect = element.getBoundingClientRect();
-    if (rect.width < 120 || rect.height < 24) return false;
+    if (rect.width < 48 || rect.height < 18) return false;
 
     if (element.matches('textarea, input')) {
       if (element.disabled || element.readOnly) return false;

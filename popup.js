@@ -4,7 +4,7 @@ const DEFAULT_CUSTOM_PATTERNS = [
   {
     id: 'openai_key',
     label: 'api_key',
-    pattern: '\\bsk-[A-Za-z0-9]{20,}\\b',
+    pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
     flags: 'g',
     score: 0.99,
     replacement: '[API KEY REDACTED]',
@@ -56,6 +56,7 @@ const DEFAULT_CUSTOM_PATTERNS = [
     enabled: true
   }
 ];
+const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
 
 const DEFAULT_SETTINGS = {
   enabled: true,
@@ -95,6 +96,44 @@ const DEFAULT_SETTINGS = {
   ],
   customPatterns: DEFAULT_CUSTOM_PATTERNS
 };
+
+function normalizeCustomPatterns(storedPatterns, defaults) {
+  const defaultList = Array.isArray(defaults) ? defaults : [];
+  if (!Array.isArray(storedPatterns) || storedPatterns.length === 0) {
+    return defaultList.slice();
+  }
+
+  const storedById = new Map();
+  const extras = [];
+
+  storedPatterns.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const id = String(entry.id || '').trim();
+    if (!id) {
+      extras.push(entry);
+      return;
+    }
+    storedById.set(id, entry);
+  });
+
+  const mergedDefaults = defaultList.map((def) => {
+    const id = String(def?.id || '').trim();
+    if (!id || !storedById.has(id)) return def;
+    const stored = storedById.get(id);
+    if (id === 'openai_key' && String(stored.pattern || '') === LEGACY_OPENAI_KEY_PATTERN) {
+      return { ...def, ...stored, pattern: def.pattern };
+    }
+    return { ...def, ...stored };
+  });
+
+  const mergedIds = new Set(mergedDefaults.map((entry) => String(entry?.id || '').trim()).filter(Boolean));
+  const customOnly = storedPatterns.filter((entry) => {
+    const id = String(entry?.id || '').trim();
+    return !id || !mergedIds.has(id);
+  });
+
+  return [...mergedDefaults, ...extras, ...customOnly];
+}
 
 class SettingsManager {
   constructor() {
@@ -142,9 +181,7 @@ class SettingsManager {
           ...DEFAULT_SETTINGS,
           ...result
         };
-        if (!Array.isArray(this.settings.customPatterns)) {
-          this.settings.customPatterns = DEFAULT_CUSTOM_PATTERNS;
-        }
+        this.settings.customPatterns = normalizeCustomPatterns(this.settings.customPatterns, DEFAULT_CUSTOM_PATTERNS);
         resolve();
       });
     });

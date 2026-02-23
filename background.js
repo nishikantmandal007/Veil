@@ -89,12 +89,21 @@ class MayaDataAnonymizer {
     }
 
     const supportedDetections = detections.filter((item) => MDP_LABEL_CONFIG[String(item?.label || '').toLowerCase()]);
+    const unsupportedLabels = Array.from(new Set(
+      detections
+        .map((item) => String(item?.label || '').toLowerCase())
+        .filter((label) => label && !MDP_LABEL_CONFIG[label])
+    ));
+    if (unsupportedLabels.length > 0) {
+      console.debug('[Privacy Shield] MDP anonymizer skipped unsupported labels:', unsupportedLabels.join(', '));
+    }
     if (supportedDetections.length === 0) {
       return detections;
     }
 
     const credentials = await this.getCredentials();
     if (!credentials.jwtToken) {
+      console.warn('[Privacy Shield] MDP anonymizer skipped: missing mdpJwtToken in chrome.storage.local.');
       return detections;
     }
 
@@ -108,8 +117,12 @@ class MayaDataAnonymizer {
       const replacements = this.extractReplacementMap(payload, apiResponse);
       return detections.map((item) => this.applyReplacement(item, replacements));
     } catch (error) {
-      console.warn('[Privacy Shield] anonymization request failed:', error?.message || String(error));
-      return detections;
+      console.warn('[Privacy Shield] anonymization bulk request failed, retrying per label:', error?.message || String(error));
+      const replacements = await this.callApiBestEffort(credentials.jwtToken, payload);
+      if (replacements.size === 0) {
+        return detections;
+      }
+      return detections.map((item) => this.applyReplacement(item, replacements));
     }
   }
 
@@ -195,6 +208,21 @@ class MayaDataAnonymizer {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  async callApiBestEffort(jwtToken, payload) {
+    const merged = new Map();
+    for (const entry of payload) {
+      try {
+        const apiResponse = await this.callApi(jwtToken, [entry]);
+        const replacementMap = this.extractReplacementMap([entry], apiResponse);
+        replacementMap.forEach((value, key) => merged.set(key, value));
+      } catch (error) {
+        const label = String(entry?.utilityParameter || entry?.column_name || 'unknown');
+        console.warn(`[Privacy Shield] MDP anonymizer skipped label ${label}:`, error?.message || String(error));
+      }
+    }
+    return merged;
   }
 
   extractReplacementMap(payload, apiResponse) {
@@ -339,7 +367,7 @@ function getDefaultCustomPatterns() {
     {
       id: 'openai_key',
       label: 'api_key',
-      pattern: '\\bsk-[A-Za-z0-9]{20,}\\b',
+      pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
       flags: 'g',
       score: 0.99,
       replacement: '[API KEY REDACTED]',
