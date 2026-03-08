@@ -1,0 +1,34 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.pytest_cache/
+
+# Node
+node_modules/
+package.json
+package-lock.json
+
+# Build & test artifacts
+dist/
+test-results/
+playwright-report/
+*.zip
+
+# Jekyll build output
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+
+# Runtime & editor
+.runtime/
+.claude/
+.env
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,37 @@
+title: Veil
+description: Real-time PII detection and redaction for AI chat interfaces. Powered by GLiNER2. Your data never leaves your machine.
+url: "https://nishikantmandal007.github.io"
+baseurl: "/Veil"
+
+author:
+  name: Nishikant Mandal
+  github: nishikantmandal007
+
+github_repo: https://github.com/nishikantmandal007/Veil
+
+remote_theme: just-the-docs/just-the-docs
+
+color_scheme: light
+
+# Just the Docs config
+search_enabled: true
+heading_anchors: true
+permalink: pretty
+
+aux_links:
+  "View on GitHub":
+    - "https://github.com/nishikantmandal007/Veil"
+
+aux_links_new_tab: true
+
+footer_content: "MIT License &copy; 2024 Nishikant Mandal &amp; Veil Contributors."
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-remote-theme
+
+exclude:
+  - node_modules/
+  - "*.sh"
+  - Gemfile
+  - Gemfile.lock
