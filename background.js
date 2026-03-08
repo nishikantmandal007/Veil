@@ -74,7 +74,7 @@ const MDP_LABEL_CONFIG = Object.freeze({
   })
 });
 
-class MayaDataAnonymizer {
+class VeilAnonymizer {
   constructor() {
     this.timeoutMs = 6000;
     this.localServerUrl = 'http://127.0.0.1:8765';
@@ -95,15 +95,15 @@ class MayaDataAnonymizer {
         .filter((label) => label && !MDP_LABEL_CONFIG[label])
     ));
     if (unsupportedLabels.length > 0) {
-      console.debug('[Privacy Shield] MDP anonymizer skipped unsupported labels:', unsupportedLabels.join(', '));
+      console.debug('[Veil] Anonymizer skipped unsupported labels:', unsupportedLabels.join(', '));
     }
     if (supportedDetections.length === 0) {
       return detections;
     }
 
     const credentials = await this.getCredentials();
-    if (!credentials.jwtToken) {
-      console.warn('[Privacy Shield] MDP anonymizer skipped: missing mdpJwtToken in chrome.storage.local.');
+    if (!credentials.apiKey) {
+      console.warn('[Veil] Anonymizer skipped: no API key configured. Set one in the extension popup.');
       return detections;
     }
 
@@ -113,12 +113,12 @@ class MayaDataAnonymizer {
     }
 
     try {
-      const apiResponse = await this.callApi(credentials.jwtToken, payload);
+      const apiResponse = await this.callApi(credentials.apiKey, payload);
       const replacements = this.extractReplacementMap(payload, apiResponse);
       return detections.map((item) => this.applyReplacement(item, replacements));
     } catch (error) {
-      console.warn('[Privacy Shield] anonymization bulk request failed, retrying per label:', error?.message || String(error));
-      const replacements = await this.callApiBestEffort(credentials.jwtToken, payload);
+      console.warn('[Veil] Anonymization bulk request failed, retrying per label:', error?.message || String(error));
+      const replacements = await this.callApiBestEffort(credentials.apiKey, payload);
       if (replacements.size === 0) {
         return detections;
       }
@@ -128,11 +128,11 @@ class MayaDataAnonymizer {
 
   async getCredentials() {
     const result = await new Promise((resolve) => {
-      chrome.storage.local.get(['mdpJwtToken'], resolve);
+      chrome.storage.local.get(['veilApiKey'], resolve);
     });
 
     return {
-      jwtToken: String(result?.mdpJwtToken || '').trim(),
+      apiKey: String(result?.veilApiKey || '').trim(),
       seed: MDP_DEFAULT_SEED
     };
   }
@@ -167,16 +167,17 @@ class MayaDataAnonymizer {
     return Array.from(grouped.values());
   }
 
-  async callApi(jwtToken, payload) {
+  async callApi(apiKey, payload) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await fetch(`${this.localServerUrl}/anonymize`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey
         },
-        body: JSON.stringify({ jwtToken, entries: payload }),
+        body: JSON.stringify({ apiKey, entries: payload }),
         signal: controller.signal
       });
 
@@ -210,16 +211,16 @@ class MayaDataAnonymizer {
     }
   }
 
-  async callApiBestEffort(jwtToken, payload) {
+  async callApiBestEffort(apiKey, payload) {
     const merged = new Map();
     for (const entry of payload) {
       try {
-        const apiResponse = await this.callApi(jwtToken, [entry]);
+        const apiResponse = await this.callApi(apiKey, [entry]);
         const replacementMap = this.extractReplacementMap([entry], apiResponse);
         replacementMap.forEach((value, key) => merged.set(key, value));
       } catch (error) {
         const label = String(entry?.utilityParameter || entry?.column_name || 'unknown');
-        console.warn(`[Privacy Shield] MDP anonymizer skipped label ${label}:`, error?.message || String(error));
+        console.warn(`[Veil] Anonymizer skipped label ${label}:`, error?.message || String(error));
       }
     }
     return merged;
@@ -839,7 +840,7 @@ class GLiNERDetector {
 }
 
 const detector = new GLiNERDetector();
-const anonymizer = new MayaDataAnonymizer();
+const anonymizer = new VeilAnonymizer();
 
 async function handleServerControl(command, options = {}) {
   try {

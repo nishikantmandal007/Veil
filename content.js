@@ -12,6 +12,49 @@ const DEFAULT_MONITORED_SELECTORS = [
   '.ProseMirror'
 ];
 
+// Platform-specific selectors for LLM chat interfaces
+const PLATFORM_SELECTORS = {
+  chatgpt: [
+    'textarea[data-id]',
+    'div[data-message-author-role="user"]',
+    'button[data-testid="send-button"] + div',
+    '.flex.flex-1 textarea',
+    'form button[type="submit"] + div textarea',
+    'textarea.w-full',
+    '[contenteditable="true"][data-placeholder]',
+    '.chat-input textarea'
+  ],
+  claude: [
+    '.claude-chat-input',
+    '[data-claude-ide] textarea',
+    '.ce-editor',
+    'div[contenteditable="true"][data-test]',
+    'textarea#composer-input',
+    'textarea[data-celled]',
+    '.composer-input textarea',
+    '[contenteditable="true"].ce-block'
+  ],
+  gemini: [
+    'text-area[aria-label*="message"]',
+    '.gemini-chat-input textarea',
+    'textarea[placeholder*="message"]',
+    'input[aria-label*="prompt"]',
+    'rich-textarea',
+    'textarea.gmat-input',
+    'div[contenteditable="true"][role="textbox"]'
+  ],
+  generic: [
+    'textarea',
+    'input[type="text"]',
+    'input[type="search"]',
+    'input[type="email"]',
+    'input:not([type])',
+    'div[contenteditable="true"]',
+    '[role="textbox"]',
+    '.ProseMirror'
+  ]
+};
+
 const DEFAULT_CUSTOM_PATTERNS = [
   {
     id: 'openai_key',
@@ -161,6 +204,26 @@ class PrivacyShield {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // Platform Detection
+  // ═══════════════════════════════════════════════════════════
+
+  detectPlatform() {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname.includes('chatgpt') || hostname.includes('openai')) return 'chatgpt';
+    if (hostname.includes('claude')) return 'claude';
+    if (hostname.includes('gemini') || hostname.includes('google')) return 'gemini';
+    return 'generic';
+  }
+
+  getPlatformSelectors() {
+    const platform = this.detectPlatform();
+    const platformSelectors = PLATFORM_SELECTORS[platform] || PLATFORM_SELECTORS.generic;
+    // Combine platform-specific selectors with generic ones (deduplicated)
+    const allSelectors = [...new Set([...PLATFORM_SELECTORS.generic, ...platformSelectors])];
+    return allSelectors;
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // Lifecycle
   // ═══════════════════════════════════════════════════════════
 
@@ -204,7 +267,7 @@ class PrivacyShield {
           monitoredSites: result.monitoredSites ?? ['claude.ai', 'gemini.google.com', 'chatgpt.com'],
           monitoredSelectors: Array.isArray(result.monitoredSelectors) && result.monitoredSelectors.length > 0
             ? result.monitoredSelectors
-            : DEFAULT_MONITORED_SELECTORS,
+            : this.getPlatformSelectors(),
           customPatterns: normalizeCustomPatterns(result.customPatterns, DEFAULT_CUSTOM_PATTERNS)
         };
         resolve();
@@ -222,10 +285,10 @@ class PrivacyShield {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'initialize' });
       if (response?.mode) {
-        console.debug('[Privacy Shield] detection mode:', response.mode);
+        console.debug('[Veil] detection mode:', response.mode);
       }
     } catch (error) {
-      console.error('[Privacy Shield] initialize failed:', error);
+      console.error('[Veil] initialize failed:', error);
     }
   }
 
@@ -282,6 +345,8 @@ class PrivacyShield {
   startMonitoring() {
     this.findInputElements();
     this.startStateReconciler();
+    this.startDynamicMonitoring();
+    this.startPollingFallback();
 
     this.domObserver = new MutationObserver((mutations) => {
       // Immediately clean up state for tracked elements that were removed from DOM
@@ -302,7 +367,8 @@ class PrivacyShield {
           }
         }
       }
-      this.findInputElements();
+      // Debounce finding new elements to batch rapid mutations
+      this.debouncedFindInputElements();
     });
     this.domObserver.observe(document.body, { childList: true, subtree: true });
 
@@ -331,6 +397,33 @@ class PrivacyShield {
         });
       }
     });
+  }
+
+  // Debounced version of findInputElements to batch rapid DOM mutations
+  debouncedFindInputElements() {
+    if (this._findInputElementsTimer) {
+      clearTimeout(this._findInputElementsTimer);
+    }
+    this._findInputElementsTimer = setTimeout(() => {
+      this.findInputElements();
+    }, 300);
+  }
+
+  // Enhanced MutationObserver with explicit new element detection
+  startDynamicMonitoring() {
+    // This is now integrated into startMonitoring's MutationObserver
+    // but we keep the method for clarity and potential separate use
+    console.debug('[Veil] Dynamic monitoring active for:', this.detectPlatform());
+  }
+
+  // Polling fallback for SPA navigation that doesn't trigger MutationObserver
+  startPollingFallback() {
+    if (this._pollingInterval) {
+      clearInterval(this._pollingInterval);
+    }
+    this._pollingInterval = setInterval(() => {
+      this.findInputElements();
+    }, 5000);
   }
 
   findInputElements() {
@@ -637,7 +730,7 @@ class PrivacyShield {
           </svg>
         </div>
         <div class="ps-scan-copy">
-          <div class="ps-scan-title">Privacy Shield</div>
+          <div class="ps-scan-title">Veil</div>
           <div class="ps-scan-sub">Anonymizing text...</div>
         </div>
       `;
@@ -859,7 +952,7 @@ class PrivacyShield {
       this.updateStats(newItems.filter((i) => !i.redacted).length, 0);
       this.lastAnalyzedSnapshot.set(element, snapshotKey);
     } catch (error) {
-      console.error('[Privacy Shield] detection error:', error);
+      console.error('[Veil] detection error:', error);
       this.lastAnalyzedSnapshot.set(element, snapshotKey);
     } finally {
       this.hideScanningPill(element);
@@ -898,31 +991,20 @@ class PrivacyShield {
     const state = this.redactions.get(element);
 
     if (element.isContentEditable || element.hasAttribute('contenteditable')) {
-      // Reconstruct the TRUE user text by replacing redaction/underline
-      // spans with their original values. This ensures the model always
-      // sees real text (not masks like <PERSON_1>) and offsets stay
-      // consistent across detection cycles.
       const clone = element.cloneNode(true);
       clone.querySelectorAll('.ps-redaction, .ps-pii-underline').forEach((span) => {
-        // Always prefer the stored original text from data-ps-original.
-        // For redacted spans the textContent is the replacement, so
-        // data-ps-original is essential.  For underline spans the
-        // textContent *should* match the original, but we still prefer
-        // the attribute to avoid any edge-case mismatch.
         const original = span.getAttribute('data-ps-original');
         if (original != null) {
           span.replaceWith(document.createTextNode(original));
         } else {
-          // Fallback: use textContent, but if an ancestor state
-          // tracks this span we can look it up by offset.
           span.replaceWith(document.createTextNode(span.textContent || ''));
         }
       });
-      const raw = clone.textContent || clone.innerText || '';
-      const normalized = raw
-        .replace(/\u00a0/g, ' ')
-        .replace(/\r\n?/g, '\n');
-      return this.restoreKnownRedactions(normalized, state);
+      // Use DOM-aware text extraction that adds \n for block elements (<p>, <div>).
+      // textContent does NOT add newlines between block elements (Gemini uses <p> tags),
+      // so we must walk the tree manually.
+      const raw = this.extractContentEditableText(clone);
+      return this.restoreKnownRedactions(raw, state);
     }
 
     const rawValue = element.value || '';
@@ -973,6 +1055,80 @@ class PrivacyShield {
     });
 
     return restored;
+  }
+
+  /**
+   * DOM-aware text extraction for contenteditable elements.
+   * Unlike textContent, this adds \n between block-level elements
+   * so Gemini's <p>-based structure is correctly read.
+   */
+  extractContentEditableText(element) {
+    let result = '';
+    const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'TR']);
+
+    const walk = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        result += (node.nodeValue || '').replace(/\u00a0/g, ' ');
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+      const tag = node.tagName.toUpperCase();
+      if (tag === 'BR') {
+        result += '\n';
+        return;
+      }
+
+      const isBlock = BLOCK_TAGS.has(tag);
+      const prevLen = result.length;
+
+      for (const child of node.childNodes) {
+        walk(child);
+      }
+
+      if (isBlock && result.length > prevLen && !result.endsWith('\n')) {
+        result += '\n';
+      }
+    };
+
+    for (const child of element.childNodes) {
+      walk(child);
+    }
+
+    return result
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\n$/, '')
+      .replace(/\r\n?/g, '\n');
+  }
+
+  /**
+   * Detect whether this contenteditable uses <p> tags (Gemini-style)
+   * or <br> elements (ChatGPT/Claude-style) for newlines.
+   */
+  detectNativeNewlineStyle(element) {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname.includes('gemini') || hostname.includes('bard.google')) return 'p';
+
+    let pCount = 0;
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'P') {
+        pCount++;
+      }
+    }
+    return pCount >= 1 ? 'p' : 'br';
+  }
+
+  /**
+   * Minimal HTML escaper for <p>-mode rendering.
+   * Keeps \n as a literal character (caller will split on it for <p> wrapping).
+   */
+  escapeHtmlForParagraph(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
   }
 
   isSyntheticReplacementToken(value) {
@@ -1282,17 +1438,20 @@ class PrivacyShield {
   }
 
   renderContentEditableHtml(element, state, flashIndex = -1) {
-    // Build the final HTML purely from state.sourceText as a string.
-    // This avoids all live-DOM mutation issues that the previous Range-based
-    // approach suffered from (stale offsets after deleteContents/insertNode).
     const sourceText = state.sourceText || '';
     if (!sourceText) return null;
 
-    // Sort items by start position (ascending) so we can walk the text left-to-right
+    // Detect whether the editor uses <p> (Gemini) or <br> (ChatGPT/Claude) for newlines
+    const newlineStyle = this.detectNativeNewlineStyle(element);
+
     const sorted = state.items
       .map((item, index) => ({ item, index }))
       .slice()
       .sort((a, b) => a.item.start - b.item.start);
+
+    const encodeSegment = (str) => newlineStyle === 'p'
+      ? this.escapeHtmlForParagraph(str)
+      : this.textToHtmlPreserveLayout(str);
 
     const parts = [];
     let cursor = 0;
@@ -1300,25 +1459,21 @@ class PrivacyShield {
     sorted.forEach(({ item, index }) => {
       const start = Math.max(0, item.start);
       const end = Math.min(sourceText.length, item.end);
-      if (start >= end || start < cursor) return; // skip invalid or overlapping
+      if (start >= end || start < cursor) return;
 
-      // Append any plain text before this span
       if (cursor < start) {
-        parts.push(this.textToHtmlPreserveLayout(sourceText.slice(cursor, start)));
+        parts.push(encodeSegment(sourceText.slice(cursor, start)));
       }
 
-      // Build the span as an HTML string
       const originalText = item.text || sourceText.slice(start, end);
       const color = this.getTypeColor(item.label);
       const stagger = `${Math.min(index * 30, 280)}ms`;
-      const escapedOriginal = this.textToHtmlPreserveLayout(originalText);
+      const escapedOriginal = encodeSegment(originalText);
 
       if (item.redacted) {
-        const displayText = this.textToHtmlPreserveLayout(this.getReplacementText(item));
+        const displayText = encodeSegment(this.getReplacementText(item));
         const extraClasses = ['ps-redaction-active'];
-        if (this.settings?.redactionMode === 'anonymize') {
-          extraClasses.push('ps-redaction-anonymized');
-        }
+        if (this.settings?.redactionMode === 'anonymize') extraClasses.push('ps-redaction-anonymized');
         if (flashIndex === index) extraClasses.push('ps-undo-ripple');
         parts.push(
           `<span class="ps-redaction ${extraClasses.join(' ')}"` +
@@ -1342,9 +1497,15 @@ class PrivacyShield {
       cursor = end;
     });
 
-    // Append any remaining text after the last span
     if (cursor < sourceText.length) {
-      parts.push(this.textToHtmlPreserveLayout(sourceText.slice(cursor)));
+      parts.push(encodeSegment(sourceText.slice(cursor)));
+    }
+
+    if (newlineStyle === 'p') {
+      // Parts contain literal \n — split and wrap each line in <p>
+      const flat = parts.join('');
+      const lines = flat.split('\n');
+      return lines.map((line) => `<p>${line || '<br>'}</p>`).join('');
     }
 
     return parts.join('');
@@ -1361,11 +1522,57 @@ class PrivacyShield {
 
   textToHtmlPreserveLayout(str) {
     const value = String(str || '').replace(/\r\n?/g, '\n');
+
+    // Step 1: Extract and preserve code blocks (```...```) first
+    const codeBlockPattern = /(```[\s\S]*?```)/g;
+    const codeBlocks = [];
+    let textWithoutCodeBlocks = value.replace(codeBlockPattern, (match) => {
+      codeBlocks.push(match);
+      return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+    });
+
+    // Step 2: Extract inline code (`...`)
+    const inlineCodePattern = /(`[^`\n]+`)/g;
+    const inlineCodes = [];
+    textWithoutCodeBlocks = textWithoutCodeBlocks.replace(inlineCodePattern, (match) => {
+      inlineCodes.push(match);
+      return `__INLINE_CODE_${inlineCodes.length - 1}__`;
+    });
+
+    // Step 3: Process the remaining text with whitespace and markdown
     let out = '';
     let lineStart = true;
 
-    for (let i = 0; i < value.length; i += 1) {
-      const ch = value[i];
+    for (let i = 0; i < textWithoutCodeBlocks.length; i += 1) {
+      const ch = textWithoutCodeBlocks[i];
+
+      // Check for placeholder markers and restore original
+      if (textWithoutCodeBlocks.startsWith(`__CODE_BLOCK_`, i)) {
+        const match = textWithoutCodeBlocks.slice(i).match(/^__CODE_BLOCK_(\d+)__/);
+        if (match) {
+          // Restore code block with literal formatting
+          const codeIdx = parseInt(match[1], 10);
+          const codeBlock = codeBlocks[codeIdx] || '';
+          // Convert newlines within code blocks to <br> but preserve leading/trailing newlines
+          out += codeBlock.replace(/\n/g, '<br>');
+          i += match[0].length - 1;
+          lineStart = false;
+          continue;
+        }
+      }
+
+      if (textWithoutCodeBlocks.startsWith(`__INLINE_CODE_`, i)) {
+        const match = textWithoutCodeBlocks.slice(i).match(/^__INLINE_CODE_(\d+)__/);
+        if (match) {
+          const codeIdx = parseInt(match[1], 10);
+          const inlineCode = inlineCodes[codeIdx] || '';
+          // Keep inline code as-is (backticks will be handled later)
+          out += inlineCode;
+          i += match[0].length - 1;
+          lineStart = false;
+          continue;
+        }
+      }
 
       if (ch === '\n') {
         out += '<br>';
@@ -1380,14 +1587,16 @@ class PrivacyShield {
       }
 
       if (ch === ' ') {
-        const prev = i > 0 ? value[i - 1] : '\n';
-        const next = i + 1 < value.length ? value[i + 1] : '\n';
-        const preserve = lineStart || prev === ' ' || next === ' ';
+        const prev = i > 0 ? textWithoutCodeBlocks[i - 1] : '\n';
+        const next = i + 1 < textWithoutCodeBlocks.length ? textWithoutCodeBlocks[i + 1] : '\n';
+        // Preserve spaces at line start, after other spaces, and before newlines
+        const preserve = lineStart || prev === ' ' || next === ' ' || next === '\n';
         out += preserve ? '&nbsp;' : ' ';
         lineStart = false;
         continue;
       }
 
+      // HTML entity escaping
       if (ch === '&') {
         out += '&amp;';
       } else if (ch === '<') {
@@ -1399,6 +1608,20 @@ class PrivacyShield {
       }
       lineStart = false;
     }
+
+    // Step 4: Restore inline code with formatting
+    out = out.replace(/__INLINE_CODE_(\d+)__/g, (match, idx) => {
+      const code = inlineCodes[parseInt(idx, 10)] || '';
+      // Wrap inline code in styling span but keep backticks visible
+      return `<span class="ps-inline-code">${code}</span>`;
+    });
+
+    // Step 5: Handle markdown formatting that wasn't in code blocks
+    // Bold: **text** or __text__
+    out = out.replace(/(\*\*[^*]+\*\*|__[^_]+__)/g, '<strong>$1</strong>');
+    // Italic: *text* or _text_ (not in strong)
+    out = out.replace(/(?<!\*)(\*[^*]+\*)(?!\*)/g, '<em>$1</em>');
+    out = out.replace(/(?<!_)(_[^_]+_)(?!_)/g, '<em>$1</em>');
 
     return out;
   }
@@ -1946,7 +2169,7 @@ class PrivacyShield {
 
       chrome.storage.local.set({ [key]: payload });
     } catch (e) {
-      console.error('[Privacy Shield] cache persist error:', e);
+      console.error('[Veil] cache persist error:', e);
     }
   }
 
@@ -1967,7 +2190,7 @@ class PrivacyShield {
         chrome.storage.local.remove(keysToRemove);
       }
     } catch (e) {
-      console.error('[Privacy Shield] cache rehydration error:', e);
+      console.error('[Veil] cache rehydration error:', e);
     }
   }
 

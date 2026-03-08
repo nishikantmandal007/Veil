@@ -141,8 +141,10 @@ class SettingsManager {
     this.stats = { detections: 0, redactions: 0 };
     this.localSecrets = {
       hfToken: '',
-      mdpJwtToken: ''
+      veilApiKey: ''
     };
+    this.apiKeyRevealed = false;
+    this.hfTokenVisible = false;
     this.serverBusy = false;
     this.serverPhase = 'disconnected';
     this.terminalVisible = false;
@@ -231,10 +233,10 @@ class SettingsManager {
 
   loadLocalSecrets() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['hfToken', 'mdpJwtToken'], (result) => {
+      chrome.storage.local.get(['hfToken', 'veilApiKey'], (result) => {
         this.localSecrets = {
           hfToken: typeof result.hfToken === 'string' ? result.hfToken : '',
-          mdpJwtToken: typeof result.mdpJwtToken === 'string' ? result.mdpJwtToken : ''
+          veilApiKey: typeof result.veilApiKey === 'string' ? result.veilApiKey : ''
         };
         resolve();
       });
@@ -312,14 +314,17 @@ class SettingsManager {
         this.saveHfToken();
       }
     });
-    document.getElementById('saveMdpCredsButton').addEventListener('click', () => this.saveMdpCredentials());
-    document.getElementById('clearMdpJwtButton').addEventListener('click', () => this.clearMdpJwt());
-    document.getElementById('mdpJwtInput').addEventListener('keydown', (event) => {
+    document.getElementById('saveApiKeyButton').addEventListener('click', () => this.saveApiKey());
+    document.getElementById('removeApiKeyButton').addEventListener('click', () => this.removeApiKey());
+    document.getElementById('revealApiKeyButton').addEventListener('click', () => this.toggleApiKeyReveal());
+    document.getElementById('toggleApiKeyVisibility').addEventListener('click', () => this.toggleApiKeyInputVisibility());
+    document.getElementById('veilApiKeyInput').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        this.saveMdpCredentials();
+        this.saveApiKey();
       }
     });
+    document.getElementById('toggleHfTokenVisibility').addEventListener('click', () => this.toggleHfTokenInputVisibility());
 
     window.addEventListener('unload', () => {
       if (this.serverPollTimer) {
@@ -354,7 +359,7 @@ class SettingsManager {
     document.getElementById('selectorsInput').value = (this.settings.monitoredSelectors || []).join('\n');
     document.getElementById('patternsInput').value = JSON.stringify(this.settings.customPatterns || [], null, 2);
     document.getElementById('hfTokenInput').value = this.localSecrets.hfToken || '';
-    document.getElementById('mdpJwtInput').value = this.localSecrets.mdpJwtToken || '';
+    this.renderApiKeyState();
 
     this.renderStatus();
     this.renderStats();
@@ -689,11 +694,6 @@ class SettingsManager {
     return String(node?.value || '').trim();
   }
 
-  getInputMdpJwtToken() {
-    const node = document.getElementById('mdpJwtInput');
-    return String(node?.value || '').trim();
-  }
-
   async saveHfToken() {
     const hfToken = this.getInputHfToken();
     await new Promise((resolve) => {
@@ -713,23 +713,88 @@ class SettingsManager {
     this.setMessage('HF token cleared.');
   }
 
-  async saveMdpCredentials() {
-    const mdpJwtToken = this.getInputMdpJwtToken();
-    await new Promise((resolve) => {
-      chrome.storage.local.set({ mdpJwtToken }, resolve);
-    });
-    this.localSecrets.mdpJwtToken = mdpJwtToken;
-    this.setMessage(mdpJwtToken ? 'Anonymization JWT saved locally.' : 'Anonymization JWT cleared.');
+  getInputApiKey() {
+    const node = document.getElementById('veilApiKeyInput');
+    return String(node?.value || '').trim();
   }
 
-  async clearMdpJwt() {
+  async saveApiKey() {
+    const veilApiKey = this.getInputApiKey();
+    if (!veilApiKey) {
+      this.setMessage('Please enter an API key.', true);
+      return;
+    }
     await new Promise((resolve) => {
-      chrome.storage.local.set({ mdpJwtToken: '' }, resolve);
+      chrome.storage.local.set({ veilApiKey }, resolve);
     });
-    this.localSecrets.mdpJwtToken = '';
-    const input = document.getElementById('mdpJwtInput');
+    this.localSecrets.veilApiKey = veilApiKey;
+    this.apiKeyRevealed = false;
+    this.renderApiKeyState();
+    this.setMessage('API key saved securely.');
+  }
+
+  async removeApiKey() {
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ veilApiKey: '' }, resolve);
+    });
+    this.localSecrets.veilApiKey = '';
+    this.apiKeyRevealed = false;
+    const input = document.getElementById('veilApiKeyInput');
     if (input) input.value = '';
-    this.setMessage('Anonymization JWT cleared.');
+    this.renderApiKeyState();
+    this.setMessage('API key removed.');
+  }
+
+  toggleApiKeyReveal() {
+    this.apiKeyRevealed = !this.apiKeyRevealed;
+    const preview = document.getElementById('apiKeyPreview');
+    const btn = document.getElementById('revealApiKeyButton');
+    if (!preview || !btn) return;
+    if (this.apiKeyRevealed) {
+      const key = this.localSecrets.veilApiKey || '';
+      preview.textContent = key.length > 8 ? `${key.slice(0, 4)}...${key.slice(-4)}` : key;
+      btn.textContent = 'Hide';
+    } else {
+      preview.textContent = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      btn.textContent = 'Show';
+    }
+  }
+
+  toggleApiKeyInputVisibility() {
+    const input = document.getElementById('veilApiKeyInput');
+    const btn = document.getElementById('toggleApiKeyVisibility');
+    if (!input || !btn) return;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    btn.setAttribute('aria-label', isPassword ? 'Hide key' : 'Show key');
+  }
+
+  toggleHfTokenInputVisibility() {
+    const input = document.getElementById('hfTokenInput');
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  renderApiKeyState() {
+    const hasKey = Boolean(this.localSecrets.veilApiKey);
+    const savedState = document.getElementById('apiKeySavedState');
+    const inputState = document.getElementById('apiKeyInputState');
+    if (!savedState || !inputState) return;
+
+    savedState.hidden = !hasKey;
+    inputState.hidden = hasKey;
+
+    if (hasKey) {
+      const preview = document.getElementById('apiKeyPreview');
+      if (preview) {
+        preview.textContent = this.apiKeyRevealed
+          ? this.localSecrets.veilApiKey
+          : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      }
+    } else {
+      const input = document.getElementById('veilApiKeyInput');
+      if (input) input.value = '';
+    }
   }
 
   updateServerState(payload = {}) {
