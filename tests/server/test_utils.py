@@ -5,8 +5,8 @@ Run with: pytest tests/server/test_utils.py -v
 import sys
 from pathlib import Path
 
-# Add scripts dir to path so we can import without installing
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
+# Add server dir to path so we can import without installing
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "server"))
 
 from gliner2_server import make_chunks, deduplicate_detections, flatten_gliner2_output, CHUNK_SIZE, CHUNK_OVERLAP
 

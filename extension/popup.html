@@ -8,6 +8,86 @@
 </head>
 <body>
   <div class="shell">
+
+    <!-- ══════════ Onboarding Wizard Overlay ══════════ -->
+    <div id="onboardingOverlay" class="onboarding-overlay" hidden aria-modal="true" role="dialog" aria-label="Welcome to Veil">
+      <div class="onboarding-card">
+
+        <!-- Progress dots -->
+        <div class="onboarding-dots" aria-hidden="true">
+          <span class="onboarding-dot" data-step="0"></span>
+          <span class="onboarding-dot" data-step="1"></span>
+          <span class="onboarding-dot" data-step="2"></span>
+          <span class="onboarding-dot" data-step="3"></span>
+        </div>
+
+        <!-- Step 0: Welcome -->
+        <div class="onboarding-step" data-step="0">
+          <div class="onboarding-icon" aria-hidden="true">
+            <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 3C11.5 3 6 9 6 16C6 23 10.5 27.5 18 34C25.5 27.5 30 23 30 16C30 9 24.5 3 18 3Z" fill="currentColor" opacity="0.12"/>
+              <path d="M18 3C11.5 3 6 9 6 16C6 23 10.5 27.5 18 34C25.5 27.5 30 23 30 16C30 9 24.5 3 18 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              <path d="M13 16.5L16.5 20.5L23 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2 class="onboarding-title">Welcome to Veil</h2>
+          <p class="onboarding-body">Veil detects and redacts personal data <strong>before it leaves your browser</strong> — powered by a local AI model with no cloud calls.</p>
+          <ul class="onboarding-bullets">
+            <li>🔒 100% local inference — your text never leaves your machine</li>
+            <li>🤖 GLiNER2 zero-shot NER for names, emails, SSNs and more</li>
+            <li>⚡ Works on ChatGPT, Claude, Gemini and any website</li>
+          </ul>
+          <div class="onboarding-actions">
+            <button id="onboardingNextBtn0" type="button" class="onboarding-primary-btn">Get Started →</button>
+            <button id="onboardingSkipBtn" type="button" class="onboarding-skip-btn">Skip setup</button>
+          </div>
+        </div>
+
+        <!-- Step 1: Native Host -->
+        <div class="onboarding-step" data-step="1" hidden>
+          <div class="onboarding-step-badge">Step 1 of 2</div>
+          <h2 class="onboarding-title">Install the Native Bridge</h2>
+          <p class="onboarding-body">Run this command once. It registers a small Python helper that lets the extension control the local server.</p>
+          <div class="onboarding-cmd-block">
+            <div class="onboarding-cmd-header">
+              <span>Run in terminal</span>
+              <button id="onboardingCopyCmd" type="button" class="onboarding-copy-btn">Copy</button>
+            </div>
+            <pre class="onboarding-cmd"><code id="onboardingInstallCmd"></code></pre>
+          </div>
+          <p id="onboardingHostStatus" class="onboarding-status-note">Waiting for native host…</p>
+          <div class="onboarding-actions">
+            <button id="onboardingCheckHost" type="button" class="onboarding-secondary-btn">Check Again</button>
+            <button id="onboardingSkipHost" type="button" class="onboarding-skip-btn">Skip this step</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Start Server -->
+        <div class="onboarding-step" data-step="2" hidden>
+          <div class="onboarding-step-badge">Step 2 of 2</div>
+          <h2 class="onboarding-title">Start the Local Model</h2>
+          <p class="onboarding-body">The GLiNER2 model runs entirely on your machine. The first start downloads the model (~700 MB) and may take a minute.</p>
+          <p id="onboardingServerStatus" class="onboarding-status-note">Server not started yet.</p>
+          <div class="onboarding-actions">
+            <button id="onboardingStartServerBtn" type="button" class="onboarding-primary-btn">Start Server</button>
+            <button id="onboardingSkipServer" type="button" class="onboarding-skip-btn">Skip for now</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Done -->
+        <div class="onboarding-step" data-step="3" hidden>
+          <div class="onboarding-done-icon" aria-hidden="true">✓</div>
+          <h2 class="onboarding-title">You're protected!</h2>
+          <p class="onboarding-body">Veil is now active. Open any AI chat site and start typing — PII will be detected and offered for redaction automatically.</p>
+          <p class="onboarding-body" style="margin-top:8px">You can change settings, PII types, and custom patterns from the main panel at any time.</p>
+          <div class="onboarding-actions">
+            <button id="onboardingDoneBtn" type="button" class="onboarding-primary-btn">Open Dashboard</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- ══════════ End Onboarding ══════════ -->
     <header class="header">
       <div class="header-brand">
         <div class="brand-logo" aria-hidden="true">

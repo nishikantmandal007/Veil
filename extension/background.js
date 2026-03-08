@@ -17,15 +17,15 @@ const DEFAULT_LABELS = [
 // detections keyed by the dict key (internal name), so no reverse mapping is needed.
 // Chunking is handled server-side via batch_extract_entities — one HTTP request per input.
 const GLINER_LABEL_DESCRIPTIONS = Object.freeze({
-  person:        'person name, first name, last name, or full name of a human individual',
-  email:         'email address or email id used for electronic communication',
-  phone:         'phone number, mobile number, telephone number, or contact number',
-  address:       'street address, home address, residential or postal address, mailing address',
-  ssn:           'social security number, national identification number, or government-issued ID number',
-  credit_card:   'credit card number, debit card number, or payment card number',
+  person: 'person name, first name, last name, or full name of a human individual',
+  email: 'email address or email id used for electronic communication',
+  phone: 'phone number, mobile number, telephone number, or contact number',
+  address: 'street address, home address, residential or postal address, mailing address',
+  ssn: 'social security number, national identification number, or government-issued ID number',
+  credit_card: 'credit card number, debit card number, or payment card number',
   date_of_birth: 'date of birth, birthday, or birth date of a person',
-  location:      'city, town, country, state, region, or geographic place name',
-  organization:  'company name, organization name, employer, institution, or business name'
+  location: 'city, town, country, state, region, or geographic place name',
+  organization: 'company name, organization name, employer, institution, or business name'
 });
 
 const DEFAULT_MONITORED_SELECTORS = [
@@ -887,6 +887,46 @@ class GLiNERDetector {
 const detector = new GLiNERDetector();
 const anonymizer = new VeilAnonymizer();
 
+// ─── Server crash detection ───────────────────────────────────────────────────
+let prevServerHealthy = null; // null = unknown, true/false = last known state
+
+async function broadcastToTabs(message) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (typeof tab.id !== 'number') continue;
+      chrome.tabs.sendMessage(tab.id, message).catch(() => { }); // ignore unresponsive tabs
+    }
+  } catch { /* ignore */ }
+}
+
+async function checkServerHealthAndNotify() {
+  let isHealthy = false;
+  try {
+    const response = await fetch('http://127.0.0.1:8765/health', { method: 'GET', signal: AbortSignal.timeout(2000) });
+    if (response.ok) {
+      const data = await response.json();
+      isHealthy = Boolean(data?.ok);
+    }
+  } catch { /* server unreachable */ }
+
+  if (prevServerHealthy === true && !isHealthy) {
+    // Server was healthy, now it's offline — crashed!
+    prevServerHealthy = false;
+    broadcastToTabs({ action: 'serverCrashed' });
+  } else if (prevServerHealthy === false && isHealthy) {
+    // Server restored
+    prevServerHealthy = true;
+    broadcastToTabs({ action: 'serverRestored' });
+  } else if (prevServerHealthy === null) {
+    prevServerHealthy = isHealthy;
+  }
+}
+
+// Poll every 5 seconds to detect crashes between popup refreshes
+setInterval(checkServerHealthAndNotify, 5000);
+
+
 async function handleServerControl(command, options = {}) {
   try {
     if (command === 'status') {
@@ -1012,9 +1052,9 @@ chrome.runtime.onInstalled.addListener(() => {
       'poe.com'
     ]
   });
-  detector.warmUpIfAvailable().catch(() => {});
+  detector.warmUpIfAvailable().catch(() => { });
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  detector.warmUpIfAvailable().catch(() => {});
+  detector.warmUpIfAvailable().catch(() => { });
 });

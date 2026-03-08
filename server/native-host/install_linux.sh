@@ -2,15 +2,16 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: bash scripts/install_native_host_mac.sh <extension_id>"
+  echo "Usage: bash server/native-host/install_linux.sh <extension_id>"
   exit 1
 fi
 
 EXTENSION_ID="$1"
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST_SCRIPT="${REPO_DIR}/scripts/native_host.py"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HOST_SCRIPT="${REPO_DIR}/server/native_host.py"
 HOST_NAME="com.privacyshield.gliner2"
 RUNTIME_DIR="${REPO_DIR}/.runtime"
+VENV_PYTHON="${REPO_DIR}/.venv/bin/python"
 
 if [[ ! -f "${HOST_SCRIPT}" ]]; then
   echo "Native host script not found: ${HOST_SCRIPT}"
@@ -21,7 +22,7 @@ chmod +x "${HOST_SCRIPT}"
 mkdir -p "${RUNTIME_DIR}/cache"
 touch "${RUNTIME_DIR}/gliner2_server.log"
 
-if [[ ! -x "${REPO_DIR}/.venv/bin/python" ]]; then
+if [[ ! -x "${VENV_PYTHON}" ]]; then
   python3 -m venv "${REPO_DIR}/.venv"
   echo "Created local virtual environment: ${REPO_DIR}/.venv"
 fi
@@ -44,9 +45,7 @@ EOF
   echo "Installed: ${manifest_file}"
 }
 
-write_manifest "${HOME}/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-write_manifest "${HOME}/Library/Application Support/Chromium/NativeMessagingHosts"
-write_manifest "${HOME}/Library/Application Support/Google/Chrome Canary/NativeMessagingHosts"
+write_manifest "${HOME}/.config/google-chrome/NativeMessagingHosts"
+write_manifest "${HOME}/.config/chromium/NativeMessagingHosts"
 
 echo "Native host installed for extension id: ${EXTENSION_ID}"
-echo "Run 'bash scripts/install_autostart_mac.sh' to start GLiNER2 automatically at login."

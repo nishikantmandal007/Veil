@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'   # Trigger on version tags: v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write   # Required to create GitHub Releases and upload assets
+
+jobs:
+  build-and-release:
+    name: Build Extension Package & Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dev dependencies
+        run: npm ci
+
+      - name: Build extension ZIP
+        run: bash scripts/build_crx.sh dist/veil-extension.zip
+
+      - name: Get version from manifest
+        id: version
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Rename ZIP with version
+        run: |
+          mv dist/veil-extension.zip "dist/veil-extension-${{ steps.version.outputs.version }}.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Veil ${{ steps.version.outputs.tag }}"
+          body: |
+            ## Veil Extension ${{ steps.version.outputs.tag }}
+
+            ### Installation
+            1. Download **veil-extension-${{ steps.version.outputs.version }}.zip** below
+            2. Extract the zip file
+            3. Open Chrome → `chrome://extensions` → Enable **Developer mode**
+            4. Click **Load unpacked** and select the extracted folder
+
+            ### Chrome Web Store
+            Submit the zip to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole).
+
+            ### Changelog
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for full details.
+          files: |
+            dist/veil-extension-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+
+  # Optional: run unit tests before packaging
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run JS unit tests
+        run: node tests/js/test_background_utils.js
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python test deps
+        run: pip install pytest
+      - name: Run Python unit tests
+        run: pytest tests/server/ -v

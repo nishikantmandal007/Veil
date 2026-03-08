@@ -1012,10 +1012,9 @@ class PrivacyShield {
           span.replaceWith(document.createTextNode(span.textContent || ''));
         }
       });
-      // Use DOM-aware text extraction that adds \n for block elements (<p>, <div>).
-      // textContent does NOT add newlines between block elements (Gemini uses <p> tags),
-      // so we must walk the tree manually.
       const raw = this.extractContentEditableText(clone);
+      // FIX: always restore known redactions so the semantic source text is
+      // returned even when CE renders replacement text (prevents re-detection loop)
       return this.restoreKnownRedactions(raw, state);
     }
 
@@ -1329,6 +1328,13 @@ class PrivacyShield {
         this.playCommitAnimation(element);
       }
       this.removeTokenTray(element);
+
+      // FIX: Update lastAnalyzedSnapshot so the input event fired by the DOM
+      // mutation doesn't immediately re-trigger detection on the replaced text.
+      const currentRevision = this.getInputRevision(element);
+      const sourceText = state.sourceText || '';
+      const snapshotKey = `${currentRevision}:${this.hashString(sourceText)}`;
+      this.lastAnalyzedSnapshot.set(element, snapshotKey);
 
       // Schedule overlay pass: if the host editor (Lexical, ProseMirror, Angular, etc.)
       // strips our injected spans during its reconciliation cycle, we draw external
@@ -2525,6 +2531,19 @@ class PrivacyShield {
   }
 
   handleRuntimeMessage(request, _sender, sendResponse) {
+    if (request?.action === 'serverCrashed') {
+      this.showNotification('⚠ GLiNER2 server offline — using regex fallback.', 'warning');
+      // Reset detector mode so next detection triggers a re-check
+      try { chrome.runtime.sendMessage({ action: 'initialize' }).catch(() => { }); } catch { }
+      return false;
+    }
+
+    if (request?.action === 'serverRestored') {
+      this.showNotification('✓ Local model back online — full AI detection active.', 'info');
+      try { chrome.runtime.sendMessage({ action: 'initialize' }).catch(() => { }); } catch { }
+      return false;
+    }
+
     if (request?.action !== 'getPageStats') return false;
     if (window !== window.top) return false;
     sendResponse({

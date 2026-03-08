@@ -24,7 +24,7 @@ WAIT_SECONDS = 18
 MODEL_ENV_VAR = "GLINER2_MODEL"
 
 REPO_DIR = Path(__file__).resolve().parent.parent
-SCRIPT_PATH = REPO_DIR / "scripts" / "gliner2_server.py"
+SCRIPT_PATH = REPO_DIR / "server" / "gliner2_server.py"
 VENV_DIR = REPO_DIR / ".venv"
 VENV_PYTHON = VENV_DIR / "bin" / "python"
 REQUIREMENTS = REPO_DIR / "requirements.txt"

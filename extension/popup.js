@@ -203,6 +203,7 @@ class SettingsManager {
     await this.refreshServerLogs({ silent: true });
     this.startServerPolling();
     this.startStatsPolling();
+    this.wizard = null; // set by OnboardingWizard after construction
   }
 
   loadSettings() {
@@ -422,7 +423,7 @@ class SettingsManager {
     });
 
     window.addEventListener('focus', () => {
-      this.loadPageStats().catch(() => {});
+      this.loadPageStats().catch(() => { });
     });
   }
 
@@ -475,6 +476,13 @@ class SettingsManager {
       dot.classList.add('warn');
       text.textContent = 'Starting Local Server';
       sub.textContent = 'Attempting to connect to local GLiNER2...';
+      return;
+    }
+
+    if (this.serverPhase === 'model-loading') {
+      dot.classList.add('warn');
+      text.textContent = 'Loading Model';
+      sub.textContent = 'GLiNER2 model is loading — first start can take 15–30 s...';
       return;
     }
 
@@ -543,8 +551,8 @@ class SettingsManager {
       clearInterval(this.serverPollTimer);
     }
     this.serverPollTimer = setInterval(() => {
-      this.refreshServerStatus({ silent: true }).catch(() => {});
-      this.refreshServerLogs({ silent: true }).catch(() => {});
+      this.refreshServerStatus({ silent: true }).catch(() => { });
+      this.refreshServerLogs({ silent: true }).catch(() => { });
     }, 2600);
   }
 
@@ -553,7 +561,7 @@ class SettingsManager {
       clearInterval(this.statsPollTimer);
     }
     this.statsPollTimer = setInterval(() => {
-      this.loadPageStats().catch(() => {});
+      this.loadPageStats().catch(() => { });
     }, 1200);
   }
 
@@ -912,10 +920,13 @@ class SettingsManager {
     } else if (this.serverState.running && this.serverState.healthy) {
       this.setServerPhase('active');
     } else if (this.serverState.running && !this.serverState.healthy) {
-      this.setServerPhase('connecting');
+      // Server process up, but health endpoint says model not loaded yet
+      this.setServerPhase('model-loading');
     } else {
       this.setServerPhase('disconnected');
     }
+    // Notify onboarding wizard of state change
+    if (this.wizard) this.wizard.onServerStateUpdate();
   }
 
   async refreshServerLogs(options = {}) {
@@ -1318,6 +1329,144 @@ class SettingsManager {
   }
 }
 
+/* ══════════════════════════════════════════════════
+   OnboardingWizard — first-run guided setup
+══════════════════════════════════════════════════ */
+
+class OnboardingWizard {
+  constructor(settingsManager) {
+    this.sm = settingsManager;
+    this.currentStep = 0;
+    this.hostPollTimer = null;
+    this.overlay = document.getElementById('onboardingOverlay');
+    if (!this.overlay) return;
+    this.sm.wizard = this; // wire back so server state updates reach wizard
+    this._bindEvents();
+    this._checkAndShow();
+  }
+
+  async _checkAndShow() {
+    const result = await new Promise((resolve) => chrome.storage.local.get(['veilOnboardingDone'], resolve));
+    if (result.veilOnboardingDone) return;
+    this._populateInstallCmd();
+    this._goToStep(0);
+    this.overlay.hidden = false;
+  }
+
+  _populateInstallCmd() {
+    const cmd = document.getElementById('onboardingInstallCmd');
+    if (cmd) cmd.textContent = `bash server/native-host/install_linux.sh ${chrome.runtime.id}`;
+  }
+
+  _bindEvents() {
+    const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+
+    on('onboardingSkipBtn', () => this._finish());
+    on('onboardingSkipHost', () => this._goToStep(2));
+    on('onboardingSkipServer', () => this._finish());
+    on('onboardingNextBtn0', () => this._goToStep(1));
+    on('onboardingDoneBtn', () => this._finish());
+
+    on('onboardingCopyCmd', async () => {
+      const cmd = document.getElementById('onboardingInstallCmd')?.textContent.trim() || '';
+      try { await navigator.clipboard.writeText(cmd); } catch { }
+      const btn = document.getElementById('onboardingCopyCmd');
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
+    });
+
+    on('onboardingCheckHost', () => this._pollHostNow());
+
+    on('onboardingStartServerBtn', async () => {
+      const btn = document.getElementById('onboardingStartServerBtn');
+      const statusEl = document.getElementById('onboardingServerStatus');
+      if (btn) btn.disabled = true;
+      if (statusEl) { statusEl.textContent = 'Starting server… (first run may take 30–60 s)'; statusEl.className = 'onboarding-status-note is-loading'; }
+      await this.sm.startServer();
+      if (btn) btn.disabled = false;
+      this._updateServerStep();
+    });
+  }
+
+  _goToStep(index) {
+    this.currentStep = index;
+    document.querySelectorAll('#onboardingOverlay .onboarding-step').forEach((step) => {
+      const stepIndex = Number(step.dataset.step);
+      step.hidden = stepIndex !== index;
+    });
+    document.querySelectorAll('#onboardingOverlay .onboarding-dot').forEach((dot) => {
+      const dotIndex = Number(dot.dataset.step);
+      dot.classList.toggle('is-active', dotIndex === index);
+      dot.classList.toggle('is-done', dotIndex < index);
+      dot.classList.remove('is-active');
+      if (dotIndex === index) dot.classList.add('is-active');
+      else if (dotIndex < index) dot.classList.add('is-done');
+    });
+
+    if (index === 1) this._startHostPolling();
+    else this._stopHostPolling();
+
+    if (index === 2) this._updateServerStep();
+  }
+
+  _startHostPolling() {
+    this._pollHostNow();
+    this.hostPollTimer = setInterval(() => this._pollHostNow(), 2500);
+  }
+
+  _stopHostPolling() {
+    if (this.hostPollTimer) { clearInterval(this.hostPollTimer); this.hostPollTimer = null; }
+  }
+
+  async _pollHostNow() {
+    const statusEl = document.getElementById('onboardingHostStatus');
+    const response = await this.sm.requestServerControl('status');
+    const installed = response?.installed !== false && response?.success !== false;
+    if (statusEl) {
+      if (installed && response?.success) {
+        statusEl.textContent = '✓ Native host detected!';
+        statusEl.className = 'onboarding-status-note is-ok';
+        this._stopHostPolling();
+        setTimeout(() => this._goToStep(2), 800);
+      } else {
+        statusEl.textContent = 'Native host not found yet. Run the command above and click Check Again.';
+        statusEl.className = 'onboarding-status-note';
+      }
+    }
+  }
+
+  _updateServerStep() {
+    const statusEl = document.getElementById('onboardingServerStatus');
+    if (!statusEl) return;
+    const state = this.sm.serverState;
+    if (state.healthy) {
+      statusEl.textContent = '✓ Local server is running!';
+      statusEl.className = 'onboarding-status-note is-ok';
+      setTimeout(() => this._goToStep(3), 800);
+    } else if (state.running) {
+      statusEl.textContent = 'Server process is starting — model loads in 15–30 s…';
+      statusEl.className = 'onboarding-status-note is-loading';
+    } else {
+      statusEl.textContent = 'Server not started yet.';
+      statusEl.className = 'onboarding-status-note';
+    }
+  }
+
+  // Called by SettingsManager when server state updates while wizard is on step 2
+  onServerStateUpdate() {
+    if (this.overlay?.hidden) return;
+    if (this.currentStep === 2) this._updateServerStep();
+  }
+
+  _finish() {
+    this._stopHostPolling();
+    chrome.storage.local.set({ veilOnboardingDone: true });
+    this.overlay.hidden = true;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  new SettingsManager();
+  const sm = new SettingsManager();
+  // eslint-disable-next-line no-new
+  new OnboardingWizard(sm);
 });
+

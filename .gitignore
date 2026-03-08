@@ -11,7 +11,6 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
-dist/
 *.egg
 .pytest_cache/
 tests/.cache/
@@ -26,12 +25,17 @@ yarn-error.log*
 .pnp/
 .pnp.js
 
-# ─── Build artefacts ─────────────────────────────────────────────────────────
+# ─── Build & packaging artefacts ─────────────────────────────────────────────
 dist/
 build/
 *.crx
 *.pem
 *.zip
+
+# ─── Test output ─────────────────────────────────────────────────────────────
+test-results/
+playwright-report/
+coverage/
 
 # ─── OS ──────────────────────────────────────────────────────────────────────
 .DS_Store
@@ -49,8 +53,7 @@ desktop.ini
 *.swp
 *.swo
 *~
-.editorconfig.bak
 
-# ─── Cache ───────────────────────────────────────────────────────────────────
+# ─── Cache & logs ────────────────────────────────────────────────────────────
 /cache
 *.log
