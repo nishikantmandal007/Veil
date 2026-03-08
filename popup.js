@@ -178,7 +178,7 @@ class SettingsManager {
 
   loadSettings() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get(Object.keys(DEFAULT_SETTINGS), (result) => {
+      chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS), (result) => {
         this.settings = {
           ...DEFAULT_SETTINGS,
           ...result
@@ -947,7 +947,7 @@ class SettingsManager {
 
   updateSetting(key, value) {
     this.settings[key] = value;
-    chrome.storage.sync.set({ [key]: value }, () => this.setMessage('Saved'));
+    chrome.storage.local.set({ [key]: value }, () => this.setMessage('Saved'));
   }
 
   parseLines(text) {
@@ -1002,7 +1002,7 @@ class SettingsManager {
       };
 
       this.settings = { ...this.settings, ...payload };
-      chrome.storage.sync.set(payload, () => {
+      chrome.storage.local.set(payload, () => {
         if (showMessage) this.setMessage('Advanced settings saved.');
       });
     } catch (error) {
@@ -1011,7 +1011,7 @@ class SettingsManager {
   }
 
   async resetDefaults() {
-    await chrome.storage.sync.set(DEFAULT_SETTINGS);
+    await chrome.storage.local.set(DEFAULT_SETTINGS);
     this.settings = { ...DEFAULT_SETTINGS };
     this.render();
     this.setMessage('Settings reset to defaults.');

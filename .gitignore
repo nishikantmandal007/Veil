@@ -1,10 +1,54 @@
+# ─── Runtime & secrets ───────────────────────────────────────────────────────
 /.runtime
-/node_modules
-/cache
+.env
+.env.*
+
+# ─── Python ──────────────────────────────────────────────────────────────────
 /.venv
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# ─── Build artefacts ─────────────────────────────────────────────────────────
+dist/
+build/
+*.crx
+*.pem
+*.zip
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Editors ─────────────────────────────────────────────────────────────────
 /.vscode
 /.idea
-/.pytest_cache
-/.mypy_cache
-/.env
-/.env.*
+*.swp
+*.swo
+*~
+.editorconfig.bak
+
+# ─── Cache ───────────────────────────────────────────────────────────────────
+/cache
+*.log

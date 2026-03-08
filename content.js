@@ -244,7 +244,7 @@ class PrivacyShield {
 
   async loadSettings() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get([
+      chrome.storage.local.get([
         'enabled',
         'autoRedact',
         'redactionMode',
@@ -718,20 +718,10 @@ class PrivacyShield {
       pill = document.createElement('div');
       pill.className = 'ps-scanning-pill';
       pill.innerHTML = `
-        <div class="ps-scan-logo-wrap" aria-hidden="true">
-          <svg class="ps-crinkle-ring" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
-            <path class="ps-crinkle-track" pathLength="100" d="M18 4.4C19.6 4.2 21 4.9 22.5 5.3C24.1 5.8 25.9 6.1 27.1 7.3C28.4 8.5 29 10.4 29.9 11.9C30.8 13.4 31.8 14.9 31.9 16.7C31.9 18.5 30.9 20 30.2 21.6C29.5 23.2 29.1 25 27.9 26.2C26.7 27.4 24.9 27.8 23.4 28.6C21.9 29.3 20.3 30.3 18.6 30.4C16.8 30.5 15.2 29.5 13.6 28.9C12 28.2 10.2 27.9 9 26.7C7.7 25.4 7.4 23.6 6.6 22.1C5.9 20.6 4.9 19 4.8 17.3C4.6 15.5 5.6 13.9 6.2 12.3C6.8 10.7 7.2 8.9 8.4 7.7C9.7 6.5 11.5 6.1 13 5.4C14.6 4.7 16.2 4.6 18 4.4Z"></path>
-            <path class="ps-crinkle-progress" pathLength="100" d="M18 4.4C19.6 4.2 21 4.9 22.5 5.3C24.1 5.8 25.9 6.1 27.1 7.3C28.4 8.5 29 10.4 29.9 11.9C30.8 13.4 31.8 14.9 31.9 16.7C31.9 18.5 30.9 20 30.2 21.6C29.5 23.2 29.1 25 27.9 26.2C26.7 27.4 24.9 27.8 23.4 28.6C21.9 29.3 20.3 30.3 18.6 30.4C16.8 30.5 15.2 29.5 13.6 28.9C12 28.2 10.2 27.9 9 26.7C7.7 25.4 7.4 23.6 6.6 22.1C5.9 20.6 4.9 19 4.8 17.3C4.6 15.5 5.6 13.9 6.2 12.3C6.8 10.7 7.2 8.9 8.4 7.7C9.7 6.5 11.5 6.1 13 5.4C14.6 4.7 16.2 4.6 18 4.4Z"></path>
-          </svg>
-          <svg class="ps-lock-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-            <path class="ps-lock-shackle" d="M8.2 10.5V8.1C8.2 5.9 10 4.1 12.2 4.1C14.4 4.1 16.2 5.9 16.2 8.1V10.5"></path>
-            <rect class="ps-lock-body" x="6.7" y="10.5" width="11" height="9.2" rx="2.1"></rect>
-            <circle class="ps-lock-dot" cx="12.2" cy="15.1" r="1"></circle>
-          </svg>
-        </div>
+        <span class="ps-scan-dot" aria-hidden="true"></span>
         <div class="ps-scan-copy">
           <div class="ps-scan-title">Veil</div>
-          <div class="ps-scan-sub">Anonymizing text...</div>
+          <div class="ps-scan-sub">Scanning...</div>
         </div>
       `;
       document.body.appendChild(pill);
@@ -1298,7 +1288,6 @@ class PrivacyShield {
       // ── Save cursor position ──
       const savedCaret = this.saveCaretPosition(element);
 
-      const allRestored = state.items.every((item) => !item.redacted);
       const allUnderlineOnly = state.items.every((item) => !item.redacted);
 
       const html = this.renderContentEditableHtml(element, state, flashIndex);
@@ -1632,10 +1621,10 @@ class PrivacyShield {
    * innerHTML is set so that listeners survive serialisation.
    */
   _attachContentEditableSpanListeners(element) {
-    // Use a single delegated listener on the element itself.
-    // Guard against double-attaching by checking a flag.
-    if (element._psListenersAttached) return;
-    element._psListenersAttached = true;
+    // Guard against double-attaching. Use a WeakSet to avoid polluting DOM nodes.
+    if (!this._ceListenersAttached) this._ceListenersAttached = new WeakSet();
+    if (this._ceListenersAttached.has(element)) return;
+    this._ceListenersAttached.add(element);
 
     element.addEventListener('click', (event) => {
       const span = event.target.closest('.ps-redaction, .ps-pii-underline');
@@ -1651,14 +1640,17 @@ class PrivacyShield {
       }
     });
 
-    element.addEventListener('mouseenter', (event) => {
+    // IMPORTANT: mouseenter/mouseleave do NOT bubble, so delegating them on the
+    // parent element never fires for child spans. Use mouseover/mouseout instead —
+    // they DO bubble — and check relatedTarget to avoid spurious leave events when
+    // moving between child nodes within the same span.
+    element.addEventListener('mouseover', (event) => {
       const span = event.target.closest('.ps-redaction, .ps-pii-underline');
-      if (!span) return;
+      if (!span || !element.contains(span)) return;
       const index = parseInt(span.getAttribute('data-index'), 10);
       if (Number.isNaN(index)) return;
       const mode = span.classList.contains('ps-pii-underline') ? 'underline' : 'redacted';
 
-      // Hover preview for redacted items
       if (mode === 'redacted') {
         const currentState = this.redactions.get(element);
         const current = currentState?.items?.[index];
@@ -1668,15 +1660,16 @@ class PrivacyShield {
         }
       }
       this.showPopover(span, element, index, mode);
-    }, true);
+    });
 
-    element.addEventListener('mouseleave', (event) => {
+    element.addEventListener('mouseout', (event) => {
       const span = event.target.closest('.ps-redaction, .ps-pii-underline');
-      if (!span) return;
+      if (!span || !element.contains(span)) return;
+      // Skip if the pointer is still within the same span (moving between child nodes)
+      if (span.contains(event.relatedTarget)) return;
       const index = parseInt(span.getAttribute('data-index'), 10);
       if (Number.isNaN(index)) return;
 
-      // Restore redacted display text
       if (span.classList.contains('ps-redaction')) {
         const currentState = this.redactions.get(element);
         const current = currentState?.items?.[index];
@@ -1686,7 +1679,7 @@ class PrivacyShield {
         }
       }
       this.schedulePopoverHide();
-    }, true);
+    });
   }
 
   // ── Underline span (Grammarly-style, before redaction) ──
@@ -1830,34 +1823,34 @@ class PrivacyShield {
 
     const popover = document.createElement('div');
     popover.className = 'ps-popover';
-    popover.style.setProperty('--detection-color', this.getTypeColor(item.label));
+    const typeColor = this.getTypeColor(item.label);
+    popover.style.setProperty('--detection-color', typeColor);
 
-    const labelText = this.formatLabel(item.label);
+    // Always escape user-derived content before injecting into innerHTML
+    const labelText = this.escapeHtml(this.formatLabel(item.label));
+    const itemText = this.escapeHtml(item.text);
 
     if (mode === 'underline') {
-      // PII detected but not yet redacted
       popover.innerHTML = `
-        <div class="ps-popover-label" style="color: ${this.getTypeColor(item.label)}">${labelText} detected</div>
-        <div class="ps-popover-text">"${this.escapeHtml(item.text)}"</div>
+        <div class="ps-popover-label" style="color:${typeColor}">${labelText} detected</div>
+        <div class="ps-popover-text">&ldquo;${itemText}&rdquo;</div>
         <div class="ps-popover-actions">
           <button type="button" class="ps-popover-btn ps-popover-btn-primary" data-action="redact">Redact</button>
           <button type="button" class="ps-popover-btn ps-popover-btn-dismiss" data-action="dismiss">Dismiss</button>
         </div>
       `;
     } else if (item.redacted) {
-      // Already redacted → offer restore
       popover.innerHTML = `
-        <div class="ps-popover-label" style="color: ${this.getTypeColor(item.label)}">${labelText}</div>
-        <div class="ps-popover-text">Original: "${this.escapeHtml(item.text)}"</div>
+        <div class="ps-popover-label" style="color:${typeColor}">${labelText}</div>
+        <div class="ps-popover-text">Original: &ldquo;${itemText}&rdquo;</div>
         <div class="ps-popover-actions">
           <button type="button" class="ps-popover-btn ps-popover-btn-restore" data-action="restore">Restore</button>
         </div>
       `;
     } else {
-      // Restored → offer re-redact
       popover.innerHTML = `
-        <div class="ps-popover-label" style="color: ${this.getTypeColor(item.label)}">${labelText}</div>
-        <div class="ps-popover-text">"${this.escapeHtml(item.text)}"</div>
+        <div class="ps-popover-label" style="color:${typeColor}">${labelText}</div>
+        <div class="ps-popover-text">&ldquo;${itemText}&rdquo;</div>
         <div class="ps-popover-actions">
           <button type="button" class="ps-popover-btn ps-popover-btn-primary" data-action="redact">Re-Redact</button>
         </div>
@@ -2282,9 +2275,12 @@ class PrivacyShield {
   }
 
   escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   updateStats(detections, redactions) {

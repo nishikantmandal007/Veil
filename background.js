@@ -948,7 +948,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({
+  chrome.storage.local.set({
     enabled: true,
     autoRedact: true,
     redactionMode: 'anonymize',

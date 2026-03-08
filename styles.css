@@ -103,75 +103,18 @@
   transition: opacity 190ms ease, transform 190ms ease;
 }
 
-.ps-scan-logo-wrap {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(145deg, rgba(224, 242, 254, 0.95), rgba(233, 213, 255, 0.75));
-  border: 1px solid rgba(186, 230, 253, 0.95);
+.ps-scan-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #60a5fa;
+  flex-shrink: 0;
+  animation: ps-scan-pulse 1.4s ease-in-out infinite;
 }
 
-.ps-crinkle-ring {
-  position: absolute;
-  inset: -7px;
-  width: 44px;
-  height: 44px;
-  overflow: visible;
-  transform-origin: 50% 50%;
-  animation: ps-crinkle-rotate 2.6s linear infinite;
-}
-
-.ps-crinkle-track,
-.ps-crinkle-progress {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.ps-crinkle-track {
-  stroke: rgba(148, 163, 184, 0.45);
-  stroke-width: 1.7;
-}
-
-.ps-crinkle-progress {
-  stroke: #60a5fa;
-  stroke-width: 2.25;
-  stroke-dasharray: 10 90;
-  stroke-dashoffset: 0;
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
-  filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.36));
-  animation:
-    ps-crinkle-progress 1.55s cubic-bezier(0.34, 0.06, 0.16, 1) infinite,
-    ps-crinkle-jiggle 620ms ease-in-out infinite;
-}
-
-.ps-lock-icon {
-  width: 17px;
-  height: 17px;
-  stroke: #475569;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  z-index: 1;
-}
-
-.ps-lock-body {
-  fill: rgba(148, 163, 184, 0.24);
-}
-
-.ps-lock-dot {
-  fill: #334155;
-  stroke: none;
-}
-
-.ps-lock-shackle {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: ps-lock-close 820ms cubic-bezier(0.2, 0.78, 0.2, 1) both;
+@keyframes ps-scan-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.72); }
 }
 
 .ps-scan-copy {
@@ -198,167 +141,95 @@
   transform: translateY(0) scale(1);
 }
 
-@keyframes ps-lock-close {
-  0% {
-    transform: rotate(-20deg) translateY(-0.5px);
-  }
-  65% {
-    transform: rotate(2deg) translateY(0);
-  }
-  100% {
-    transform: rotate(0deg) translateY(0);
-  }
-}
-
-@keyframes ps-crinkle-rotate {
-  0% {
-    transform: rotate(-14deg);
-  }
-  100% {
-    transform: rotate(346deg);
-  }
-}
-
-@keyframes ps-crinkle-progress {
-  0% {
-    stroke-dasharray: 9 91;
-    stroke-dashoffset: 0;
-  }
-  30% {
-    stroke-dasharray: 28 72;
-  }
-  58% {
-    stroke-dasharray: 54 46;
-    stroke-dashoffset: -22;
-  }
-  100% {
-    stroke-dasharray: 11 89;
-    stroke-dashoffset: -100;
-  }
-}
-
-@keyframes ps-crinkle-jiggle {
-  0% {
-    stroke-width: 2.1;
-    transform: translate(0, 0) rotate(0deg);
-    opacity: 0.9;
-  }
-  25% {
-    stroke-width: 2.35;
-    transform: translate(0.12px, -0.1px) rotate(0.5deg);
-    opacity: 1;
-  }
-  50% {
-    stroke-width: 2.15;
-    transform: translate(-0.1px, 0.08px) rotate(-0.5deg);
-  }
-  75% {
-    stroke-width: 2.32;
-    transform: translate(0.14px, -0.06px) rotate(0.4deg);
-  }
-  100% {
-    stroke-width: 2.1;
-    transform: translate(0, 0) rotate(0deg);
-    opacity: 0.9;
-  }
-}
 
 /* ─── PII underline (Grammarly-style – before redaction) ─── */
 .ps-pii-underline {
   display: inline;
   position: relative;
   cursor: pointer;
-  border-bottom: 2px dotted var(--detection-color, #D32F2F);
-  background: color-mix(in srgb, var(--detection-color, #D32F2F) 7%, transparent);
+  /* Wavy underline — closer to Grammarly's feel */
+  text-decoration: underline wavy var(--detection-color, #D32F2F);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
   border-radius: 2px;
   padding: 0 1px;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    box-shadow 160ms ease;
-  animation: ps-underline-reveal 350ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+    background-color 120ms ease,
+    text-decoration-color 120ms ease;
+  animation: ps-underline-reveal 220ms ease-out both;
   animation-delay: var(--stagger, 0ms);
 }
 
 .ps-pii-underline:hover {
-  border-bottom-style: solid;
-  background: color-mix(in srgb, var(--detection-color, #D32F2F) 14%, transparent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--detection-color, #D32F2F) 20%, transparent);
+  background: color-mix(in srgb, var(--detection-color, #D32F2F) 10%, transparent);
 }
 
 @keyframes ps-underline-reveal {
-  from {
-    clip-path: inset(0 100% 0 0);
-    opacity: 0;
-  }
-
-  to {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ─── Redacted span (after redact action) ─── */
 .ps-redaction {
   display: inline;
   margin: 0;
-  padding: 0 1px;
-  border-radius: 2px;
+  padding: 1px 3px;
+  border-radius: 3px;
   cursor: pointer;
   user-select: none;
-  /* Inherit the host element's typography so the text layout is preserved */
   font-family: inherit;
   font-weight: inherit;
   font-size: inherit;
   line-height: inherit;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+  animation: ps-redact-in 180ms ease-out both;
+  animation-delay: var(--stagger, 0ms);
+}
+
+@keyframes ps-redact-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .ps-redaction-active {
-  color: inherit;
-  background: color-mix(in srgb, var(--redaction-color, #D32F2F) 7%, transparent);
-  border-bottom: 2px dotted var(--redaction-color, #D32F2F);
-  box-shadow: none;
+  color: color-mix(in srgb, var(--redaction-color, #D32F2F) 90%, #000);
+  background: color-mix(in srgb, var(--redaction-color, #D32F2F) 9%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--redaction-color, #D32F2F) 22%, transparent);
+  outline-offset: 0;
 }
 
 .ps-redaction-anonymized {
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .ps-redaction-restored {
   color: inherit;
-  background: color-mix(in srgb, #dbeafe 40%, transparent);
-  border-bottom: 2px dashed color-mix(in srgb, var(--redaction-color, #00695c) 30%, transparent);
-  box-shadow: none;
+  background: color-mix(in srgb, #93c5fd 18%, transparent);
+  outline: 1px dashed color-mix(in srgb, #3b82f6 30%, transparent);
+  outline-offset: 0;
 }
 
-/* Hover preview on redacted items – show original text underneath */
+/* Hover — reveal original text peek */
 .ps-redaction-hover-preview {
-  color: #1f2937;
-  background: color-mix(in srgb, #fde68a 50%, transparent);
-  border-bottom-color: rgba(146, 64, 14, 0.3);
-  box-shadow: none;
+  background: color-mix(in srgb, #fbbf24 18%, transparent);
+  outline-color: color-mix(in srgb, #d97706 28%, transparent);
+  color: #1c1917;
 }
 
-/* Undo/redo ripple animation */
+/* Undo ripple — subtle, fast */
 .ps-undo-ripple {
-  animation: ps-undo-ripple 400ms ease-out;
+  animation: ps-undo-ripple 300ms ease-out;
 }
 
 @keyframes ps-undo-ripple {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-  }
-
-  50% {
-    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.15);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-  }
+  0%   { outline-color: rgba(34, 197, 94, 0.6); }
+  100% { outline-color: transparent; }
 }
 
 /* ─── Popover (per-span anchored tooltip) ─── */
@@ -721,9 +592,7 @@
   .ps-awaiting-idle,
   .ps-redaction-commit,
   .ps-scanning-pill,
-  .ps-crinkle-ring,
-  .ps-crinkle-progress,
-  .ps-lock-shackle,
+  .ps-scan-dot,
   .ps-popover,
   .ps-action-bar,
   .ps-token-tray,

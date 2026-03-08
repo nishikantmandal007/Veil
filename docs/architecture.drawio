@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="21.0.0">
+  <diagram name="Veil Architecture" id="veil-arch-v1">
+    <mxGraphModel dx="1200" dy="780" grid="0" gridSize="10" guides="0" tooltips="1"
+                  connect="0" arrows="0" fold="0" page="0" pageScale="1"
+                  pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ── BROWSER BOUNDARY ── -->
+        <mxCell id="browser" value="Browser" style="rounded=1;arcSize=4;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontStyle=1;fontSize=13;fontColor=#334155;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="760" height="460" as="geometry"/>
+        </mxCell>
+
+        <!-- ── POPUP ── -->
+        <mxCell id="popup" value="popup.html / popup.js&#xa;&#xa;HF Token · API Key · Diagnostics" style="rounded=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#93C5FD;strokeWidth=1.5;fontSize=11;fontColor=#1E40AF;align=center;" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="190" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ── CONTENT SCRIPT ── -->
+        <mxCell id="content" value="content.js&#xa;&#xa;MutationObserver · PII render&#xa;Popover · Token tray" style="rounded=1;arcSize=8;fillColor=#F0FDF4;strokeColor=#86EFAC;strokeWidth=1.5;fontSize=11;fontColor=#14532D;align=center;" vertex="1" parent="1">
+          <mxGeometry x="320" y="100" width="200" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ── BACKGROUND ── -->
+        <mxCell id="bg" value="background.js (Service Worker)&#xa;&#xa;GLiNER detector · Regex fallback&#xa;VeilAnonymizer · Storage broker" style="rounded=1;arcSize=8;fillColor=#FFF7ED;strokeColor=#FCA5A5;strokeWidth=1.5;fontSize=11;fontColor=#7C2D12;align=center;" vertex="1" parent="1">
+          <mxGeometry x="320" y="280" width="210" height="88" as="geometry"/>
+        </mxCell>
+
+        <!-- ── STORAGE ── -->
+        <mxCell id="storage" value="chrome.storage.local&#xa;&#xa;apiKey · seed · customPatterns&#xa;settings · cachedRedactions" style="rounded=1;arcSize=8;fillColor=#FAF5FF;strokeColor=#D8B4FE;strokeWidth=1.5;fontSize=11;fontColor=#4A1D96;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="280" width="200" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ── PAGE DOM ── -->
+        <mxCell id="dom" value="Page DOM&#xa;&#xa;contenteditable · input&#xa;textarea · form fields" style="rounded=1;arcSize=8;fillColor=#FFFBEB;strokeColor=#FDE68A;strokeWidth=1.5;fontSize=11;fontColor=#78350F;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="100" width="190" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ── LOCAL SERVER BOUNDARY ── -->
+        <mxCell id="server-box" value="Local Machine (Python)" style="rounded=1;arcSize=4;fillColor=#F1F5F9;strokeColor=#94A3B8;strokeWidth=1.5;fontStyle=1;fontSize=12;fontColor=#334155;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="540" width="760" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- ── GLINER SERVER ── -->
+        <mxCell id="gliner" value="GLiNER2 HTTP Server&#xa;127.0.0.1:8765&#xa;&#xa;NER inference (offline)" style="rounded=1;arcSize=8;fillColor=#F0F9FF;strokeColor=#7DD3FC;strokeWidth=1.5;fontSize=11;fontColor=#0C4A6E;align=center;" vertex="1" parent="1">
+          <mxGeometry x="80" y="590" width="200" height="66" as="geometry"/>
+        </mxCell>
+
+        <!-- ── GLINER MODEL ── -->
+        <mxCell id="model" value="GLiNER2 Model&#xa;(ONNX / HuggingFace)" style="rounded=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#6EE7B7;strokeWidth=1.5;fontSize=11;fontColor=#065F46;align=center;" vertex="1" parent="1">
+          <mxGeometry x="330" y="590" width="200" height="66" as="geometry"/>
+        </mxCell>
+
+        <!-- ── EXTERNAL API ── -->
+        <mxCell id="api" value="Anonymization API&#xa;(optional, keyed)" style="rounded=1;arcSize=8;fillColor=#FFF1F2;strokeColor=#FCA5A5;strokeWidth=1.5;fontSize=11;fontColor=#881337;align=center;" vertex="1" parent="1">
+          <mxGeometry x="580" y="590" width="185" height="66" as="geometry"/>
+        </mxCell>
+
+        <!-- ── EDGES ── -->
+
+        <!-- popup ↔ background (chrome.runtime messages) -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#94A3B8;strokeWidth=1.5;exitX=0.5;exitY=1;entryX=0.15;entryY=0;fontSize=10;fontColor=#64748B;" edge="1" source="popup" target="bg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1l" value="chrome.runtime.sendMessage" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=9;fontColor=#64748B;" vertex="1" connectable="0" parent="e1">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- content ↔ background (chrome.runtime messages) -->
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#94A3B8;strokeWidth=1.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=10;fontColor=#64748B;" edge="1" source="content" target="bg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2l" value="sendMessage / onMessage" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=9;fontColor=#64748B;" vertex="1" connectable="0" parent="e2">
+          <mxGeometry x="0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- content ↔ DOM -->
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#94A3B8;strokeWidth=1.5;" edge="1" source="content" target="dom" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3l" value="observe / mutate" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=9;fontColor=#64748B;" vertex="1" connectable="0" parent="e3">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- background ↔ storage -->
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#94A3B8;strokeWidth=1.5;" edge="1" source="bg" target="storage" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4l" value="get / set" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=9;fontColor=#64748B;" vertex="1" connectable="0" parent="e4">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- background → GLiNER server (fetch) -->
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#7DD3FC;strokeWidth=1.5;dashed=0;" edge="1" source="bg" target="gliner" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5l" value="fetch / HTTP POST" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=9;fontColor=#0C4A6E;" vertex="1" connectable="0" parent="e5">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- GLiNER server ↔ model -->
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6EE7B7;strokeWidth=1.5;" edge="1" source="gliner" target="model" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- background → external API (dashed = optional) -->
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#FCA5A5;strokeWidth=1.5;dashed=1;" edge="1" source="bg" target="api" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7l" value="X-API-Key (optional)" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=9;fontColor=#881337;" vertex="1" connectable="0" parent="e7">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
