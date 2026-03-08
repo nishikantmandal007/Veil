@@ -8,6 +8,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 EXTENSION_DIR="$ROOT/extension"
 OUTPUT="${1:-$ROOT/dist/veil-extension.zip}"
+if [[ "$OUTPUT" != /* ]]; then
+  OUTPUT="$PWD/$OUTPUT"
+fi
 
 echo "🛡  Veil Extension — CRX Package Builder"
 echo "   Source : $EXTENSION_DIR"

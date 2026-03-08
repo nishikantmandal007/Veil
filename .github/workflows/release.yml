@@ -32,7 +32,7 @@ jobs:
       - name: Get version from manifest
         id: version
         run: |
-          VERSION=$(node -p "require('./manifest.json').version")
+          VERSION=$(node -p "require('./extension/manifest.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
