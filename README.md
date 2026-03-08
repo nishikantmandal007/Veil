@@ -7,10 +7,12 @@
 **Stop pasting your SSNs, API keys, and names into ChatGPT.**  
 Veil runs a local AI model to detect and redact PII *before* it ever leaves your browser.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](#testing)
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue?logo=googlechrome)](https://chrome.google.com/webstore)
-
+[![CI](https://github.com/nishikantmandal007/Veil/actions/workflows/ci.yml/badge.svg)](https://github.com/nishikantmandal007/Veil/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black?style=flat-square)](LICENSE)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-black?style=flat-square&logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
+[![GitHub release](https://img.shields.io/github/v/release/nishikantmandal007/Veil?style=flat-square&color=black)](https://github.com/nishikantmandal007/Veil/releases)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-black?style=flat-square)](docs/CONTRIBUTING.md)
+[![GitHub stars](https://img.shields.io/github/stars/nishikantmandal007/Veil?style=flat-square&color=black)](https://github.com/nishikantmandal007/Veil/stargazers)
 </div>
 
 ---
