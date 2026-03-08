@@ -1,4 +1,38 @@
-/* styles.css - Grammarly-style PII detection & redaction UI */
+/* styles.css — Veil in-page UI
+   Design tokens mirror popup.css exactly:
+     surface  #fffdf8   border   #e7dece
+     text     #2f281f   muted    #6f6659
+     ink      #23201b   bg       #f4efe6
+     btn-dark #2d251c   btn-2nd  #efe2ce   btn-ghost #f6ebda
+*/
+
+/* ─── Shared token variables (scoped to all Veil in-page elements) ─── */
+.ps-overlay,
+.ps-highlight,
+.ps-label,
+.ps-scanning-pill,
+.ps-pii-underline,
+.ps-redaction,
+.ps-popover,
+.ps-action-bar,
+.ps-token-tray,
+.ps-notification,
+.ps-reveal-overlay,
+.ps-overlay-hl {
+  --veil-surface:   #fffdf8;
+  --veil-surface-2: #faf6ee;
+  --veil-bg:        #f4efe6;
+  --veil-border:    #e7dece;
+  --veil-text:      #2f281f;
+  --veil-muted:     #6f6659;
+  --veil-ink:       #23201b;
+  --veil-btn:       #2d251c;
+  --veil-btn-text:  #faf8f3;
+  --veil-btn-2:     #efe2ce;
+  --veil-btn-2-txt: #3c3123;
+  --veil-shadow:    rgba(45, 37, 28, 0.12);
+  --veil-font:      "Avenir Next", "Manrope", "Segoe UI Variable", "Segoe UI", sans-serif;
+}
 
 /* ─── Overlay (pointer-events passthrough container) ─── */
 .ps-overlay {
@@ -8,18 +42,16 @@
   z-index: 2147483000;
 }
 
-/* ─── Field highlight border (detection glow around the input) ─── */
+/* ─── Field highlight border ─── */
 .ps-highlight {
   position: absolute;
   pointer-events: none;
   border-radius: 12px;
   opacity: 0;
   transform: scale(0.995);
-  border: 1px solid color-mix(in srgb, var(--detection-color, #00796b) 55%, white);
-  background: linear-gradient(120deg,
-      color-mix(in srgb, var(--detection-color, #00796b) 4%, transparent),
-      color-mix(in srgb, var(--detection-color, #00796b) 8%, transparent));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--detection-color, #00796b) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--detection-color, #b45309) 40%, #e7dece);
+  background: color-mix(in srgb, var(--detection-color, #b45309) 5%, #fdf8f0);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--detection-color, #b45309) 12%, transparent);
   transition: opacity 200ms ease, transform 200ms ease;
 }
 
@@ -33,54 +65,43 @@
 }
 
 @keyframes ps-soft-breathe {
-
-  0%,
-  100% {
+  0%, 100% {
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--detection-color, #00796b) 20%, transparent),
-      0 8px 18px color-mix(in srgb, var(--detection-color, #00796b) 12%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--detection-color, #b45309) 16%, transparent),
+      0 8px 18px rgba(45, 37, 28, 0.08);
   }
-
   50% {
     box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--detection-color, #00796b) 30%, transparent),
-      0 10px 24px color-mix(in srgb, var(--detection-color, #00796b) 18%, transparent);
+      0 0 0 2px color-mix(in srgb, var(--detection-color, #b45309) 24%, transparent),
+      0 10px 24px rgba(45, 37, 28, 0.13);
   }
 }
 
-/* ─── Detection label pill above the field ─── */
+/* ─── Detection label pill ─── */
 .ps-label {
   position: absolute;
   top: -22px;
   left: 10px;
-  padding: 4px 9px;
+  padding: 3px 8px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
-  color: white;
-  background: linear-gradient(135deg,
-      color-mix(in srgb, var(--detection-color, #00796b) 78%, black),
-      color-mix(in srgb, var(--detection-color, #00796b) 96%, black));
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
-  animation: ps-label-slide 280ms ease;
+  font-family: var(--veil-font);
+  color: var(--veil-btn-text);
+  background: var(--veil-btn);
+  border: 1px solid rgba(45, 37, 28, 0.55);
+  box-shadow: 0 4px 10px rgba(45, 37, 28, 0.18);
+  animation: ps-label-slide 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes ps-label-slide {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ─── Scanning indicator (floating logo animation) ─── */
+/* ─── Scanning pill ─── */
 .ps-scanning-pill {
   position: absolute;
   z-index: 2147483250;
@@ -91,30 +112,36 @@
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--veil-font);
   letter-spacing: 0.005em;
-  color: #334155;
-  background: linear-gradient(140deg, rgba(248, 250, 252, 0.96), rgba(240, 249, 255, 0.96));
-  border: 1px solid rgba(148, 163, 184, 0.38);
-  box-shadow: 0 8px 18px rgba(148, 163, 184, 0.2);
+  color: var(--veil-text);
+  background: linear-gradient(140deg, #fdfbf6, #f4efe6);
+  border: 1px solid #e7dece;
+  box-shadow: 0 4px 14px rgba(45, 37, 28, 0.10), 0 1px 0 rgba(255,255,255,0.7) inset;
   pointer-events: none;
   opacity: 0;
   transform: translateY(8px) scale(0.96);
-  transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ps-scanning-pill.ps-scanning-pill-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .ps-scan-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #60a5fa;
+  background: #2d251c;
   flex-shrink: 0;
   animation: ps-scan-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes ps-scan-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.45; transform: scale(0.72); }
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.65); }
 }
 
 .ps-scan-copy {
@@ -126,42 +153,34 @@
 .ps-scan-title {
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: rgba(71, 85, 105, 0.8);
+  letter-spacing: 0.08em;
+  color: var(--veil-muted);
 }
 
 .ps-scan-sub {
   margin-top: 1px;
   font-size: 11px;
-  color: #334155;
+  font-weight: 600;
+  color: var(--veil-ink);
 }
 
-.ps-scanning-pill.ps-scanning-pill-visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-
-/* ─── PII underline (Grammarly-style – before redaction) ─── */
+/* ─── PII underline (Grammarly-style — before redaction) ─── */
 .ps-pii-underline {
   display: inline;
   position: relative;
   cursor: pointer;
-  /* Wavy underline — closer to Grammarly's feel */
-  text-decoration: underline wavy var(--detection-color, #D32F2F);
+  text-decoration: underline wavy var(--detection-color, #b45309);
   text-underline-offset: 3px;
   text-decoration-thickness: 1.5px;
   border-radius: 2px;
   padding: 0 1px;
-  transition:
-    background-color 200ms ease,
-    text-decoration-color 200ms ease;
+  transition: background-color 200ms ease, text-decoration-color 200ms ease;
   animation: ps-underline-reveal 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--stagger, 0ms);
 }
 
 .ps-pii-underline:hover {
-  background: color-mix(in srgb, var(--detection-color, #D32F2F) 10%, transparent);
+  background: color-mix(in srgb, var(--detection-color, #b45309) 10%, #fdf6ed);
 }
 
 @keyframes ps-underline-reveal {
@@ -169,12 +188,12 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── Redacted span (after redact action) ─── */
+/* ─── Redacted span ─── */
 .ps-redaction {
   display: inline;
   margin: 0;
-  padding: 1px 3px;
-  border-radius: 3px;
+  padding: 1px 4px;
+  border-radius: 4px;
   cursor: pointer;
   user-select: none;
   font-family: inherit;
@@ -183,11 +202,8 @@
   line-height: inherit;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  transition:
-    background-color 200ms ease,
-    color 200ms ease,
-    opacity 200ms ease,
-    outline-color 200ms ease;
+  transition: background-color 200ms ease, color 200ms ease,
+              opacity 200ms ease, outline-color 200ms ease;
   animation: ps-redact-in 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--stagger, 0ms);
 }
@@ -198,9 +214,9 @@
 }
 
 .ps-redaction-active {
-  color: color-mix(in srgb, var(--redaction-color, #D32F2F) 90%, #000);
-  background: color-mix(in srgb, var(--redaction-color, #D32F2F) 9%, transparent);
-  outline: 1px solid color-mix(in srgb, var(--redaction-color, #D32F2F) 22%, transparent);
+  color: color-mix(in srgb, var(--redaction-color, #b45309) 88%, #2f281f);
+  background: color-mix(in srgb, var(--redaction-color, #b45309) 10%, #fdf6ed);
+  outline: 1px solid color-mix(in srgb, var(--redaction-color, #b45309) 28%, #e7dece);
   outline-offset: 0;
 }
 
@@ -210,70 +226,61 @@
 }
 
 .ps-redaction-restored {
-  color: inherit;
-  background: color-mix(in srgb, #93c5fd 18%, transparent);
-  outline: 1px dashed color-mix(in srgb, #3b82f6 30%, transparent);
+  color: var(--veil-text);
+  background: color-mix(in srgb, #e7dece 55%, #fffdf8);
+  outline: 1px dashed #d3c4ab;
   outline-offset: 0;
 }
 
-/* Hover — reveal original text peek */
-/* The .ps-redaction-hover-preview class is no longer applied to spans.
-   Hover reveal is handled entirely by .ps-reveal-overlay (a fixed-position
-   element in document.body, outside the contenteditable). This avoids any
-   DOM mutation inside the editor, which ProseMirror/Lexical would reconcile away. */
-
-/* ── Reveal overlay (Grammarly approach — lives in document.body) ── */
+/* ─── Reveal overlay (outside editor DOM, Grammarly-style) ─── */
 .ps-reveal-overlay {
-  background: color-mix(in srgb, #fbbf24 18%, #fffbeb);
-  color: #92400e;
-  outline: 1.5px solid color-mix(in srgb, #d97706 35%, transparent);
-  border-radius: 3px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  /* Warm card — readable on any background thanks to the drop-shadow */
+  background: linear-gradient(135deg, #fffefb, #fdfaf4);
+  color: var(--veil-ink, #23201b);
+  border: 1px solid #e7dece;
+  border-radius: 5px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22), 0 1px 0 rgba(255,255,255,0.9) inset;
+  font-family: var(--veil-font);
+  font-weight: 600;
   animation: ps-reveal-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes ps-reveal-in {
-  from { opacity: 0; transform: translateX(-50%) scale(0.94); }
+  from { opacity: 0; transform: translateX(-50%) scale(0.93); }
   to   { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
-/* ── External overlay highlights (AI sites — spans stripped by editor) ── */
-/* These live in document.body at position:fixed, completely outside the editor DOM */
+/* ─── External overlay highlights (AI sites) ─── */
 .ps-overlay-hl {
   pointer-events: all;
   cursor: pointer;
   z-index: 2147483100;
   box-sizing: border-box;
-  border-radius: 2px;
-  animation: ps-overlay-hl-in 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  border-radius: 3px;
+  animation: ps-overlay-hl-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Redacted token — amber/tinted box matching the redaction style */
 .ps-overlay-hl-redacted {
-  background: color-mix(in srgb, var(--hl-color, #D32F2F) 10%, transparent);
-  outline: 1px solid color-mix(in srgb, var(--hl-color, #D32F2F) 28%, transparent);
+  /* Fully transparent fill — works on both light and dark page backgrounds */
+  background: color-mix(in srgb, var(--hl-color, #b45309) 14%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--hl-color, #b45309) 45%, transparent);
   transition: background 180ms ease, outline-color 180ms ease;
 }
 .ps-overlay-hl-redacted:hover {
-  background: color-mix(in srgb, var(--hl-color, #D32F2F) 16%, transparent);
-  outline-color: color-mix(in srgb, var(--hl-color, #D32F2F) 45%, transparent);
+  background: color-mix(in srgb, var(--hl-color, #b45309) 22%, transparent);
+  outline-color: color-mix(in srgb, var(--hl-color, #b45309) 65%, transparent);
 }
 
-/* Underline — wavy line drawn below the detected text */
 .ps-overlay-hl-underline {
-  background: transparent;
-  border-bottom: 1.5px solid var(--hl-color, #D32F2F);
-  /* Simulate wavy using two layered gradients */
-  border-bottom: none;
   background-image:
-    linear-gradient(135deg, transparent 45%, var(--hl-color, #D32F2F) 45%, var(--hl-color, #D32F2F) 55%, transparent 55%),
-    linear-gradient(45deg,  transparent 45%, var(--hl-color, #D32F2F) 45%, var(--hl-color, #D32F2F) 55%, transparent 55%);
+    linear-gradient(135deg, transparent 45%, var(--hl-color, #b45309) 45%, var(--hl-color, #b45309) 55%, transparent 55%),
+    linear-gradient(45deg,  transparent 45%, var(--hl-color, #b45309) 45%, var(--hl-color, #b45309) 55%, transparent 55%);
   background-size: 6px 3px;
   background-repeat: repeat-x;
   background-position: bottom left;
 }
 .ps-overlay-hl-underline:hover {
-  background-color: color-mix(in srgb, var(--hl-color, #D32F2F) 8%, transparent);
+  background-color: color-mix(in srgb, var(--hl-color, #b45309) 10%, transparent);
 }
 
 @keyframes ps-overlay-hl-in {
@@ -281,35 +288,36 @@
   to   { opacity: 1; }
 }
 
-/* Undo ripple — subtle, fast */
+/* ─── Undo ripple ─── */
 .ps-undo-ripple {
-  animation: ps-undo-ripple 300ms ease-out;
+  animation: ps-undo-ripple 320ms ease-out;
 }
 
 @keyframes ps-undo-ripple {
-  0%   { outline-color: rgba(34, 197, 94, 0.6); }
+  0%   { outline-color: color-mix(in srgb, #b45309 55%, transparent); }
   100% { outline-color: transparent; }
 }
 
-/* ─── Popover (per-span anchored tooltip) ─── */
+/* ─── Popover ─── */
 .ps-popover {
   position: absolute;
   z-index: 2147483200;
-  min-width: 180px;
+  min-width: 190px;
   max-width: 300px;
   padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.36);
+  border-radius: 14px;
+  border: 1px solid #e7dece;
+  background: linear-gradient(180deg, #fffefb 0%, #fffbf4 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.9) inset,
+    0 12px 32px rgba(0, 0, 0, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.12);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(6px) scale(0.96);
-  transition: opacity 180ms cubic-bezier(0.22, 0.8, 0.2, 1),
-    transform 180ms cubic-bezier(0.22, 0.8, 0.2, 1);
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+  transform: translateY(8px) scale(0.97);
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: var(--veil-font);
 }
 
 .ps-popover.ps-popover-visible {
@@ -327,24 +335,24 @@
   transform: translateX(-50%) rotate(45deg);
   width: 10px;
   height: 10px;
-  background: rgba(15, 23, 42, 0.92);
-  border-right: 1px solid rgba(148, 163, 184, 0.26);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.26);
+  background: #fffbf4;
+  border-right: 1px solid #e7dece;
+  border-bottom: 1px solid #e7dece;
 }
 
 .ps-popover-label {
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--detection-color, #0ea5e9);
-  margin-bottom: 4px;
+  color: var(--detection-color, #b45309);
+  margin-bottom: 3px;
 }
 
 .ps-popover-text {
   font-size: 12px;
   font-weight: 500;
-  color: #e2e8f0;
+  color: var(--veil-text);
   line-height: 1.4;
   margin-bottom: 8px;
   word-break: break-word;
@@ -352,76 +360,77 @@
 
 .ps-popover-actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
+/* Base button — mirrors popup.css `button` */
 .ps-popover-btn {
   flex: 1;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  border: 1px solid #3a3024;
+  border-radius: 8px;
   padding: 5px 10px;
   font-size: 11px;
-  font-weight: 700;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
-  letter-spacing: 0.02em;
-  color: #f8fafc;
-  background: rgba(148, 163, 184, 0.18);
+  font-weight: 600;
+  font-family: var(--veil-font);
+  letter-spacing: 0.01em;
+  color: var(--veil-btn-text);
+  background: var(--veil-btn);
   cursor: pointer;
-  transition: transform 140ms ease, background-color 140ms ease;
+  transition: opacity 140ms ease, background-color 140ms ease;
   text-align: center;
 }
-
 .ps-popover-btn:hover {
-  transform: translateY(-1px);
-  background: rgba(148, 163, 184, 0.35);
+  background: #3a3127;
+}
+.ps-popover-btn:active {
+  background: #241d16;
 }
 
+/* Primary (Redact / Re-Redact) — dark brown, matches popup default button */
 .ps-popover-btn-primary {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: var(--veil-btn);
+  color: var(--veil-btn-text);
+  border-color: #3a3024;
 }
+.ps-popover-btn-primary:hover { background: #3a3127; }
 
-.ps-popover-btn-primary:hover {
-  background: linear-gradient(135deg, #ef4444, #991b1b);
-}
-
+/* Restore — warm beige, matches popup secondary button */
 .ps-popover-btn-restore {
-  background: linear-gradient(135deg, #16a34a, #15803d);
+  background: #efe2ce;
+  color: #3c3123;
+  border-color: #d3c4ab;
 }
+.ps-popover-btn-restore:hover { background: #e8d6bc; }
 
-.ps-popover-btn-restore:hover {
-  background: linear-gradient(135deg, #22c55e, #166534);
-}
-
+/* Dismiss — ghost, lowest weight */
 .ps-popover-btn-dismiss {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #94a3b8;
+  background: #f6ebda;
+  color: #6f6659;
+  border-color: #d9ccb8;
   font-weight: 600;
 }
+.ps-popover-btn-dismiss:hover { color: #2f281f; background: #efe2ce; }
 
-.ps-popover-btn-dismiss:hover {
-  color: #e2e8f0;
-  background: rgba(148, 163, 184, 0.12);
-}
-
-/* ─── Action bar (Redact All / near the field) ─── */
+/* ─── Action bar ─── */
 .ps-action-bar {
   position: absolute;
   z-index: 2147483150;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.28);
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffefb 0%, #fffbf4 100%);
+  border: 1px solid #e7dece;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.8) inset,
+    0 6px 18px rgba(45, 37, 28, 0.11);
   opacity: 0;
   pointer-events: none;
   transform: translateY(4px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: var(--veil-font);
 }
 
 .ps-action-bar.ps-action-bar-visible {
@@ -431,46 +440,41 @@
 }
 
 .ps-action-bar-btn {
-  border: none;
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 5px 11px;
   font-size: 11px;
-  font-weight: 700;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
-  letter-spacing: 0.02em;
-  color: #f8fafc;
+  font-weight: 600;
+  font-family: var(--veil-font);
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: transform 120ms ease, background-color 120ms ease;
+  transition: opacity 140ms ease, background-color 140ms ease;
 }
 
-.ps-action-bar-btn:hover {
-  transform: translateY(-1px);
-}
-
+/* Redact All — dark brown */
 .ps-action-bar-btn-redact {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: var(--veil-btn);
+  color: var(--veil-btn-text);
+  border: 1px solid #3a3024;
 }
+.ps-action-bar-btn-redact:hover { background: #3a3127; }
 
-.ps-action-bar-btn-redact:hover {
-  background: linear-gradient(135deg, #ef4444, #991b1b);
-}
-
+/* Restore All — warm beige */
 .ps-action-bar-btn-restore {
-  background: linear-gradient(135deg, #16a34a, #15803d);
+  background: #efe2ce;
+  color: #3c3123;
+  border: 1px solid #d3c4ab;
 }
-
-.ps-action-bar-btn-restore:hover {
-  background: linear-gradient(135deg, #22c55e, #166534);
-}
+.ps-action-bar-btn-restore:hover { background: #e8d6bc; }
 
 .ps-action-bar-count {
   font-size: 10px;
   font-weight: 600;
-  color: #94a3b8;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--veil-muted);
+  font-family: var(--veil-font);
+  padding: 0 2px;
 }
 
-/* ─── Token tray (for input/textarea) ─── */
+/* ─── Token tray ─── */
 .ps-token-tray {
   position: absolute;
   z-index: 2147483100;
@@ -479,12 +483,15 @@
   gap: 6px;
   padding: 7px;
   border-radius: 12px;
-  background: rgba(248, 250, 252, 0.95);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  background: linear-gradient(180deg, #fffefb 0%, #faf6ee 100%);
+  border: 1px solid #e7dece;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.8) inset,
+    0 10px 22px rgba(45, 37, 28, 0.10);
   opacity: 0;
   transform: translateY(5px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .ps-token-tray-visible {
@@ -493,41 +500,40 @@
 }
 
 .ps-token-chip {
-  border: none;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 700;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
-  padding: 6px 10px;
+  font-weight: 600;
+  font-family: var(--veil-font);
+  padding: 5px 10px;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .ps-token-chip.is-redacted {
-  color: #f8fafc;
-  background: linear-gradient(135deg,
-      color-mix(in srgb, var(--chip-color, #0369a1) 68%, black),
-      color-mix(in srgb, var(--chip-color, #0369a1) 85%, black));
+  background: var(--veil-btn);
+  color: var(--veil-btn-text);
+  border: 1px solid #3a3024;
 }
 
 .ps-token-chip.is-restored {
-  color: #0f172a;
-  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  background: #efe2ce;
+  color: #3c3123;
+  border: 1px solid #d3c4ab;
 }
 
 .ps-token-chip:hover {
+  opacity: 0.85;
   transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
 }
 
 .ps-token-chip.is-hover-preview {
-  color: #0f172a;
-  background: linear-gradient(135deg, #fef9c3, #fde68a);
+  background: linear-gradient(135deg, #fdf4e3, #fdecc8);
+  color: var(--veil-ink);
+  border: 1px solid #e7d5a8;
 }
 
-/* ─── Analyzing / Idle states ─── */
+/* ─── Analyzing / idle animations ─── */
 .ps-analyzing {
-  position: relative;
   animation: ps-input-scan 1150ms ease-in-out infinite;
 }
 
@@ -536,61 +542,24 @@
 }
 
 @keyframes ps-input-scan {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
-  }
-
-  50% {
-    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.10);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 37, 28, 0); }
+  50%       { box-shadow: 0 0 0 2px rgba(45, 37, 28, 0.08); }
 }
 
 @keyframes ps-idle-await {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
-  }
-
-  50% {
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.10);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0); }
+  50%       { box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.10); }
 }
 
-/* Commit shimmer on the whole element */
+/* Commit shimmer */
 .ps-redaction-commit {
-  animation:
-    ps-redaction-commit 520ms cubic-bezier(0.22, 0.9, 0.24, 1),
-    ps-redaction-shimmer 900ms ease-out;
+  animation: ps-redaction-commit 520ms cubic-bezier(0.22, 0.9, 0.24, 1);
 }
 
 @keyframes ps-redaction-commit {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.18);
-    filter: saturate(1.05);
-  }
-
-  45% {
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.28);
-    filter: saturate(1.12);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-    filter: saturate(1);
-  }
-}
-
-@keyframes ps-redaction-shimmer {
-  0% {
-    background-position: 0% 50%;
-  }
-
-  100% {
-    background-position: -180% 50%;
-  }
+  0%   { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0.12); }
+  45%  { box-shadow: 0 0 0 4px rgba(180, 83, 9, 0.22); }
+  100% { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0); }
 }
 
 /* ─── Toast notifications ─── */
@@ -599,15 +568,17 @@
   right: 20px;
   bottom: 20px;
   z-index: 2147483300;
-  max-width: 360px;
+  max-width: 340px;
   border-radius: 12px;
-  padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  color: #f8fafc;
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+  padding: 11px 14px;
+  background: linear-gradient(180deg, #fffefb 0%, #fffbf4 100%);
+  border: 1px solid #e7dece;
+  color: var(--veil-text);
+  font-family: var(--veil-font);
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.35;
+  box-shadow: 0 8px 24px rgba(45, 37, 28, 0.14);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 200ms ease, transform 200ms ease;
@@ -619,11 +590,15 @@
 }
 
 .ps-notification-warning {
-  background: rgba(133, 77, 14, 0.95);
+  background: linear-gradient(180deg, #fefce8 0%, #fef3c7 100%);
+  border-color: #e9d36e;
+  color: #713f12;
 }
 
 .ps-notification-error {
-  background: rgba(127, 29, 29, 0.95);
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+  border-color: #fca5a5;
+  color: #7f1d1d;
 }
 
 /* ─── Responsive ─── */
@@ -633,7 +608,6 @@
     right: 12px;
     max-width: none;
   }
-
   .ps-label {
     top: -26px;
     font-size: 10px;
@@ -642,7 +616,6 @@
 
 /* ─── Reduced motion ─── */
 @media (prefers-reduced-motion: reduce) {
-
   .ps-highlight,
   .ps-label,
   .ps-pii-underline,
@@ -655,7 +628,8 @@
   .ps-popover,
   .ps-action-bar,
   .ps-token-tray,
-  .ps-notification {
+  .ps-notification,
+  .ps-overlay-hl {
     animation: none !important;
     transition: none !important;
   }
