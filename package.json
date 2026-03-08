@@ -1,7 +1,7 @@
 {
-  "name": "privacy-shield-llm",
+  "name": "veil",
   "version": "1.0.0",
-  "description": "Privacy protection extension for LLM websites using GLiNER 2 for PII detection",
+  "description": "Real-time PII detection and redaction for AI chat interfaces. Powered by a local GLiNER2 model — your data never leaves your machine.",
   "scripts": {
     "setup": "python3 -m venv .venv && . .venv/bin/activate && pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.0.0' && pip install -r requirements.txt",
     "download-gliner2": ".venv/bin/python server/gliner2_server.py --download-only",
@@ -30,19 +30,27 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/privacy-shield-llm"
+    "url": "https://github.com/nishikantmandal007/Veil.git"
+  },
+  "homepage": "https://nishikantmandal007.github.io/Veil",
+  "bugs": {
+    "url": "https://github.com/nishikantmandal007/Veil/issues"
   },
   "keywords": [
     "chrome-extension",
     "privacy",
     "pii-detection",
+    "pii",
     "gliner",
+    "gliner2",
     "llm",
     "security",
     "nlp",
-    "ner"
+    "ner",
+    "chatgpt",
+    "redaction"
   ],
-  "author": "Your Name",
+  "author": "Nishikant Mandal <nishikantmandal007@gmail.com>",
   "license": "MIT",
   "browser": {
     "fs": false,
