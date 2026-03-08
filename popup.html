@@ -138,9 +138,20 @@
             <!-- Panel 2: Diagnostics -->
             <section class="server-tool-panel">
               <p class="panel-title">Diagnostics</p>
+
+              <label class="field field-tight" style="margin-bottom:8px">
+                <span style="font-size:11px;font-weight:600;color:var(--ink)">GLiNER2 Model</span>
+                <select id="modelSelect">
+                  <option value="fastino/gliner2-large-v1">gliner2-large-v1 — 340 M &nbsp;(best quality)</option>
+                  <option value="fastino/gliner2-base-v1">gliner2-base-v1 — 205 M &nbsp;(faster, less RAM)</option>
+                  <option value="fastino/gliner2-multi-v1">gliner2-multi-v1 — multilingual</option>
+                </select>
+                <p class="hint" style="margin:3px 0 0">Takes effect on next server start. Downloads automatically.</p>
+              </label>
+
               <div class="diag-row">
-                <span class="diag-key">Model</span>
-                <code class="diag-value" id="modelText">fastino/gliner2-base-v1</code>
+                <span class="diag-key">Active Model</span>
+                <code class="diag-value" id="modelText">—</code>
               </div>
               <div class="diag-row">
                 <span class="diag-key">Runtime Dir</span>
@@ -189,9 +200,10 @@
       <label class="field">
         <span>Redaction Mode</span>
         <select id="redactionModeSelect">
-          <option value="anonymize">Anonymize</option>
-          <option value="mask">Mask</option>
+          <option value="mask">Mask — [EMAIL REDACTED]</option>
+          <option value="anonymize" id="anonymizeOption">Anonymize — MayaDataPrivacy</option>
         </select>
+        <p class="hint" id="anonymizeHint" style="margin:3px 0 0" hidden>Requires a MayaDataPrivacy API key — paste it in the API Key tab above.</p>
       </label>
       <label class="field">
         <span>Sensitivity</span>
@@ -203,12 +215,12 @@
       </label>
       <div class="mode-help">
         <div class="mode-help-row">
-          <span class="mode-help-label">Anonymize</span>
-          <code>John Doe &rarr; &lt;PERSON_1&gt;</code>
-        </div>
-        <div class="mode-help-row">
           <span class="mode-help-label">Mask</span>
           <code>john@x.com &rarr; [EMAIL REDACTED]</code>
+        </div>
+        <div class="mode-help-row">
+          <span class="mode-help-label">Anonymize</span>
+          <code>John Doe &rarr; Alex Smith &nbsp;<span style="color:#9a7a52">(MayaDataPrivacy)</span></code>
         </div>
         <div class="mode-help-row">
           <span class="mode-help-label">Low</span>
@@ -239,12 +251,31 @@
         <label><input type="checkbox" class="type-checkbox" value="location" checked>Location</label>
         <label><input type="checkbox" class="type-checkbox" value="organization" checked>Org</label>
       </div>
+
+      <div class="patterns-section" style="margin-top:12px">
+        <div class="patterns-header-row">
+          <span class="patterns-section-title">Custom AI Detectors</span>
+          <button id="addEntityTypeButton" type="button" class="ghost compact">+ Add</button>
+        </div>
+        <p class="hint" style="margin:0 0 8px">Teach GLiNER2 to find anything — describe it in plain English.</p>
+
+        <div id="addEntityTypeForm" class="add-pattern-form" hidden>
+          <input id="newEntityName" type="text" class="pattern-form-input" placeholder='Name (e.g. "Employee ID")' spellcheck="false" autocomplete="off">
+          <input id="newEntityDescription" type="text" class="pattern-form-input" placeholder='What to detect (e.g. "employee ID number or staff badge number")' spellcheck="false" autocomplete="off">
+          <div class="button-row">
+            <button id="confirmAddEntityButton" type="button">Add Detector</button>
+            <button id="cancelAddEntityButton" type="button" class="secondary">Cancel</button>
+          </div>
+        </div>
+
+        <div id="entityTypeCardsList" class="pattern-cards-list"></div>
+      </div>
     </section>
 
     <details class="card advanced">
       <summary>Advanced</summary>
       <div class="advanced-body">
-        <p class="hint">Customize field selectors, site scope, and regex patterns.</p>
+        <p class="hint">Customize which websites and input fields Veil monitors.</p>
         <label class="field">
           <span>Scoped Websites (one per line)</span>
           <textarea id="monitoredSitesInput" rows="4" spellcheck="false" placeholder="claude.ai&#10;chatgpt.com&#10;gemini.google.com"></textarea>
@@ -253,22 +284,33 @@
           <span>Input Selectors (comma/newline separated)</span>
           <textarea id="selectorsInput" rows="4" spellcheck="false" placeholder="textarea&#10;input[type=&quot;text&quot;]&#10;div[contenteditable=&quot;true&quot;]"></textarea>
         </label>
-        <label class="field">
-          <span>Custom Regex Patterns (JSON array)</span>
-          <textarea id="patternsInput" rows="9" spellcheck="false" placeholder='[&#10;  {&#10;    "id": "my_pattern",&#10;    "label": "api_key",&#10;    "pattern": "\\bsk-[A-Za-z0-9]{20,}\\b",&#10;    "flags": "g",&#10;    "score": 0.99,&#10;    "replacement": "[API KEY REDACTED]",&#10;    "enabled": true&#10;  }&#10;]'></textarea>
-        </label>
-        <pre class="boilerplate" aria-label="Pattern boilerplate">
-{
-  "label": "ip_address",
-  "pattern": "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b",
-  "flags": "g",
-  "score": 0.96,
-  "replacement": "[IP REDACTED]",
-  "enabled": true
-}</pre>
-        <div class="button-row">
-          <button id="saveAdvancedButton" type="button">Save Advanced</button>
-          <button id="loadDefaultsButton" type="button" class="secondary">Load Defaults</button>
+        <div class="button-row" style="margin-bottom:16px">
+          <button id="saveAdvancedButton" type="button">Save</button>
+        </div>
+
+        <div class="patterns-section">
+          <div class="patterns-header-row">
+            <span class="patterns-section-title">Detection Patterns</span>
+            <button id="addPatternButton" type="button" class="ghost compact">+ Add</button>
+          </div>
+          <p class="hint" style="margin:0 0 8px">Toggle patterns on or off. Add your own without writing JSON.</p>
+
+          <!-- Add pattern inline form -->
+          <div id="addPatternForm" class="add-pattern-form" hidden>
+            <input id="newPatternName" type="text" class="pattern-form-input" placeholder="Name (e.g. Employee ID)" spellcheck="false" autocomplete="off">
+            <input id="newPatternRegex" type="text" class="pattern-form-input" placeholder="Regex: \bEMP-\d{6}\b" spellcheck="false" autocomplete="off">
+            <input id="newPatternReplacement" type="text" class="pattern-form-input" placeholder="Replacement: [ID REDACTED]" spellcheck="false" autocomplete="off">
+            <div class="button-row">
+              <button id="confirmAddPatternButton" type="button">Add Pattern</button>
+              <button id="cancelAddPatternButton" type="button" class="secondary">Cancel</button>
+            </div>
+          </div>
+
+          <div id="patternCardsList" class="pattern-cards-list"></div>
+
+          <div class="button-row" style="margin-top:6px">
+            <button id="loadDefaultsButton" type="button" class="ghost compact">Reset to Defaults</button>
+          </div>
         </div>
       </div>
     </details>
@@ -280,7 +322,7 @@
       <div class="links">
         <a href="https://github.com/fastino-ai/GLiNER2" target="_blank" rel="noreferrer">GLiNER2</a>
         <span>&bull;</span>
-        <a href="DEVELOPMENT.md" target="_blank" rel="noreferrer">Dev Guide</a>
+        <a href="docs/DEVELOPMENT.md" target="_blank" rel="noreferrer">Dev Guide</a>
       </div>
     </footer>
   </div>

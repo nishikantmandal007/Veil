@@ -54,6 +54,33 @@ const DEFAULT_CUSTOM_PATTERNS = [
     score: 0.99,
     replacement: '[SSN REDACTED]',
     enabled: true
+  },
+  {
+    id: 'indian_pan',
+    label: 'pan',
+    pattern: '\\b[A-Z]{5}[0-9]{4}[A-Z]\\b',
+    flags: 'g',
+    score: 0.98,
+    replacement: '[PAN REDACTED]',
+    enabled: true
+  },
+  {
+    id: 'indian_aadhaar',
+    label: 'aadhaar',
+    pattern: '\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b',
+    flags: 'g',
+    score: 0.95,
+    replacement: '[AADHAAR REDACTED]',
+    enabled: true
+  },
+  {
+    id: 'passport',
+    label: 'passport',
+    pattern: '\\b[A-Z][0-9]{7}\\b',
+    flags: 'g',
+    score: 0.92,
+    replacement: '[PASSPORT REDACTED]',
+    enabled: false
   }
 ];
 const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
@@ -61,7 +88,7 @@ const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
 const DEFAULT_SETTINGS = {
   enabled: true,
   autoRedact: true,
-  redactionMode: 'anonymize',
+  redactionMode: 'mask',
   sensitivity: 'medium',
   includeRegexWhenModelOnline: false,
   monitorAllSites: true,
@@ -94,7 +121,8 @@ const DEFAULT_SETTINGS = {
     '[role="textbox"]',
     '.ProseMirror'
   ],
-  customPatterns: DEFAULT_CUSTOM_PATTERNS
+  customPatterns: DEFAULT_CUSTOM_PATTERNS,
+  customEntityTypes: []
 };
 
 function normalizeCustomPatterns(storedPatterns, defaults) {
@@ -143,6 +171,7 @@ class SettingsManager {
       hfToken: '',
       veilApiKey: ''
     };
+    this.selectedModel = 'fastino/gliner2-large-v1';
     this.apiKeyRevealed = false;
     this.hfTokenVisible = false;
     this.serverBusy = false;
@@ -233,14 +262,31 @@ class SettingsManager {
 
   loadLocalSecrets() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['hfToken', 'veilApiKey'], (result) => {
+      chrome.storage.local.get(['hfToken', 'veilApiKey', 'selectedModel'], (result) => {
         this.localSecrets = {
           hfToken: typeof result.hfToken === 'string' ? result.hfToken : '',
           veilApiKey: typeof result.veilApiKey === 'string' ? result.veilApiKey : ''
         };
+        if (result.selectedModel) {
+          this.selectedModel = result.selectedModel;
+        }
         resolve();
       });
     });
+  }
+
+  renderAnonymizeAvailability() {
+    const hasKey = Boolean(this.localSecrets.veilApiKey);
+    const anonymizeOption = document.getElementById('anonymizeOption');
+    const anonymizeHint = document.getElementById('anonymizeHint');
+    if (anonymizeOption) anonymizeOption.disabled = !hasKey;
+    if (anonymizeHint) anonymizeHint.hidden = hasKey;
+    // If key removed and mode was anonymize, force mask
+    if (!hasKey && this.settings.redactionMode === 'anonymize') {
+      this.settings.redactionMode = 'mask';
+      document.getElementById('redactionModeSelect').value = 'mask';
+      this.updateSetting('redactionMode', 'mask');
+    }
   }
 
   bindEvents() {
@@ -281,12 +327,43 @@ class SettingsManager {
 
     document.getElementById('saveAdvancedButton').addEventListener('click', () => this.saveAdvancedConfig(true));
     document.getElementById('loadDefaultsButton').addEventListener('click', () => {
-      document.getElementById('patternsInput').value = JSON.stringify(DEFAULT_CUSTOM_PATTERNS, null, 2);
-      this.setMessage('Default regex patterns loaded.');
+      this.settings.customPatterns = DEFAULT_CUSTOM_PATTERNS.slice();
+      this.renderPatternCards();
+      this.savePatterns();
+      this.setMessage('Patterns reset to defaults.');
     });
 
-    document.getElementById('monitoredSitesInput').addEventListener('blur', () => this.saveAdvancedConfig(false, false));
-    document.getElementById('selectorsInput').addEventListener('blur', () => this.saveAdvancedConfig(false, false));
+    document.getElementById('monitoredSitesInput').addEventListener('blur', () => this.saveAdvancedConfig(false));
+    document.getElementById('selectorsInput').addEventListener('blur', () => this.saveAdvancedConfig(false));
+
+    document.getElementById('addPatternButton').addEventListener('click', () => {
+      const form = document.getElementById('addPatternForm');
+      form.hidden = !form.hidden;
+      if (!form.hidden) document.getElementById('newPatternName').focus();
+    });
+
+    document.getElementById('cancelAddPatternButton').addEventListener('click', () => {
+      document.getElementById('addPatternForm').hidden = true;
+      document.getElementById('newPatternName').value = '';
+      document.getElementById('newPatternRegex').value = '';
+      document.getElementById('newPatternReplacement').value = '';
+    });
+
+    document.getElementById('confirmAddPatternButton').addEventListener('click', () => this.addPatternFromForm());
+
+    document.getElementById('addEntityTypeButton').addEventListener('click', () => {
+      const form = document.getElementById('addEntityTypeForm');
+      form.hidden = !form.hidden;
+      if (!form.hidden) document.getElementById('newEntityName').focus();
+    });
+
+    document.getElementById('cancelAddEntityButton').addEventListener('click', () => {
+      document.getElementById('addEntityTypeForm').hidden = true;
+      document.getElementById('newEntityName').value = '';
+      document.getElementById('newEntityDescription').value = '';
+    });
+
+    document.getElementById('confirmAddEntityButton').addEventListener('click', () => this.addEntityTypeFromForm());
 
     document.getElementById('resetButton').addEventListener('click', () => this.resetDefaults());
 
@@ -326,6 +403,13 @@ class SettingsManager {
     });
     document.getElementById('toggleHfTokenVisibility').addEventListener('click', () => this.toggleHfTokenInputVisibility());
 
+    document.getElementById('modelSelect').addEventListener('change', (event) => {
+      this.selectedModel = event.target.value;
+      chrome.storage.local.set({ selectedModel: this.selectedModel }, () => {
+        this.setMessage(`Model set to ${this.selectedModel}. Restart server to apply.`);
+      });
+    });
+
     window.addEventListener('unload', () => {
       if (this.serverPollTimer) {
         clearInterval(this.serverPollTimer);
@@ -357,8 +441,12 @@ class SettingsManager {
 
     document.getElementById('monitoredSitesInput').value = (this.settings.monitoredSites || []).join('\n');
     document.getElementById('selectorsInput').value = (this.settings.monitoredSelectors || []).join('\n');
-    document.getElementById('patternsInput').value = JSON.stringify(this.settings.customPatterns || [], null, 2);
     document.getElementById('hfTokenInput').value = this.localSecrets.hfToken || '';
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) modelSelect.value = this.selectedModel;
+    this.renderPatternCards();
+    this.renderEntityTypeCards();
+    this.renderAnonymizeAvailability();
     this.renderApiKeyState();
 
     this.renderStatus();
@@ -577,7 +665,9 @@ class SettingsManager {
   }
 
   renderServerDiagnostics() {
-    document.getElementById('modelText').textContent = String(this.serverMeta.modelOverride || 'fastino/gliner2-base-v1');
+    // Active model: show what the running server reported, or the selected model if stopped
+    const activeModel = this.serverMeta.modelOverride || (this.serverState.running ? this.selectedModel : '—');
+    document.getElementById('modelText').textContent = String(activeModel);
     document.getElementById('logFileText').textContent = String(this.serverMeta.logFile || '.runtime/gliner2_server.log');
     document.getElementById('logCommandText').textContent = String(this.serverMeta.logCommand || 'tail -n 80 .runtime/gliner2_server.log');
     document.getElementById('runtimeDirText').textContent = String(this.serverMeta.runtimeDir || '.runtime');
@@ -728,6 +818,12 @@ class SettingsManager {
       chrome.storage.local.set({ veilApiKey }, resolve);
     });
     this.localSecrets.veilApiKey = veilApiKey;
+    // Auto-activate Anonymize mode when API key is set
+    this.updateSetting('redactionMode', 'anonymize');
+    this.settings.redactionMode = 'anonymize';
+    document.getElementById('redactionModeSelect').value = 'anonymize';
+    this.renderAnonymizeAvailability();
+    this.renderModeSummary();
     this.apiKeyRevealed = false;
     this.renderApiKeyState();
     this.setMessage('API key saved securely.');
@@ -738,6 +834,12 @@ class SettingsManager {
       chrome.storage.local.set({ veilApiKey: '' }, resolve);
     });
     this.localSecrets.veilApiKey = '';
+    // Revert to Mask mode when API key is removed
+    this.updateSetting('redactionMode', 'mask');
+    this.settings.redactionMode = 'mask';
+    document.getElementById('redactionModeSelect').value = 'mask';
+    this.renderAnonymizeAvailability();
+    this.renderModeSummary();
     this.apiKeyRevealed = false;
     const input = document.getElementById('veilApiKeyInput');
     if (input) input.value = '';
@@ -862,7 +964,8 @@ class SettingsManager {
     const response = await this.requestServerControl('start', {
       installDeps: true,
       downloadModel: true,
-      hfToken
+      hfToken,
+      modelId: this.selectedModel
     });
     this.setServerButtonsDisabled(false);
 
@@ -984,30 +1087,203 @@ class SettingsManager {
     });
   }
 
-  saveAdvancedConfig(showMessage = true, includePatterns = true) {
+  saveAdvancedConfig(showMessage = true) {
     try {
       const monitoredSites = this.parseLines(document.getElementById('monitoredSitesInput').value);
       const monitoredSelectors = this.parseLines(document.getElementById('selectorsInput').value);
 
-      let customPatterns = this.settings.customPatterns;
-      if (includePatterns) {
-        const rawPatterns = JSON.parse(document.getElementById('patternsInput').value || '[]');
-        customPatterns = this.normalizePatterns(rawPatterns);
-      }
-
       const payload = {
         monitoredSites: monitoredSites.length > 0 ? monitoredSites : DEFAULT_SETTINGS.monitoredSites,
-        monitoredSelectors: monitoredSelectors.length > 0 ? monitoredSelectors : DEFAULT_SETTINGS.monitoredSelectors,
-        customPatterns
+        monitoredSelectors: monitoredSelectors.length > 0 ? monitoredSelectors : DEFAULT_SETTINGS.monitoredSelectors
       };
 
       this.settings = { ...this.settings, ...payload };
       chrome.storage.local.set(payload, () => {
-        if (showMessage) this.setMessage('Advanced settings saved.');
+        if (showMessage) this.setMessage('Settings saved.');
       });
     } catch (error) {
-      this.setMessage(error.message || 'Invalid advanced settings.', true);
+      this.setMessage(error.message || 'Invalid settings.', true);
     }
+  }
+
+  savePatterns() {
+    const customPatterns = this.settings.customPatterns;
+    chrome.storage.local.set({ customPatterns }, () => this.setMessage('Patterns saved.'));
+  }
+
+  addPatternFromForm() {
+    const name = document.getElementById('newPatternName').value.trim();
+    const regex = document.getElementById('newPatternRegex').value.trim();
+    const replacement = document.getElementById('newPatternReplacement').value.trim();
+
+    if (!name || !regex) {
+      this.setMessage('Name and regex pattern are required.', true);
+      return;
+    }
+
+    // Validate the regex
+    try {
+      // eslint-disable-next-line no-new
+      new RegExp(regex, 'g');
+    } catch {
+      this.setMessage('Invalid regex pattern — check your syntax.', true);
+      return;
+    }
+
+    const id = `custom_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}_${Date.now()}`;
+    const newPattern = {
+      id,
+      label: name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+      pattern: regex,
+      flags: 'g',
+      score: 0.97,
+      replacement: replacement || `[${name.toUpperCase()} REDACTED]`,
+      enabled: true
+    };
+
+    this.settings.customPatterns = [...(this.settings.customPatterns || []), newPattern];
+    this.renderPatternCards();
+    this.savePatterns();
+
+    // Reset and hide form
+    document.getElementById('addPatternForm').hidden = true;
+    document.getElementById('newPatternName').value = '';
+    document.getElementById('newPatternRegex').value = '';
+    document.getElementById('newPatternReplacement').value = '';
+  }
+
+  renderPatternCards() {
+    const list = document.getElementById('patternCardsList');
+    if (!list) return;
+
+    const patterns = this.settings.customPatterns || [];
+    if (patterns.length === 0) {
+      list.innerHTML = '<p class="hint" style="text-align:center;padding:8px 0">No patterns yet.</p>';
+      return;
+    }
+
+    const defaultIds = new Set(DEFAULT_CUSTOM_PATTERNS.map((p) => p.id));
+
+    const PATTERN_NAMES = {
+      openai_key: 'OpenAI API Key',
+      aws_access_key: 'AWS Access Key',
+      github_token: 'GitHub Token',
+      jwt_token: 'JWT Token',
+      ipv4: 'IPv4 Address',
+      ssn: 'US Social Security Number',
+      indian_pan: 'Indian PAN Number',
+      indian_aadhaar: 'Indian Aadhaar',
+      passport: 'Passport Number'
+    };
+
+    list.innerHTML = patterns.map((pattern, index) => {
+      const isDefault = defaultIds.has(pattern.id);
+      const displayName = PATTERN_NAMES[pattern.id]
+        || pattern.id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const labelBadge = String(pattern.label || '').replace(/_/g, ' ');
+      const preview = pattern.pattern.length > 36
+        ? `${pattern.pattern.slice(0, 36)}…`
+        : pattern.pattern;
+
+      return `<div class="pattern-card${pattern.enabled ? '' : ' pattern-card--off'}">
+  <label class="pattern-toggle-wrap" title="${pattern.enabled ? 'Disable' : 'Enable'}">
+    <input type="checkbox" class="pattern-cb" data-index="${index}"${pattern.enabled ? ' checked' : ''}>
+    <span class="pattern-toggle-pill"></span>
+  </label>
+  <div class="pattern-card-body">
+    <span class="pattern-card-name">${displayName}</span>
+    <code class="pattern-card-preview">${preview}</code>
+  </div>
+  <span class="pattern-card-badge">${labelBadge}</span>
+  ${!isDefault ? `<button class="pattern-card-del ghost compact" data-index="${index}" aria-label="Remove pattern" title="Remove">&#x2715;</button>` : ''}
+</div>`;
+    }).join('');
+
+    list.querySelectorAll('.pattern-cb').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const idx = parseInt(cb.dataset.index, 10);
+        this.settings.customPatterns[idx].enabled = cb.checked;
+        cb.closest('.pattern-card').classList.toggle('pattern-card--off', !cb.checked);
+        this.savePatterns();
+      });
+    });
+
+    list.querySelectorAll('.pattern-card-del').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.index, 10);
+        this.settings.customPatterns.splice(idx, 1);
+        this.renderPatternCards();
+        this.savePatterns();
+      });
+    });
+  }
+
+  saveEntityTypes() {
+    const customEntityTypes = this.settings.customEntityTypes || [];
+    chrome.storage.local.set({ customEntityTypes }, () => this.setMessage('Custom detectors saved.'));
+  }
+
+  addEntityTypeFromForm() {
+    const name = document.getElementById('newEntityName').value.trim();
+    const description = document.getElementById('newEntityDescription').value.trim();
+
+    if (!name || !description) {
+      this.setMessage('Name and description are both required.', true);
+      return;
+    }
+
+    const id = `entity_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}_${Date.now()}`;
+    const newEntity = { id, name, description, enabled: true };
+
+    this.settings.customEntityTypes = [...(this.settings.customEntityTypes || []), newEntity];
+    this.renderEntityTypeCards();
+    this.saveEntityTypes();
+
+    document.getElementById('addEntityTypeForm').hidden = true;
+    document.getElementById('newEntityName').value = '';
+    document.getElementById('newEntityDescription').value = '';
+  }
+
+  renderEntityTypeCards() {
+    const list = document.getElementById('entityTypeCardsList');
+    if (!list) return;
+
+    const types = this.settings.customEntityTypes || [];
+    if (types.length === 0) {
+      list.innerHTML = '<p class="hint" style="text-align:center;padding:8px 0">No custom detectors yet. Add one to teach GLiNER2 new entity types.</p>';
+      return;
+    }
+
+    list.innerHTML = types.map((t, index) => `<div class="pattern-card${t.enabled ? '' : ' pattern-card--off'}">
+  <label class="pattern-toggle-wrap" title="${t.enabled ? 'Disable' : 'Enable'}">
+    <input type="checkbox" class="entity-cb" data-index="${index}"${t.enabled ? ' checked' : ''}>
+    <span class="pattern-toggle-pill"></span>
+  </label>
+  <div class="pattern-card-body">
+    <span class="pattern-card-name">${t.name}</span>
+    <code class="pattern-card-preview">${t.description.slice(0, 48)}${t.description.length > 48 ? '…' : ''}</code>
+  </div>
+  <span class="pattern-card-badge">AI</span>
+  <button class="entity-del ghost compact" data-index="${index}" aria-label="Remove" title="Remove">&#x2715;</button>
+</div>`).join('');
+
+    list.querySelectorAll('.entity-cb').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const idx = parseInt(cb.dataset.index, 10);
+        this.settings.customEntityTypes[idx].enabled = cb.checked;
+        cb.closest('.pattern-card').classList.toggle('pattern-card--off', !cb.checked);
+        this.saveEntityTypes();
+      });
+    });
+
+    list.querySelectorAll('.entity-del').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.index, 10);
+        this.settings.customEntityTypes.splice(idx, 1);
+        this.renderEntityTypeCards();
+        this.saveEntityTypes();
+      });
+    });
   }
 
   async resetDefaults() {

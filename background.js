@@ -12,6 +12,22 @@ const DEFAULT_LABELS = [
   'organization'
 ];
 
+// GLiNER2 accepts labels as a Dict[internal_name → natural_language_description].
+// The model uses the description for zero-shot embedding matching; it returns
+// detections keyed by the dict key (internal name), so no reverse mapping is needed.
+// Chunking is handled server-side via batch_extract_entities — one HTTP request per input.
+const GLINER_LABEL_DESCRIPTIONS = Object.freeze({
+  person:        'person name, first name, last name, or full name of a human individual',
+  email:         'email address or email id used for electronic communication',
+  phone:         'phone number, mobile number, telephone number, or contact number',
+  address:       'street address, home address, residential or postal address, mailing address',
+  ssn:           'social security number, national identification number, or government-issued ID number',
+  credit_card:   'credit card number, debit card number, or payment card number',
+  date_of_birth: 'date of birth, birthday, or birth date of a person',
+  location:      'city, town, country, state, region, or geographic place name',
+  organization:  'company name, organization name, employer, institution, or business name'
+});
+
 const DEFAULT_MONITORED_SELECTORS = [
   'textarea',
   'input[type="text"]',
@@ -535,6 +551,9 @@ class GLiNERDetector {
     const customPatterns = Array.isArray(options.customPatterns)
       ? options.customPatterns
       : getDefaultCustomPatterns();
+    const customEntityTypes = Array.isArray(options.customEntityTypes)
+      ? options.customEntityTypes.filter((t) => t && t.enabled && t.id && t.description)
+      : [];
     const includeRegexWhenModelOnline = Boolean(options.includeRegexWhenModelOnline);
 
     if (!text || text.trim().length === 0) {
@@ -545,7 +564,7 @@ class GLiNERDetector {
     let modelOnline = false;
     if (this.mode === 'gliner2-local') {
       try {
-        detections.push(...await this.detectWithLocalGLiNER(text, enabledTypes, threshold));
+        detections.push(...await this.detectWithLocalGLiNER(text, enabledTypes, threshold, customEntityTypes));
         modelOnline = true;
       } catch (error) {
         console.warn('Local GLiNER2 server unavailable, using fallback detection:', error.message);
@@ -664,24 +683,36 @@ class GLiNERDetector {
     }
   }
 
-  async detectWithLocalGLiNER(text, enabledTypes, threshold) {
+  async detectWithLocalGLiNER(text, enabledTypes, threshold, customEntityTypes = []) {
+    // Build labels dict: {internal_name: description}.
+    // GLiNER2 uses the description for zero-shot embedding matching and returns
+    // detections keyed by the internal name — no reverse mapping needed.
+    // Chunking is handled server-side via batch_extract_entities.
+    const labels = {};
+    for (const type of enabledTypes) {
+      labels[type] = GLINER_LABEL_DESCRIPTIONS[type] || type;
+    }
+    // Merge user-defined custom entity types — user describes what to find in plain English
+    for (const entity of customEntityTypes) {
+      labels[entity.id] = entity.description;
+    }
+
     const response = await this.fetchWithTimeout(
       `${this.localServerUrl}/detect`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, labels: enabledTypes, threshold })
+        body: JSON.stringify({ text, labels, threshold })
       },
-      4200
+      8000  // longer timeout — server may be chunking + batching long inputs
     );
 
     if (!response.ok) {
-      throw new Error(`GLiNER2 local server returned status ${response.status}`);
+      throw new Error(`GLiNER2 server returned status ${response.status}`);
     }
 
     const data = await response.json();
-    const rows = Array.isArray(data?.detections) ? data.detections : [];
-    return rows
+    return (Array.isArray(data?.detections) ? data.detections : [])
       .map((row) => this.normalizeDetection(row, text, 'gliner2'))
       .filter(Boolean)
       .filter((row) => row.score >= threshold);
@@ -762,6 +793,20 @@ class GLiNERDetector {
 
     if (enabledTypes.includes('person')) {
       // Disabled by default due high false positives.
+    }
+
+    // Indian PAN number: 5 uppercase letters, 4 digits, 1 uppercase letter (e.g. ABCDE1234F)
+    if (enabledTypes.includes('pan')) {
+      const regex = /\b[A-Z]{5}[0-9]{4}[A-Z]\b/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) push(match, 'pan', 0.98);
+    }
+
+    // Indian Aadhaar: 12-digit number, optionally space/hyphen separated in groups of 4
+    if (enabledTypes.includes('aadhaar')) {
+      const regex = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) push(match, 'aadhaar', 0.95);
     }
 
     return detections.filter((item) => item.score >= threshold);
@@ -859,14 +904,14 @@ async function handleServerControl(command, options = {}) {
 
     if (command === 'start') {
       const hfToken = typeof options.hfToken === 'string' ? options.hfToken.trim() : '';
+      const modelId = typeof options.modelId === 'string' ? options.modelId.trim() : '';
       const payload = {
         action: 'start',
         installDeps: options.installDeps !== false,
         downloadModel: options.downloadModel !== false
       };
-      if (hfToken) {
-        payload.hfToken = hfToken;
-      }
+      if (hfToken) payload.hfToken = hfToken;
+      if (modelId) payload.modelId = modelId;
       const response = await sendNativeHostMessage({
         ...payload
       });

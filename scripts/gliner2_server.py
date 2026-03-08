@@ -20,8 +20,9 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urlparse
 
-DEFAULT_MODEL = "fastino/gliner2-base-v1"
+DEFAULT_MODEL = "fastino/gliner2-large-v1"
 FALLBACK_MODELS = [
+    "fastino/gliner2-base-v1",
     "fastino/gliner2-multi-v1",
 ]
 DEFAULT_THRESHOLD = 0.42
@@ -37,6 +38,11 @@ DEFAULT_LABELS = [
     "location",
     "organization",
 ]
+
+# Server-side chunking: GLiNER2's context window is ~512 tokens; 480 chars is a
+# safe character-level proxy. Chunks overlap so entities near boundaries aren't missed.
+CHUNK_SIZE = 480
+CHUNK_OVERLAP = 80
 REPO_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = REPO_DIR / ".env"
 ANON_ENDPOINT_ENV_KEY = "MDP_ANONYMIZATION_ENDPOINT"
@@ -302,6 +308,44 @@ def extract_score(item: Dict[str, Any]) -> float:
         return 0.0
 
 
+def make_chunks(text: str) -> List[Tuple[str, int]]:
+    """Split text into overlapping chunks. Returns [(chunk_text, char_offset), ...]."""
+    if len(text) <= CHUNK_SIZE:
+        return [(text, 0)]
+    result: List[Tuple[str, int]] = []
+    pos = 0
+    while pos < len(text):
+        end = min(pos + CHUNK_SIZE, len(text))
+        # Prefer breaking at whitespace to avoid splitting tokens
+        if end < len(text):
+            ws = text.rfind(" ", pos + CHUNK_SIZE // 2, end)
+            if ws > pos:
+                end = ws + 1
+        result.append((text[pos:end], pos))
+        if end >= len(text):
+            break
+        pos += CHUNK_SIZE - CHUNK_OVERLAP
+    return result
+
+
+def deduplicate_detections(detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove overlapping spans, keeping the one with the highest score."""
+    if not detections:
+        return []
+    detections.sort(key=lambda d: (d["start"], -d["score"]))
+    merged: List[Dict[str, Any]] = []
+    cur = detections[0]
+    for nxt in detections[1:]:
+        if nxt["start"] < cur["end"]:  # overlap — keep higher score
+            if nxt["score"] > cur["score"]:
+                cur = nxt
+        else:
+            merged.append(cur)
+            cur = nxt
+    merged.append(cur)
+    return merged
+
+
 class GLiNERService:
     def __init__(self, model_name: str, default_threshold: float) -> None:
         self.model_name = model_name
@@ -409,26 +453,27 @@ class GLiNERService:
             f"Model load failed. Tried: {', '.join(candidates)}. Last errors: {joined}"
         )
 
-    def _predict(self, text: str, labels: List[str], threshold: float) -> List[Dict[str, Any]]:
+    def _predict(self, text: str, labels, threshold: float) -> List[Dict[str, Any]]:
         """
-        Support GLiNER2 advanced API first, then fallback to older API shape.
+        Call GLiNER2 with list or dict labels.
+
+        Dict labels: {internal_name: natural_language_description}
+        GLiNER2 uses the description values for zero-shot embedding matching
+        and returns detections keyed by the dict key (internal name).
+        This is the preferred format — it eliminates the need for reverse mapping.
+
+        Falls back through known API signatures for compatibility.
         """
         if hasattr(self.model, "extract_entities"):
             attempts = [
                 lambda: self.model.extract_entities(
-                    text,
-                    labels,
-                    threshold=threshold,
-                    format_results=True,
-                    include_spans=True,
-                    include_confidence=True,
+                    text, labels,
+                    include_spans=True, include_confidence=True,
                 ),
                 lambda: self.model.extract_entities(
-                    text,
-                    labels,
+                    text, labels,
                     threshold=threshold,
-                    include_spans=True,
-                    include_confidence=True,
+                    include_spans=True, include_confidence=True,
                 ),
                 lambda: self.model.extract_entities(text, labels, threshold=threshold, include_spans=True),
                 lambda: self.model.extract_entities(text, labels, threshold=threshold),
@@ -444,9 +489,11 @@ class GLiNERService:
                     continue
 
         if hasattr(self.model, "predict_entities"):
+            # predict_entities only supports list labels — convert dict to list of keys
+            label_list = list(labels.keys()) if isinstance(labels, dict) else labels
             attempts = [
-                lambda: self.model.predict_entities(text, labels, threshold=threshold),
-                lambda: self.model.predict_entities(text, labels),
+                lambda: self.model.predict_entities(text, label_list, threshold=threshold),
+                lambda: self.model.predict_entities(text, label_list),
             ]
             for attempt in attempts:
                 try:
@@ -456,43 +503,91 @@ class GLiNERService:
 
         raise RuntimeError("Unsupported GLiNER model API: missing extract_entities/predict_entities")
 
-    def detect(self, text: str, labels: List[str], threshold: float) -> List[Dict[str, Any]]:
-        self.load_model()
-
-        safe_labels = [str(label).strip().lower() for label in labels if str(label).strip()]
-        if not safe_labels:
-            safe_labels = DEFAULT_LABELS
-
-        with self.model_lock:
-            raw_items = self._predict(text, safe_labels, threshold)
-        raw_items = flatten_gliner2_output(raw_items)
-
+    def _predict_chunk(self, chunk_text: str, labels, threshold: float, source_text: str, offset: int) -> List[Dict[str, Any]]:
+        """Run prediction on one chunk and return detections with absolute offsets."""
+        raw_items = flatten_gliner2_output(self._predict(chunk_text, labels, threshold))
         detections: List[Dict[str, Any]] = []
         for item in raw_items:
             label = extract_label(item)
             if not label:
                 continue
-
-            span = extract_span(item, text)
+            span = extract_span(item, chunk_text)
             if span is None:
                 continue
-
-            start, end = span
-            if start < 0 or end > len(text) or end <= start:
+            start, end = span[0] + offset, span[1] + offset
+            if start < 0 or end > len(source_text) or end <= start:
                 continue
-
-            detections.append(
-                {
-                    "text": text[start:end],
-                    "label": label,
-                    "start": start,
-                    "end": end,
-                    # Some GLiNER2 output formats omit confidence; keep it usable.
-                    "score": max(extract_score(item), threshold),
-                }
-            )
-
+            detections.append({
+                "text":  source_text[start:end],
+                "label": label,
+                "start": start,
+                "end":   end,
+                "score": max(extract_score(item), threshold),
+            })
         return detections
+
+    def detect(self, text: str, labels, threshold: float) -> List[Dict[str, Any]]:
+        self.load_model()
+
+        # Normalize labels.
+        # Dict {internal_name: description} — passed directly to GLiNER2 so it uses
+        # the richer descriptions for zero-shot embedding matching.
+        # List — clean and lower-case as before.
+        if isinstance(labels, dict) and labels:
+            safe_labels = {
+                str(k).strip().lower(): str(v).strip()
+                for k, v in labels.items()
+                if str(k).strip()
+            }
+            if not safe_labels:
+                safe_labels = {lbl: lbl for lbl in DEFAULT_LABELS}
+        else:
+            cleaned = [str(lbl).strip().lower() for lbl in (labels or []) if str(lbl).strip()]
+            safe_labels = cleaned if cleaned else list(DEFAULT_LABELS)
+
+        chunks = make_chunks(text)
+        detections: List[Dict[str, Any]] = []
+
+        with self.model_lock:
+            if len(chunks) == 1:
+                detections = self._predict_chunk(chunks[0][0], safe_labels, threshold, text, 0)
+            else:
+                # Try batch inference first — one forward pass for all chunks.
+                try:
+                    if not hasattr(self.model, "batch_extract_entities"):
+                        raise AttributeError("no batch API")
+                    chunk_texts = [c[0] for c in chunks]
+                    batch = self.model.batch_extract_entities(
+                        chunk_texts, safe_labels,
+                        include_confidence=True, include_spans=True,
+                    )
+                    for raw, (chunk_text, offset) in zip(batch, chunks):
+                        flat = flatten_gliner2_output(raw)
+                        for item in flat:
+                            label = extract_label(item)
+                            if not label:
+                                continue
+                            span = extract_span(item, chunk_text)
+                            if span is None:
+                                continue
+                            start, end = span[0] + offset, span[1] + offset
+                            if start < 0 or end > len(text) or end <= start:
+                                continue
+                            detections.append({
+                                "text":  text[start:end],
+                                "label": label,
+                                "start": start,
+                                "end":   end,
+                                "score": max(extract_score(item), threshold),
+                            })
+                except (AttributeError, TypeError, Exception):
+                    # Fallback: sequential per-chunk calls
+                    for chunk_text, offset in chunks:
+                        detections.extend(
+                            self._predict_chunk(chunk_text, safe_labels, threshold, text, offset)
+                        )
+
+        return deduplicate_detections(detections)
 
 
 def make_handler(service: GLiNERService, max_chars: int):

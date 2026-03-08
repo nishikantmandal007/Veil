@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_DIR}/.venv/bin/python"
+PLIST_DIR="${HOME}/Library/LaunchAgents"
+PLIST_LABEL="com.privacyshield.gliner2"
+PLIST_FILE="${PLIST_DIR}/${PLIST_LABEL}.plist"
+LOG_FILE="${REPO_DIR}/.runtime/gliner2_server.log"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Missing virtualenv python: ${PYTHON_BIN}"
+  echo "Create it first:"
+  echo "  cd ${REPO_DIR}"
+  echo "  python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  exit 1
+fi
+
+mkdir -p "${PLIST_DIR}"
+mkdir -p "${REPO_DIR}/.runtime"
+touch "${LOG_FILE}"
+
+cat > "${PLIST_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${PLIST_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${PYTHON_BIN}</string>
+    <string>${REPO_DIR}/scripts/gliner2_server.py</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8765</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${LOG_FILE}</string>
+  <key>StandardErrorPath</key>
+  <string>${LOG_FILE}</string>
+  <key>WorkingDirectory</key>
+  <string>${REPO_DIR}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+</dict>
+</plist>
+EOF
+
+launchctl load "${PLIST_FILE}"
+echo "Installed and started: ${PLIST_FILE}"
+echo "Status: $(launchctl list | grep ${PLIST_LABEL} || echo 'not listed yet — may take a moment')"

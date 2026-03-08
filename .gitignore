@@ -7,12 +7,14 @@
 /.venv
 __pycache__/
 *.py[cod]
+*.pyc
 *.pyo
 *.pyd
 *.egg-info/
 dist/
 *.egg
 .pytest_cache/
+tests/.cache/
 .mypy_cache/
 .ruff_cache/
 

@@ -262,7 +262,8 @@ class PrivacyShield {
         'monitorAllSites',
         'monitoredSites',
         'monitoredSelectors',
-        'customPatterns'
+        'customPatterns',
+        'customEntityTypes'
       ], (result) => {
         this.settings = {
           enabled: result.enabled ?? true,
@@ -276,7 +277,8 @@ class PrivacyShield {
           monitoredSelectors: Array.isArray(result.monitoredSelectors) && result.monitoredSelectors.length > 0
             ? result.monitoredSelectors
             : this.getPlatformSelectors(),
-          customPatterns: normalizeCustomPatterns(result.customPatterns, DEFAULT_CUSTOM_PATTERNS)
+          customPatterns: normalizeCustomPatterns(result.customPatterns, DEFAULT_CUSTOM_PATTERNS),
+          customEntityTypes: Array.isArray(result.customEntityTypes) ? result.customEntityTypes : []
         };
         resolve();
       });
@@ -394,7 +396,8 @@ class PrivacyShield {
         changes.monitorAllSites ||
         changes.monitoredSites ||
         changes.monitoredSelectors ||
-        changes.customPatterns
+        changes.customPatterns ||
+        changes.customEntityTypes
       ) {
         this.loadSettings().then(() => {
           if (!this.settings.enabled || !this.isSiteMonitored()) {
@@ -831,6 +834,7 @@ class PrivacyShield {
           threshold: this.getSensitivityThreshold(),
           enabledTypes: this.settings.enabledTypes,
           customPatterns: this.settings.customPatterns,
+          customEntityTypes: this.settings.customEntityTypes || [],
           includeRegexWhenModelOnline: this.settings.includeRegexWhenModelOnline
         }
       });

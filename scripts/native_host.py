@@ -256,7 +256,7 @@ def ensure_model_downloaded(extra_env: Dict[str, str] | None = None) -> None:
         )
 
 
-def start_server(install_deps: bool, download_model: bool, hf_token: str = "") -> Dict[str, Any]:
+def start_server(install_deps: bool, download_model: bool, hf_token: str = "", model_id: str = "") -> Dict[str, Any]:
     state = load_state()
     pid = state.get("pid")
     if is_pid_running(pid):
@@ -276,6 +276,9 @@ def start_server(install_deps: bool, download_model: bool, hf_token: str = "") -
         extra_env["HF_TOKEN"] = hf_token_value
         extra_env["HUGGING_FACE_HUB_TOKEN"] = hf_token_value
 
+    # Model precedence: popup selection > GLINER2_MODEL env var > server default
+    resolved_model = str(model_id or "").strip() or os.environ.get(MODEL_ENV_VAR, "").strip()
+
     if install_deps:
         ensure_dependencies()
 
@@ -285,9 +288,8 @@ def start_server(install_deps: bool, download_model: bool, hf_token: str = "") -
     ensure_runtime_dirs()
     log_handle = LOG_FILE.open("a", encoding="utf-8")
     cmd = [str(VENV_PYTHON), "-u", str(SCRIPT_PATH), "--host", "127.0.0.1", "--port", "8765"]
-    model_override = os.environ.get(MODEL_ENV_VAR, "").strip()
-    if model_override:
-        cmd.extend(["--model", model_override])
+    if resolved_model:
+        cmd.extend(["--model", resolved_model])
 
     process = subprocess.Popen(
         cmd,
@@ -393,6 +395,7 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
             install_deps=bool(request.get("installDeps", True)),
             download_model=bool(request.get("downloadModel", True)),
             hf_token=str(request.get("hfToken", "")),
+            model_id=str(request.get("modelId", "")),
         )
     if action == "stop":
         return stop_server()
