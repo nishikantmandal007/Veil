@@ -26,7 +26,7 @@ Protect your sensitive data before it reaches any AI model — locally, privatel
 
 <br/>
 
-[Website](https://nishikantmandal007.github.io/Veil) · [Documentation](https://nishikantmandal007.github.io/Veil/install) · [Report a Bug](https://github.com/nishikantmandal007/Veil/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/nishikantmandal007/Veil/issues/new?template=feature_request.md)
+[Website](https://nishikantmandal007.github.io/Veil) · [Documentation](https://nishikantmandal007.github.io/Veil/install) · [Changelog](CHANGELOG.md) · [Report a Bug](https://github.com/nishikantmandal007/Veil/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/nishikantmandal007/Veil/issues/new?template=feature_request.md)
 
 <br/>
 
@@ -64,17 +64,17 @@ All PII processing happens at `127.0.0.1`. The GLiNER2 model runs locally. No da
 
 ## Features
 
-| Feature | Detail |
-|---------|--------|
-| Local AI | GLiNER2 runs entirely on your machine — zero cloud calls, zero data egress |
-| Inline redaction | Grammarly-style highlights with one-click redact per entity |
-| Regex fallback | Pattern rules for emails, API keys, phone numbers — instant, works offline |
-| Content-editable safe | Works correctly in rich-text fields (Gemini, Notion, Claude.ai) |
-| Custom patterns | Add your own regex patterns for API keys, IPs, custom identifiers |
-| Sensitivity control | Low / Medium / High detection thresholds |
-| Server health monitor | Live status indicator and crash toast notifications |
-| Onboarding wizard | First-run setup guide with automatic extension ID detection |
-| Cross-platform server | Autostart scripts for Linux (systemd), macOS (launchd), and Windows |
+| Feature               | Detail                                                                     |
+| --------------------- | -------------------------------------------------------------------------- |
+| Local AI              | GLiNER2 runs entirely on your machine — zero cloud calls, zero data egress |
+| Inline redaction      | Grammarly-style highlights with one-click redact per entity                |
+| Regex fallback        | Pattern rules for emails, API keys, phone numbers — instant, works offline |
+| Content-editable safe | Works correctly in rich-text fields (Gemini, Notion, Claude.ai)            |
+| Custom patterns       | Add your own regex patterns for API keys, IPs, custom identifiers          |
+| Sensitivity control   | Low / Medium / High detection thresholds                                   |
+| Server health monitor | Live status indicator and crash toast notifications                        |
+| Onboarding wizard     | First-run setup guide with automatic extension ID detection                |
+| Cross-platform server | Autostart scripts for Linux (systemd), macOS (launchd), and Windows        |
 
 ---
 
@@ -141,11 +141,11 @@ server\autostart\install_windows.bat   # Windows — Task Scheduler
 
 **Sensitivity thresholds**
 
-| Level | Threshold | Notes |
-|-------|-----------|-------|
-| Low | 0.75 | Higher precision, fewer detections. Recommended for production use. |
-| Medium | 0.62 | Balanced. Default. |
-| High | 0.52 | More detections, higher false positive rate. |
+| Level  | Threshold | Notes                                                               |
+| ------ | --------- | ------------------------------------------------------------------- |
+| Low    | 0.75      | Higher precision, fewer detections. Recommended for production use. |
+| Medium | 0.62      | Balanced. Default.                                                  |
+| High   | 0.52      | More detections, higher false positive rate.                        |
 
 **Custom regex patterns**
 
@@ -193,11 +193,8 @@ npm run build:zip
 # → dist/veil-extension.zip  ready for Chrome Web Store upload
 ```
 
-Pushing a version tag triggers the GitHub Actions release pipeline:
-
-```bash
-git tag v1.1.0 && git push origin v1.1.0
-```
+Releases are managed automatically via [release-please](https://github.com/googleapis/release-please-action).
+Merge the open `chore: release vX.Y.Z` pull request to tag a release and publish to GitHub Releases.
 
 ---
 
@@ -242,13 +239,13 @@ Veil protects against accidental data disclosure to AI APIs. It is not designed 
 
 ### Permissions
 
-| Permission | Reason |
-|------------|--------|
-| `storage` | Save settings locally |
-| `activeTab` | Read current tab for stats display |
-| `scripting` | Inject content scripts |
-| `nativeMessaging` | Communicate with local GLiNER2 bridge |
-| `<all_urls>` | Monitor any website (user-configurable) |
+| Permission        | Reason                                  |
+| ----------------- | --------------------------------------- |
+| `storage`         | Save settings locally                   |
+| `activeTab`       | Read current tab for stats display      |
+| `scripting`       | Inject content scripts                  |
+| `nativeMessaging` | Communicate with local GLiNER2 bridge   |
+| `<all_urls>`      | Monitor any website (user-configurable) |
 
 ### Reporting vulnerabilities
 
@@ -284,6 +281,12 @@ Areas that need help: Firefox/Safari port · Windows and macOS native host impro
 ## Contributors
 
 See [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full history of changes, automatically generated from [conventional commits](https://www.conventionalcommits.org/).
 
 ---
 
