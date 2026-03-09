@@ -19,6 +19,22 @@
   }
 
   /* ─────────────────────────────────
+     Scrolled nav: collapse links
+  ───────────────────────────────── */
+  var siteNav = document.querySelector('.site-nav');
+  if (siteNav) {
+    var onScroll = function () {
+      if (window.scrollY > 60) {
+        siteNav.classList.add('nav-scrolled');
+      } else {
+        siteNav.classList.remove('nav-scrolled');
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  /* ─────────────────────────────────
      Browser demo animation
   ───────────────────────────────── */
   var bw = document.getElementById('browser-demo');
