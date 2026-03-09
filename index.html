@@ -56,48 +56,79 @@ description: Real-time PII detection and redaction for AI chat interfaces. Power
 </section>
 
 <!-- ══════════════════════
-     DEMO MOCKUP
+     ANIMATED CHAT DEMO
 ══════════════════════ -->
-<div class="demo-section">
-  <div class="demo-outer">
-    <div class="demo-card" role="img" aria-label="Demo: PII detection before and after">
+<div class="chat-demo-section">
+  <div class="chat-demo-outer">
 
-      <div class="demo-titlebar" aria-hidden="true">
-        <span class="demo-dot"></span>
-        <span class="demo-dot"></span>
-        <span class="demo-dot"></span>
-        <span class="demo-url-bar">chatgpt.com</span>
-      </div>
+    <div class="chat-demo" id="chat-demo" data-platform="chatgpt"
+         aria-label="Animated demo: Veil detecting and redacting PII in a chat interface">
 
-      <div class="demo-split">
-        <!-- Before -->
-        <div class="demo-pane">
-          <p class="demo-pane-label">Without Veil</p>
-          <p class="demo-text">
-            Hi, I need help drafting a termination letter for
-            <span class="pii">Sarah Mitchell</span>,
-            employee at <span class="pii">Acme Corp</span>.
-            Her SSN is <span class="pii">482-66-1209</span>
-            and she can be reached at
-            <span class="pii">sarah.m@acmecorp.com</span>
-            or <span class="pii">(415) 555-0187</span>.
-          </p>
+      <!-- Browser chrome + platform tabs -->
+      <div class="chat-demo-titlebar">
+        <div class="chat-demo-dots" aria-hidden="true">
+          <span class="chat-demo-dot"></span>
+          <span class="chat-demo-dot"></span>
+          <span class="chat-demo-dot"></span>
         </div>
 
-        <div class="demo-divider" aria-hidden="true"></div>
+        <div class="platform-tabs" role="tablist" aria-label="Platform">
+          <button class="platform-tab active" data-platform="chatgpt"
+                  role="tab" aria-selected="true">
+            <span class="platform-tab-dot" aria-hidden="true"></span>
+            ChatGPT
+          </button>
+          <button class="platform-tab" data-platform="gemini"
+                  role="tab" aria-selected="false">
+            <span class="platform-tab-dot" aria-hidden="true"></span>
+            Gemini
+          </button>
+          <button class="platform-tab" data-platform="claude"
+                  role="tab" aria-selected="false">
+            <span class="platform-tab-dot" aria-hidden="true"></span>
+            Claude
+          </button>
+        </div>
+      </div>
 
-        <!-- After -->
-        <div class="demo-pane redacted">
-          <p class="demo-pane-label">With Veil — one click to redact</p>
-          <p class="demo-text">
-            Hi, I need help drafting a termination letter for
-            <span class="pii-tag person">[PERSON]</span>,
-            employee at <span class="pii-tag org">[ORG]</span>.
-            Her SSN is <span class="pii-tag ssn">[SSN]</span>
-            and she can be reached at
-            <span class="pii-tag email">[EMAIL]</span>
-            or <span class="pii-tag phone">[PHONE]</span>.
-          </p>
+      <!-- Chat body -->
+      <div class="chat-body">
+
+        <!-- Previous AI message -->
+        <div class="chat-history">
+          <div class="chat-msg">
+            <div class="chat-avatar ai" id="demo-avatar" aria-hidden="true">GPT</div>
+            <div class="chat-bubble" id="demo-ai-msg">
+              Of course — what changes need to be made to the contract?
+            </div>
+          </div>
+        </div>
+
+        <!-- User compose area -->
+        <div class="chat-compose">
+
+          <!-- Veil status bar — hidden until PII detected -->
+          <div class="veil-status-bar" id="veil-status" aria-live="polite">
+            <svg class="veil-status-icon" viewBox="0 0 128 128" fill="none"
+                 xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="128" height="128" rx="20" fill="currentColor" opacity="0.15"/>
+              <rect x="20" y="49" width="88" height="12" rx="3" fill="currentColor"/>
+            </svg>
+            <span class="veil-status-count" id="veil-count">0 items detected</span>
+            <button class="veil-redact-btn" id="veil-redact-btn" tabindex="-1">Redact all</button>
+          </div>
+
+          <!-- Text input simulation -->
+          <div class="chat-input-field">
+            <p class="chat-input-text" id="chat-input-text" aria-label="User is typing"></p>
+            <span class="chat-cursor" aria-hidden="true"></span>
+            <button class="chat-send-btn" tabindex="-1" aria-label="Send" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M2 8h12M9 4l5 4-5 4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
         </div>
       </div>
 
