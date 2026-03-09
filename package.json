@@ -1,6 +1,6 @@
 {
   "name": "veil",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Real-time PII detection and redaction for AI chat interfaces. Powered by a local GLiNER2 model — your data never leaves your machine.",
   "scripts": {
     "setup": "python3 -m venv .venv && . .venv/bin/activate && pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.0.0' && pip install -r requirements.txt",
