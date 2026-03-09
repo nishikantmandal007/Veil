@@ -76,6 +76,7 @@ body {
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  padding-top: 64px;
 }
 
 a {
@@ -139,7 +140,7 @@ hr.rule {
    NAVIGATION
 ───────────────────────────────── */
 .site-nav {
-  position: sticky;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -163,11 +164,6 @@ hr.rule {
   margin: 0 auto;
 }
 
-@keyframes logoSlideIn {
-  from { opacity: 0; transform: translateX(-18px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
 .nav-logo {
   display: flex;
   align-items: center;
@@ -175,7 +171,6 @@ hr.rule {
   color: var(--ink);
   text-decoration: none;
   flex-shrink: 0;
-  animation: logoSlideIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .nav-logo-icon {
