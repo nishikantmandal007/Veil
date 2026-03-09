@@ -75,7 +75,7 @@ jobs:
       - name: Run JS unit tests
         run: node tests/js/test_background_utils.js
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install Python test deps
