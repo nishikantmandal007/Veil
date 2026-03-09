@@ -1,180 +1,199 @@
 <div align="center">
 
+<br/>
+
 <picture>
-  <source media="(prefers-color-scheme: dark)"
-    srcset="assets/icons/veil-wordmark-dark.png">
-  <source media="(prefers-color-scheme: light)"
-    srcset="assets/icons/veil-wordmark-light.png">
-  <img src="assets/icons/veil-wordmark-dark.png"
-    alt="Veil" height="48">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/icons/veil-wordmark-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/brand/veil-wordmark-light.png">
+  <img src="assets/icons/veil-wordmark-dark.png" alt="Veil" height="96">
 </picture>
 
-# Veil — Privacy Shield for LLM Interfaces
+<br/><br/>
 
-**Stop pasting your SSNs, API keys, and names into ChatGPT.**  
-Veil runs a local AI model to detect and redact PII *before* it ever leaves your browser.
+**Real-time PII detection and redaction for AI chat interfaces.**<br/>
+Protect your sensitive data before it reaches any AI model — locally, privately, and automatically.
+
+<br/>
 
 [![CI](https://github.com/nishikantmandal007/Veil/actions/workflows/ci.yml/badge.svg)](https://github.com/nishikantmandal007/Veil/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-black?style=flat-square)](LICENSE)
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-black?style=flat-square&logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
-[![GitHub release](https://img.shields.io/github/v/release/nishikantmandal007/Veil?style=flat-square&color=black)](https://github.com/nishikantmandal007/Veil/releases)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-black?style=flat-square)](docs/CONTRIBUTING.md)
-[![GitHub stars](https://img.shields.io/github/stars/nishikantmandal007/Veil?style=flat-square&color=black)](https://github.com/nishikantmandal007/Veil/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
+[![Powered by GLiNER2](https://img.shields.io/badge/Powered%20by-GLiNER2-8B5CF6?style=flat-square)](https://github.com/fastino-ai/GLiNER2)
+[![MAYA DATA PRIVACY](https://img.shields.io/badge/Anonymisation%20by-MAYA%20DATA%20PRIVACY-22C55E?style=flat-square)](https://github.com/MAYA-DATA-PRIVACY)
+[![Release](https://img.shields.io/github/v/release/nishikantmandal007/Veil?style=flat-square&color=22C55E)](https://github.com/nishikantmandal007/Veil/releases)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange?style=flat-square)](docs/CONTRIBUTING.md)
+[![Stars](https://img.shields.io/github/stars/nishikantmandal007/Veil?style=flat-square&color=yellow)](https://github.com/nishikantmandal007/Veil/stargazers)
+
+<br/>
+
+[Website](https://nishikantmandal007.github.io/Veil) · [Documentation](https://nishikantmandal007.github.io/Veil/install) · [Report a Bug](https://github.com/nishikantmandal007/Veil/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/nishikantmandal007/Veil/issues/new?template=feature_request.md)
+
+<br/>
+
 </div>
 
 ---
 
-## ✨ What it does
+## Why Veil?
 
-Veil monitors every text field on LLM sites (ChatGPT, Claude, Gemini, etc.) and highlights or auto-redacts detected PII in real time using a **local GLiNER2 NER model** — no data ever sent to a third-party service.
+Every time you paste a name, email, phone number, or address into an AI assistant, that data is sent to a third-party server. It becomes part of training data. It lives in logs. You lose control.
 
-| Feature                     | Detail                                                                     |
-| --------------------------- | -------------------------------------------------------------------------- |
-| 🧠 **Local AI**              | GLiNER2 runs entirely on your machine — zero cloud calls                   |
-| ⚡ **Regex fallback**        | Pattern rules for emails, API keys, phone numbers — instant, works offline |
-| ✏️ **Inline redaction**      | Click to replace PII with `[PERSON]`, `[EMAIL]`, etc.                      |
-| 🔒 **Content-editable safe** | Works correctly in rich-text composer fields (Notion, Gemini, Claude)      |
-| 🩺 **Server health**         | Live status indicator + crash toast notifications                          |
-| 🧭 **Onboarding wizard**     | First-run setup guide walks you through everything                         |
+Veil intercepts your input before it is sent. It detects PII in real time using a local ML model (GLiNER2), highlights it inline, and lets you redact it with one click — all without a single byte of your sensitive data leaving your machine.
 
 ---
 
-## 📐 Repository Layout
+## How It Works
 
 ```
-veil/
-├── extension/              # Chrome extension source (load this folder in Chrome)
-│   ├── manifest.json
-│   ├── background.js       # Service worker — detection, server health, crash monitoring
-│   ├── content.js          # In-page PII detection, redaction & UI
-│   ├── popup.html/js/css   # Extension popup UI
-│   └── icons/
-│
-├── server/                 # Local inference backend
-│   ├── gliner2_server.py   # GLiNER2 HTTP inference server (port 8765)
-│   ├── native_host.py      # Chrome native messaging host
-│   ├── native-host/        # Install / uninstall scripts per platform
-│   │   ├── install_linux.sh
-│   │   ├── install_mac.sh
-│   │   └── install_windows.bat
-│   └── autostart/          # System-level autostart scripts
-│       ├── install_linux.sh
-│       ├── install_mac.sh
-│       └── install_windows.bat
-│
-├── tests/
-│   ├── e2e/                # Playwright end-to-end tests
-│   ├── js/                 # JS unit tests (no framework)
-│   └── server/             # Python unit tests (pytest)
-│
-├── scripts/
-│   └── build_crx.sh        # Builds dist/veil-extension.zip for CWS upload
-│
-├── docs/                   # Project documentation
-│   ├── CHANGELOG.md
-│   ├── CONTRIBUTING.md
-│   ├── SECURITY.md
-│   ├── DEVELOPMENT.md
-│   └── ISSUE_TEMPLATE/
-│
-└── .github/
-    └── workflows/
-        └── release.yml     # Builds + publishes a release ZIP on version tag push
+Browser Tab (e.g. chatgpt.com)
+    │
+    ▼
+content.js  ──── detects user input ────► background.js (service worker)
+    │                                           │
+    │   inject redaction spans                  ▼
+    │◄──────────────────────────    GLiNER2 local server (127.0.0.1:8765)
+    │                                      via native_host.py (stdio bridge)
+    ▼
+User sees:   "Hello [PERSON], your SSN is [SSN REDACTED]"
+AI receives: exactly that — never the original PII
 ```
+
+All PII processing happens at `127.0.0.1`. The GLiNER2 model runs locally. No data is stored in the extension, synced to Chrome accounts, or sent to any third party.
 
 ---
 
-## 🚀 Getting Started
+## Features
 
-### Prerequisites
-
-- **Chrome** (or Chromium) — any recent version
-- **Python 3.10+** — for the local inference server
-- **~2 GB disk** — for the GLiNER2 model weights (downloaded once, cached locally)
-
-### 1 · Install Python dependencies
-
-```bash
-git clone https://github.com/yourusername/veil.git
-cd veil
-npm run setup          # Creates .venv and installs PyTorch + GLiNER2
-```
-
-### 2 · Load the extension in Chrome
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (toggle, top-right)
-3. Click **Load unpacked** → select the **`extension/`** folder
-4. Note the extension ID shown on the card
-
-### 3 · Install the native messaging host
-
-```bash
-# Linux
-bash server/native-host/install_linux.sh <EXTENSION_ID>
-
-# macOS
-bash server/native-host/install_mac.sh <EXTENSION_ID>
-
-# Windows
-server\native-host\install_windows.bat <EXTENSION_ID>
-```
-
-Or use `npm run install-native-host-linux` — it fills in your extension ID automatically via the onboarding wizard.
-
-### 4 · Start the local server
-
-```bash
-npm run run-gliner2-lazy   # Lazy-load: model warms up on first detection (faster start)
-npm run run-gliner2        # Eager-load: model ready immediately
-```
-
-The first start downloads the model (~1.5 GB). Subsequent starts are instant.
-
-### 5 · Pin the extension and go
-
-Click the Veil shield icon in your Chrome toolbar. The onboarding wizard will confirm everything is set up correctly.
+| Feature | Detail |
+|---------|--------|
+| Local AI | GLiNER2 runs entirely on your machine — zero cloud calls, zero data egress |
+| Inline redaction | Grammarly-style highlights with one-click redact per entity |
+| Regex fallback | Pattern rules for emails, API keys, phone numbers — instant, works offline |
+| Content-editable safe | Works correctly in rich-text fields (Gemini, Notion, Claude.ai) |
+| Custom patterns | Add your own regex patterns for API keys, IPs, custom identifiers |
+| Sensitivity control | Low / Medium / High detection thresholds |
+| Server health monitor | Live status indicator and crash toast notifications |
+| Onboarding wizard | First-run setup guide with automatic extension ID detection |
+| Cross-platform server | Autostart scripts for Linux (systemd), macOS (launchd), and Windows |
 
 ---
 
-## 🔁 Autostart (optional)
+## Supported PII Types
 
-Have the GLiNER2 server start automatically at login:
+Detected by GLiNER2 NER model: `PERSON` · `EMAIL` · `PHONE` · `ADDRESS` · `SSN` · `CREDIT_CARD` · `DATE_OF_BIRTH` · `LOCATION` · `ORGANIZATION`
+
+Detected by regex fallback: `OpenAI API keys` · `AWS credentials` · `GitHub tokens` · `JWT tokens` · `IPv4/IPv6 addresses` · `Custom patterns`
+
+---
+
+## Prerequisites
+
+- Chrome or any Chromium-based browser
+- Python 3.10+
+- Node.js 18+
+- ~2 GB free disk space for GLiNER2 model weights (downloaded once, cached locally)
+
+---
+
+## Quick Start
 
 ```bash
-npm run install-autostart-linux   # Linux (systemd user service)
-# or
-bash server/autostart/install_mac.sh  # macOS (launchd plist)
+# 1. Clone
+git clone https://github.com/nishikantmandal007/Veil.git
+cd Veil
+
+# 2. Install Python dependencies (creates .venv, installs PyTorch CPU + GLiNER2)
+npm run setup
+
+# 3. Load the extension in Chrome
+#    chrome://extensions → Developer mode ON → Load unpacked → select extension/
+#    Note the Extension ID shown on the card
+
+# 4. Install the native messaging host
+bash server/native-host/install_linux.sh <EXTENSION_ID>   # Linux
+bash server/native-host/install_mac.sh   <EXTENSION_ID>   # macOS
+server\native-host\install_windows.bat   <EXTENSION_ID>   # Windows
+
+# 5. Start the local inference server
+npm run run-gliner2-lazy   # lazy-load: model warms on first detection
+npm run run-gliner2        # eager-load: model ready immediately (~30s)
+```
+
+The first start downloads the GLiNER2 model (~1.5 GB). Subsequent starts are instant.
+
+Full setup guide: [nishikantmandal007.github.io/Veil/install](https://nishikantmandal007.github.io/Veil/install)
+
+---
+
+## Autostart
+
+Have the inference server launch automatically at login:
+
+```bash
+npm run install-autostart-linux        # Linux  — systemd user service
+bash server/autostart/install_mac.sh   # macOS  — launchd plist
+server\autostart\install_windows.bat   # Windows — Task Scheduler
 ```
 
 ---
 
-## 🧪 Testing
+## Configuration
 
-```bash
-# JavaScript unit tests
-npm run test:unit
+**Sensitivity thresholds**
 
-# Python unit tests (requires .venv)
-npm run test:unit:python
+| Level | Threshold | Notes |
+|-------|-----------|-------|
+| Low | 0.75 | Higher precision, fewer detections. Recommended for production use. |
+| Medium | 0.62 | Balanced. Default. |
+| High | 0.52 | More detections, higher false positive rate. |
 
-# Playwright E2E tests (opens Chromium with extension loaded)
-npm run test:e2e
+**Custom regex patterns**
 
-# E2E with visible browser
-npm run test:e2e:headed
+Add patterns under Advanced → Custom Regex Patterns:
+
+```json
+[
+  {
+    "id": "stripe_key",
+    "label": "api_key",
+    "pattern": "\\bsk_(?:test|live)_[A-Za-z0-9]{24,}\\b",
+    "flags": "g",
+    "score": 0.99,
+    "replacement": "[STRIPE KEY REDACTED]",
+    "enabled": true
+  }
+]
 ```
 
 ---
 
-## 📦 Building a Release
+## Anonymisation Service
+
+Veil optionally integrates with the **[MAYA DATA PRIVACY](https://github.com/MAYA-DATA-PRIVACY)** anonymisation API for format-preserving entity replacement — replacing detected PII with consistent synthetic aliases rather than generic redaction labels (e.g. `John Doe → <PERSON_1>` instead of `[NAME REDACTED]`).
+
+To enable, add your MAYA DATA PRIVACY API key under Advanced Settings in the extension popup.
+
+---
+
+## Testing
+
+```bash
+npm run test:unit           # JavaScript unit tests
+npm run test:unit:python    # Python unit tests (pytest)
+npm run test:e2e            # Playwright end-to-end tests (headless)
+npm run test:e2e:headed     # Playwright end-to-end tests (visible browser)
+```
+
+---
+
+## Building a Release
 
 ```bash
 npm run build:zip
-# → dist/veil-extension.zip  (browser-side files only, ready for Chrome Web Store)
+# → dist/veil-extension.zip  ready for Chrome Web Store upload
 ```
 
-Tagging a version triggers the GitHub Actions release pipeline:
+Pushing a version tag triggers the GitHub Actions release pipeline:
 
 ```bash
 git tag v1.1.0 && git push origin v1.1.0
@@ -182,44 +201,122 @@ git tag v1.1.0 && git push origin v1.1.0
 
 ---
 
-## 🏗 Architecture
+## Repository Layout
 
 ```
-Browser Tab                Extension                    Local Machine
-──────────────             ──────────────               ──────────────
-[textarea / CE]  ──text──► content.js                  gliner2_server.py
-                           │ detectAndHighlight()        │  (port 8765)
-                           │                            │  GLiNER2 model
-                           └──chrome.runtime──────────► background.js
-                                                        │  + native_host.py
-                                                        │  (stdio bridge)
-                                                        └── VeilAnonymizer
+veil/
+├── extension/              # Chrome extension source (load this folder in Chrome)
+│   ├── manifest.json
+│   ├── background.js       # Service worker: detection, server health, crash monitoring
+│   ├── content.js          # In-page PII detection, redaction & UI
+│   ├── popup.html/js/css   # Extension popup UI
+│   └── styles.css
+│
+├── server/                 # Local inference backend (Python)
+│   ├── gliner2_server.py   # GLiNER2 HTTP server (localhost:8765)
+│   ├── native_host.py      # Chrome native messaging bridge
+│   ├── native-host/        # Install/uninstall scripts per platform
+│   └── autostart/          # System-level autostart scripts
+│
+├── tests/
+│   ├── e2e/                # Playwright end-to-end tests
+│   ├── js/                 # JavaScript unit tests
+│   └── server/             # Python unit tests (pytest)
+│
+├── assets/brand/           # Logo, wordmarks, icons
+├── scripts/
+│   └── build_crx.sh        # Builds dist/veil-extension.zip
+│
+├── docs/                   # Contributing, security, changelog, development guide
+└── .github/
+    └── workflows/          # CI, CodeQL, release pipeline
 ```
 
-All text stays on `localhost`. No third-party API is contacted unless you explicitly configure an anonymisation proxy.
+---
+
+## Security
+
+### Threat model
+
+Veil protects against accidental data disclosure to AI APIs. It is not designed to protect against a compromised browser or OS, malicious extensions with higher privileges, or network-level interception.
+
+### Permissions
+
+| Permission | Reason |
+|------------|--------|
+| `storage` | Save settings locally |
+| `activeTab` | Read current tab for stats display |
+| `scripting` | Inject content scripts |
+| `nativeMessaging` | Communicate with local GLiNER2 bridge |
+| `<all_urls>` | Monitor any website (user-configurable) |
+
+### Reporting vulnerabilities
+
+Do not open a public issue for security vulnerabilities. See [docs/SECURITY.md](docs/SECURITY.md) for responsible disclosure instructions.
 
 ---
 
-## 🤝 Contributing
+## Roadmap
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines, and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the dev environment setup.
-
-Bug reports and feature suggestions go in [GitHub Issues](../../issues).
-
----
-
-## 🛡 Security
-
-Found a vulnerability? Please see [docs/SECURITY.md](docs/SECURITY.md) — do **not** open a public issue.
-
----
-
-## 👥 Contributors
-
-See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list.
+- [x] GLiNER2 local NER detection
+- [x] Regex fallback engine
+- [x] Inline redaction UI
+- [x] Content-editable field support (Gemini, Claude.ai, Notion)
+- [x] Custom regex patterns
+- [x] Cross-platform autostart scripts
+- [ ] Firefox support
+- [ ] On-device ONNX model (no Python required)
+- [ ] Audit log / export of redacted sessions
+- [ ] Team policy mode (enforce redaction rules via JSON config)
 
 ---
 
-## 📄 License
+## Contributing
 
-[MIT](LICENSE) © 2024 Veil Contributors
+Contributions are welcome — especially improvements to PII detection accuracy, new platform support, and performance work.
+
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the local development setup.
+
+Areas that need help: Firefox/Safari port · Windows and macOS native host improvements · ONNX model packaging · UI screenshots and demo GIF
+
+---
+
+## Contributors
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
+---
+
+## Acknowledgments
+
+<table>
+  <tr>
+    <td align="center" width="160">
+      <a href="https://github.com/fastino-ai">
+        <img src="https://github.com/fastino-ai.png" width="52" style="border-radius:8px" /><br/>
+        <b>Fastino Labs</b>
+      </a><br/>
+      <sub>GLiNER2 — local zero-shot NER powering PII detection</sub>
+    </td>
+    <td align="center" width="160">
+      <a href="https://github.com/MAYA-DATA-PRIVACY">
+        <img src="https://github.com/MAYA-DATA-PRIVACY.png" width="52" style="border-radius:8px" /><br/>
+        <b>MAYA DATA PRIVACY</b>
+      </a><br/>
+      <sub>Anonymisation API for format-preserving entity replacement</sub>
+    </td>
+    <td align="center" width="160">
+      <a href="https://huggingface.co">
+        <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" width="52" /><br/>
+        <b>Hugging Face</b>
+      </a><br/>
+      <sub>Model hosting and transformers ecosystem</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## License
+
+[MIT](LICENSE) © 2025 Nishikant Mandal & Veil Contributors
