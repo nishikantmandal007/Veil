@@ -1,0 +1,30 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Automated Changelog & Release PR
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+          changelog-path: CHANGELOG.md
+          # Commit message prefixes that appear in the changelog:
+          # feat:     → ### Features   (bumps minor version)
+          # fix:      → ### Bug Fixes  (bumps patch version)
+          # perf:     → ### Performance Improvements
+          # feat!: or BREAKING CHANGE: → ### ⚠ BREAKING CHANGES (bumps major)
+          # chore:, docs:, ci: → omitted from changelog (internal only)

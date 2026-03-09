@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # full history so CHANGELOG.md is present
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -40,6 +42,16 @@ jobs:
         run: |
           mv dist/veil-extension.zip "dist/veil-extension-${{ steps.version.outputs.version }}.zip"
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          # Pull out the block between this version's header and the next
+          NOTES=$(awk "/^## \\[$VERSION\\]/,/^## \\[/{ if (/^## \\[/ && !/^## \\[$VERSION\\]/) exit; print }" CHANGELOG.md | tail -n +2)
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -56,8 +68,9 @@ jobs:
             ### Chrome Web Store
             Submit the zip to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole).
 
-            ### Changelog
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for full details.
+            ---
+
+            ${{ steps.changelog.outputs.notes }}
           files: |
             dist/veil-extension-${{ steps.version.outputs.version }}.zip
           draft: false
