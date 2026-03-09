@@ -1,6 +1,13 @@
 <div align="center">
 
-<img src="extension/icons/icon128.png" alt="Veil logo" width="80" />
+<picture>
+  <source media="(prefers-color-scheme: dark)"
+    srcset="assets/brand/veil-wordmark-dark.png">
+  <source media="(prefers-color-scheme: light)"
+    srcset="assets/brand/veil-wordmark-light.png">
+  <img src="assets/brand/veil-wordmark-dark.png"
+    alt="Veil" height="48">
+</picture>
 
 # Veil — Privacy Shield for LLM Interfaces
 
