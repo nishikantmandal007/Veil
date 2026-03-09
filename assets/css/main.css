@@ -1491,7 +1491,7 @@ hr.rule {
 
 /* ── Browser viewport ── */
 .bw-viewport {
-  height: 500px;
+  height: 620px;
   display: flex;
   position: relative;
   overflow: hidden;
@@ -1963,7 +1963,7 @@ hr.rule {
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .bw-section { padding-left: 16px; padding-right: 16px; }
-  .bw-viewport { height: 420px; }
+  .bw-viewport { height: 520px; }
   .plat-sidebar { width: 160px; }
   .plat-bubble { font-size: 0.8rem; }
   .plat-typing { font-size: 0.82rem; }
@@ -1972,5 +1972,5 @@ hr.rule {
 
 @media (max-width: 600px) {
   .plat-sidebar { display: none; }
-  .bw-viewport  { height: 360px; }
+  .bw-viewport  { height: 440px; }
 }
