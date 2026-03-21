@@ -488,7 +488,7 @@
 
 /* ─── Token tray ─── */
 .ps-token-tray {
-  position: absolute;
+  position: fixed;
   z-index: 2147483100;
   display: flex;
   flex-wrap: wrap;

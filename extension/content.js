@@ -204,6 +204,10 @@ class PrivacyShield {
     this.activePopover = null;
     this.activePopoverHideTimer = null;
     this.activeRevealOverlay = null;
+    this.isApplyingDecode = false; // guard: true while response decoder is mutating text nodes
+    // Session-level decode map: token → original, persists after clearElementState clears
+    // this.redactions (which happens 180ms post-send, before the AI response arrives).
+    this.sessionDecodeMap = new Map();
 
     // Overlay highlights — fixed-position divs in document.body that visually
     // decorate text inside rich-editor contenteditables without touching their DOM.
@@ -399,6 +403,8 @@ class PrivacyShield {
 
     window.addEventListener('scroll', this.handleViewportChange, true);
     window.addEventListener('resize', this.handleViewportChange);
+
+    this.initResponseDecoder();
 
     // Hide scanning pills when the tab goes to the background so they don't
     // linger and appear stale when switching back.
@@ -661,8 +667,9 @@ class PrivacyShield {
         this.showNotification('Review pending redactions before sending.', 'warning');
       }
       if (event.key === 'Enter' && !event.shiftKey && !event.defaultPrevented) {
-        // Immediately remove the highlight overlay so it doesn't linger
+        // Immediately clear all visual artifacts so nothing lingers after send
         this.clearHighlights(element);
+        this._clearElementOverlay(element); // removes fixed-position ps-overlay-hl divs instantly
         this.removeActionBar(element);
         this.removeTokenTray(element);
         this.hideScanningPill(element);
@@ -1385,6 +1392,16 @@ class PrivacyShield {
     });
 
     if (changed) {
+      // Snapshot committed redactions into session map so response decoder survives
+      // clearElementState (which fires at 180ms post-send, before AI responds).
+      state.items.forEach((item) => {
+        if (!item.redacted) return;
+        const original = item.text;
+        if (item.maskIndex != null) this.sessionDecodeMap.set(this.getMaskText(item.label, item.maskIndex), original);
+        this.sessionDecodeMap.set(this.getMaskText(item.label), original);
+        if (item.alias) this.sessionDecodeMap.set(`<${item.alias}>`, original);
+        if (item.anonymizedText) this.sessionDecodeMap.set(item.anonymizedText, original);
+      });
       this.renderElement(element);
       this.persistCache(element);
       this.showNotification(`${count} item${count === 1 ? '' : 's'} protected`, 'info');
@@ -2341,12 +2358,23 @@ class PrivacyShield {
 
   positionTokenTray(element, tray) {
     const rect = element.getBoundingClientRect();
-    tray.style.top = `${window.scrollY + rect.bottom + 6}px`;
-    tray.style.left = `${window.scrollX + rect.left}px`;
+    // Skip elements that aren't actually visible (hidden duplicates, zero-size ghosts)
+    if (rect.width < 50 || rect.height < 10) return;
+    // Tray is position:fixed — use viewport coordinates directly (no scroll offset)
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 80) {
+      // Not enough room below — show above the element instead
+      tray.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+      tray.style.top = 'auto';
+    } else {
+      tray.style.top = `${rect.bottom + 6}px`;
+      tray.style.bottom = 'auto';
+    }
+    tray.style.left = `${rect.left}px`;
     tray.style.maxWidth = `${Math.max(220, rect.width)}px`;
     tray.classList.add('ps-token-tray-visible');
     requestAnimationFrame(() => {
-      const maxLeft = window.scrollX + window.innerWidth - tray.offsetWidth - 8;
+      const maxLeft = window.innerWidth - tray.offsetWidth - 8;
       if (parseFloat(tray.style.left) > maxLeft) tray.style.left = `${Math.max(8, maxLeft)}px`;
     });
   }
@@ -2697,7 +2725,9 @@ class PrivacyShield {
   // Covers mask tokens ([NAME_1 REDACTED]), alias tokens (<PERSON_1>), and
   // synthetic names (anonymize mode). Memory-only — never persisted.
   buildGlobalReverseMap() {
-    const map = new Map();
+    // Seed from session-level cache so decoder works even after clearElementState
+    // fires at 180ms post-send (before the AI response has been received).
+    const map = new Map(this.sessionDecodeMap);
     this.redactions.forEach((state) => {
       if (!state?.items) return;
       state.items.forEach((item) => {
@@ -2716,15 +2746,18 @@ class PrivacyShield {
     return map;
   }
 
-  // Replace tokens inside a response-area element tree with hoverable spans.
-  // Called on initial scan and again whenever new redactions are committed.
+  // Replace tokens in a response-area element tree with original values.
+  // Uses direct text node content mutation — no new DOM nodes, no span wrapping.
+  // This is the least invasive mutation possible and survives React/Preact
+  // reconciliation because completed responses are frozen (no more state updates).
   processResponseNodeTree(container, reverseMap) {
     if (!container || !reverseMap.size) return;
 
-    // Build a regex from all known tokens (longest first to avoid partial matches)
     const tokens = [...reverseMap.keys()].sort((a, b) => b.length - a.length);
-    const escapedTokens = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const tokenRegex = new RegExp(`(${escapedTokens.join('|')})`, 'g');
+    const tokenRegex = new RegExp(
+      tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+      'g'
+    );
 
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
     const textNodes = [];
@@ -2733,36 +2766,18 @@ class PrivacyShield {
 
     textNodes.forEach((textNode) => {
       if (!textNode.parentNode) return;
-      // Skip text nodes already inside a decoded span or any Veil element
-      if (textNode.parentElement?.closest('.ps-decoded-token, .ps-pii-underline, .ps-redaction, .ps-action-bar, .ps-token-tray, .ps-scanning-pill, .ps-popover')) return;
+      // Never mutate text inside Veil's own UI elements
+      if (textNode.parentElement?.closest(
+        '.ps-pii-underline, .ps-redaction, .ps-action-bar, .ps-token-tray, .ps-scanning-pill'
+      )) return;
 
       const text = textNode.textContent;
       tokenRegex.lastIndex = 0;
       if (!tokenRegex.test(text)) return;
       tokenRegex.lastIndex = 0;
 
-      const fragment = document.createDocumentFragment();
-      let lastIndex = 0;
-      let match;
-      while ((match = tokenRegex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-        }
-        const token = match[0];
-        const original = reverseMap.get(token);
-        const span = document.createElement('span');
-        span.className = 'ps-decoded-token';
-        span.setAttribute('data-ps-original', original);
-        span.setAttribute('data-ps-token', token);
-        span.title = `\uD83D\uDD13 ${original}`;
-        span.textContent = token;
-        fragment.appendChild(span);
-        lastIndex = match.index + token.length;
-      }
-      if (lastIndex < text.length) {
-        fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-      }
-      textNode.parentNode.replaceChild(fragment, textNode);
+      // Pure text replacement — decoded value shown inline, no DOM structure change.
+      textNode.textContent = text.replace(tokenRegex, (match) => reverseMap.get(match) ?? match);
     });
   }
 
@@ -2771,43 +2786,82 @@ class PrivacyShield {
     const reverseMap = this.buildGlobalReverseMap();
     if (!reverseMap.size) return;
     const selector = RESPONSE_AREA_SELECTORS.join(', ');
+
+    // Disconnect during scan so our text mutations don't re-trigger the decoder observer.
+    if (this.responseDecoderObserver) this.responseDecoderObserver.disconnect();
+    this.isApplyingDecode = true;
     try {
       document.querySelectorAll(selector).forEach((el) => this.processResponseNodeTree(el, reverseMap));
     } catch { /* ignore invalid selectors on unusual pages */ }
+    finally {
+      this.isApplyingDecode = false;
+      if (this.responseDecoderObserver) {
+        this.responseDecoderObserver.observe(document.body, {
+          childList: true, subtree: true, characterData: true,
+        });
+      }
+    }
   }
 
-  // Set up a MutationObserver to decode tokens in response areas as they stream in.
+  // Set up a MutationObserver to decode tokens in response areas after streaming ends.
+  //
+  // Design:
+  //   • watches characterData so we catch streaming text-node updates
+  //   • 500ms per-container debounce — decode fires only after streaming goes quiet
+  //   • disconnect → replace → reconnect prevents our own text mutations from
+  //     looping back into the observer
   initResponseDecoder() {
     if (this.responseDecoderObserver) return;
     const responseSelector = RESPONSE_AREA_SELECTORS.join(', ');
+    const decodeTimers = new Map(); // container → setTimeout id
+
+    const observerOptions = { childList: true, subtree: true, characterData: true };
 
     this.responseDecoderObserver = new MutationObserver((mutations) => {
+      if (this.isApplyingDecode) return; // our own replacement firing — skip
       const reverseMap = this.buildGlobalReverseMap();
       if (!reverseMap.size) return;
 
+      // Identify which response-area containers were touched by this mutation batch.
+      const affected = new Set();
       for (const mutation of mutations) {
-        for (const added of mutation.addedNodes) {
-          if (added.nodeType === Node.TEXT_NODE) {
-            // Text node added directly into a response area
-            try {
-              if (added.parentElement?.closest(responseSelector)) {
-                this.processResponseNodeTree(added.parentElement, reverseMap);
-              }
-            } catch { /* ignore */ }
-          } else if (added instanceof HTMLElement) {
-            try {
-              if (added.matches(responseSelector) || added.closest(responseSelector)) {
-                this.processResponseNodeTree(added, reverseMap);
-              }
-            } catch { /* ignore */ }
-          }
-        }
+        const target = mutation.target instanceof Element
+          ? mutation.target
+          : mutation.target.parentElement;
+        if (!target) continue;
+        try {
+          const container = target.matches(responseSelector)
+            ? target
+            : target.closest(responseSelector);
+          if (container) affected.add(container);
+        } catch { /* invalid selector on some page */ }
       }
+
+      // Debounce per container: reset timer on every streaming chunk,
+      // fire 500ms after the last one (i.e. after streaming completes).
+      affected.forEach((container) => {
+        clearTimeout(decodeTimers.get(container));
+        decodeTimers.set(container, setTimeout(() => {
+          decodeTimers.delete(container);
+          const currentMap = this.buildGlobalReverseMap(); // re-fetch — may have grown
+          if (!currentMap.size) return;
+
+          // Disconnect → mutate text nodes → reconnect.
+          this.responseDecoderObserver.disconnect();
+          this.isApplyingDecode = true;
+          try {
+            this.processResponseNodeTree(container, currentMap);
+          } finally {
+            this.isApplyingDecode = false;
+            this.responseDecoderObserver.observe(document.body, observerOptions);
+          }
+        }, 500));
+      });
     });
 
-    this.responseDecoderObserver.observe(document.body, { childList: true, subtree: true });
+    this.responseDecoderObserver.observe(document.body, observerOptions);
 
-    // Decode tokens in any response areas already present on the page
+    // Decode any tokens already present on the page (resumed conversation, etc.)
     this.scanExistingResponseAreas();
   }
 }
