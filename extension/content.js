@@ -569,6 +569,14 @@ class PrivacyShield {
         this.scanningPills.delete(element);
       }
     });
+    // Remove fixed-position overlay highlights whose source element is gone.
+    // These are not tracked by data-element-id so must be swept via the Map.
+    this._ceOverlayHighlights.forEach((highlights, element) => {
+      if (!element?.isConnected) {
+        highlights.forEach((hl) => hl.remove());
+        this._ceOverlayHighlights.delete(element);
+      }
+    });
   }
 
   pruneDisconnectedMonitoredElements() {
@@ -701,6 +709,14 @@ class PrivacyShield {
           event.preventDefault();
           this.showNotification('Review pending redactions before sending.', 'warning');
         }
+        // Mirror the same immediate cleanup done on Enter so overlays don't
+        // linger when the user sends via a submit button rather than keyboard.
+        this.clearHighlights(element);
+        this._clearElementOverlay(element);
+        this.removeActionBar(element);
+        this.removeTokenTray(element);
+        this.hideScanningPill(element);
+        this.hidePopover();
         this.schedulePostInteractionCleanup(element);
       };
       form.addEventListener('submit', handleSubmit);
