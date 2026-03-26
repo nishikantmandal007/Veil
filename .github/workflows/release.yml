@@ -31,6 +31,9 @@ jobs:
       - name: Build extension ZIP
         run: bash scripts/build_crx.sh dist/veil-extension.zip
 
+      - name: Build backend release bundle
+        run: python3 scripts/build_backend_bundle.py
+
       - name: Get version from manifest
         id: version
         run: |
@@ -65,6 +68,20 @@ jobs:
             3. Open Chrome → `chrome://extensions` → Enable **Developer mode**
             4. Click **Load unpacked** and select the extracted folder
 
+            ### Local Server Install / Update
+            Linux/macOS:
+            `curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh | bash -s -- --extension-id <EXTENSION_ID>`
+
+            Windows:
+            `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/${{ github.repository }}/releases/latest/download/install.ps1' | iex; Install-Veil -ExtensionId '<EXTENSION_ID>'"`
+
+            ### Local Server Uninstall
+            Linux/macOS:
+            `curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/uninstall.sh | bash`
+
+            Windows:
+            `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/${{ github.repository }}/releases/latest/download/uninstall.ps1' | iex; Uninstall-Veil"`
+
             ### Chrome Web Store
             Submit the zip to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole).
 
@@ -73,6 +90,12 @@ jobs:
             ${{ steps.changelog.outputs.notes }}
           files: |
             dist/veil-extension-${{ steps.version.outputs.version }}.zip
+            dist/install.sh
+            dist/install.ps1
+            dist/uninstall.sh
+            dist/uninstall.ps1
+            dist/veil-backend-unix.tar.gz
+            dist/veil-backend-windows.zip
           draft: false
           prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
 

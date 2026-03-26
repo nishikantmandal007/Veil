@@ -13,7 +13,12 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 UNIX_ARCHIVE = DIST / "veil-backend-unix.tar.gz"
 WINDOWS_ARCHIVE = DIST / "veil-backend-windows.zip"
-INSTALLER_FILES = [ROOT / "install.sh", ROOT / "install.ps1"]
+INSTALLER_FILES = [
+    ROOT / "install.sh",
+    ROOT / "install.ps1",
+    ROOT / "uninstall.sh",
+    ROOT / "uninstall.ps1",
+]
 INCLUDE_PATHS = [ROOT / "server", ROOT / "requirements.txt", ROOT / "LICENSE"]
 SKIP_DIRS = {"__pycache__", ".pytest_cache"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".DS_Store"}

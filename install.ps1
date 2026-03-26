@@ -8,6 +8,7 @@ function Install-Veil {
     $repoSlug = "nishikantmandal007/Veil"
     $releaseBase = "https://github.com/$repoSlug/releases/latest/download"
     $assetName = "veil-backend-windows.zip"
+    $defaultAnonEndpoint = "https://app.mayadataprivacy.in/mdp/engine/anonymization"
 
     if ([string]::IsNullOrWhiteSpace($InstallDir)) {
         $InstallDir = Join-Path $env:LOCALAPPDATA "Veil"
@@ -26,10 +27,21 @@ function Install-Veil {
         Expand-Archive -Path $archivePath -DestinationPath $extractDir -Force
 
         Get-ChildItem -LiteralPath $InstallDir -Force | Where-Object {
-            $_.Name -notin @(".venv", ".runtime")
+            $_.Name -notin @(".venv", ".runtime", ".env")
         } | Remove-Item -Recurse -Force
 
         Copy-Item -Path (Join-Path $extractDir "*") -Destination $InstallDir -Recurse -Force
+
+        $envFile = Join-Path $InstallDir ".env"
+        if (-not (Test-Path -LiteralPath $envFile)) {
+            "MDP_ANONYMIZATION_ENDPOINT=$defaultAnonEndpoint" | Set-Content -LiteralPath $envFile -Encoding UTF8
+        }
+        else {
+            $envContent = Get-Content -LiteralPath $envFile -Raw
+            if ($envContent -notmatch "(?m)^MDP_ANONYMIZATION_ENDPOINT=") {
+                Add-Content -LiteralPath $envFile -Value "`r`nMDP_ANONYMIZATION_ENDPOINT=$defaultAnonEndpoint"
+            }
+        }
 
         $python = Get-Command python -ErrorAction Stop
         $venvPython = Join-Path $InstallDir ".venv\Scripts\python.exe"

@@ -363,13 +363,16 @@ def stop_server() -> Dict[str, Any]:
 def server_status() -> Dict[str, Any]:
     state = load_state()
     pid = state.get("pid")
-    running = is_pid_running(pid)
-    healthy = is_server_healthy() if running else False
+    tracked_running = is_pid_running(pid)
+    healthy = is_server_healthy()
+    running = tracked_running or healthy
+    if pid and not tracked_running and not healthy:
+        save_state({})
     return {
         "success": True,
         "running": running,
         "healthy": healthy,
-        "pid": pid if running else None,
+        "pid": pid if tracked_running else None,
         "host": HOST_NAME,
         "logExists": LOG_FILE.exists(),
         **runtime_meta(),

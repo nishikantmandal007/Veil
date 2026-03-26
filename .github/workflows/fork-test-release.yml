@@ -84,12 +84,16 @@ jobs:
             - `veil-extension.zip`
             - `install.sh`
             - `install.ps1`
+            - `uninstall.sh`
+            - `uninstall.ps1`
             - `veil-backend-unix.tar.gz`
             - `veil-backend-windows.zip`
           files: |
             dist/veil-extension.zip
             dist/install.sh
             dist/install.ps1
+            dist/uninstall.sh
+            dist/uninstall.ps1
             dist/veil-backend-unix.tar.gz
             dist/veil-backend-windows.zip
           draft: false
