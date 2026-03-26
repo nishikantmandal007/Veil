@@ -287,7 +287,7 @@ class PrivacyShield {
         this.settings = {
           enabled: result.enabled ?? true,
           autoRedact: result.autoRedact ?? true,
-          redactionMode: result.redactionMode ?? 'anonymize',
+          redactionMode: result.redactionMode ?? 'mask',
           sensitivity: result.sensitivity ?? 'medium',
           includeRegexWhenModelOnline: result.includeRegexWhenModelOnline ?? false,
           enabledTypes: result.enabledTypes ?? ['person', 'email', 'phone', 'address', 'ssn', 'credit_card'],
@@ -405,6 +405,7 @@ class PrivacyShield {
     window.addEventListener('resize', this.handleViewportChange);
 
     this.initResponseDecoder();
+    this._loadSessionDecodeMap();
 
     // Hide scanning pills when the tab goes to the background so they don't
     // linger and appear stale when switching back.
@@ -662,6 +663,13 @@ class PrivacyShield {
     };
 
     const handleKeydown = (event) => {
+      // Immediately drop highlight overlays when the user deletes text so stale
+      // green boxes don't linger. The debounced re-scan will restore any that
+      // are still valid after the edit.
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        this.clearHighlights(element);
+        this._clearElementOverlay(element);
+      }
       if (event.key === 'Enter' && !event.shiftKey && this.hasUnreviewedRedactions(element)) {
         event.preventDefault();
         this.showNotification('Review pending redactions before sending.', 'warning');
@@ -1402,6 +1410,7 @@ class PrivacyShield {
         if (item.alias) this.sessionDecodeMap.set(`<${item.alias}>`, original);
         if (item.anonymizedText) this.sessionDecodeMap.set(item.anonymizedText, original);
       });
+      this._persistSessionDecodeMap();
       this.renderElement(element);
       this.persistCache(element);
       this.showNotification(`${count} item${count === 1 ? '' : 's'} protected`, 'info');
@@ -2715,6 +2724,30 @@ class PrivacyShield {
         [key]: { ...this.siteAliasCache, updatedAt: Date.now() }
       });
     }, 1000);
+  }
+
+  // Persist sessionDecodeMap to chrome.storage.session so it survives tab reload.
+  // Auto-cleared when the browser closes — PII never written to long-term disk.
+  _persistSessionDecodeMap() {
+    if (!chrome?.storage?.session) return;
+    const key = `veil::decodeMap::${location.hostname}`;
+    chrome.storage.session.set({ [key]: Object.fromEntries(this.sessionDecodeMap) });
+  }
+
+  // Restore sessionDecodeMap from chrome.storage.session on startup.
+  async _loadSessionDecodeMap() {
+    if (!chrome?.storage?.session) return;
+    const key = `veil::decodeMap::${location.hostname}`;
+    try {
+      const data = await new Promise((resolve) => chrome.storage.session.get(key, resolve));
+      if (data[key] && typeof data[key] === 'object') {
+        Object.entries(data[key]).forEach(([token, original]) => {
+          if (!this.sessionDecodeMap.has(token)) {
+            this.sessionDecodeMap.set(token, original);
+          }
+        });
+      }
+    } catch { /* non-fatal — session storage unavailable in older Chrome */ }
   }
 
   // ═══════════════════════════════════════════════════════════

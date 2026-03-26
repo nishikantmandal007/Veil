@@ -174,6 +174,7 @@ class SettingsManager {
     this.selectedModel = 'fastino/gliner2-large-v1';
     this.apiKeyRevealed = false;
     this.hfTokenVisible = false;
+    this.keyExpanded = false;
     this.serverBusy = false;
     this.serverPhase = 'disconnected';
     this.terminalVisible = false;
@@ -194,6 +195,10 @@ class SettingsManager {
   }
 
   async init() {
+    // Open as full-page settings tab when ?tab=1 is in the URL
+    if (location.search.includes('tab=1')) {
+      document.body.classList.add('full-page');
+    }
     await this.loadSettings();
     await this.loadLocalSecrets();
     this.bindEvents();
@@ -270,11 +275,25 @@ class SettingsManager {
   renderRedactionKey(key) {
     const card = document.getElementById('redactionKeyCard');
     const list = document.getElementById('redactionKeyList');
-    if (!card || !list) return;
+    const toggle = document.getElementById('redactionKeyToggle');
+    if (!card || !list || !toggle) return;
+
     if (!key || Object.keys(key).length === 0) {
       card.hidden = true;
       return;
     }
+
+    // Wire toggle once
+    if (!toggle._veilBound) {
+      toggle._veilBound = true;
+      toggle.addEventListener('click', () => {
+        this.keyExpanded = !this.keyExpanded;
+        toggle.setAttribute('aria-expanded', String(this.keyExpanded));
+        list.hidden = !this.keyExpanded;
+      });
+    }
+
+    // Rebuild list content
     list.innerHTML = '';
     Object.entries(key).forEach(([token, original]) => {
       const row = document.createElement('div');
@@ -285,6 +304,10 @@ class SettingsManager {
         + `<span class="key-original">${esc(original)}</span>`;
       list.appendChild(row);
     });
+
+    // Apply current expand/collapse state (preserved across poll cycles)
+    toggle.setAttribute('aria-expanded', String(this.keyExpanded));
+    list.hidden = !this.keyExpanded;
     card.hidden = false;
   }
 
@@ -308,7 +331,8 @@ class SettingsManager {
     const anonymizeOption = document.getElementById('anonymizeOption');
     const anonymizeHint = document.getElementById('anonymizeHint');
     if (anonymizeOption) anonymizeOption.disabled = !hasKey;
-    if (anonymizeHint) anonymizeHint.hidden = hasKey;
+    // Only show hint when user has actually selected Anonymize mode but has no key
+    if (anonymizeHint) anonymizeHint.hidden = hasKey || this.settings.redactionMode !== 'anonymize';
     // If key removed and mode was anonymize, force mask
     if (!hasKey && this.settings.redactionMode === 'anonymize') {
       this.settings.redactionMode = 'mask';
@@ -318,6 +342,10 @@ class SettingsManager {
   }
 
   bindEvents() {
+    document.getElementById('openSettingsTabBtn')?.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
+    });
+
     document.getElementById('enabledToggle').addEventListener('change', (event) => {
       this.updateSetting('enabled', event.target.checked);
       this.renderStatus();
@@ -669,7 +697,7 @@ class SettingsManager {
   }
 
   getNativeHostInstallCommand() {
-    return `bash scripts/install_native_host_linux.sh ${chrome.runtime.id}`;
+    return `# Run from your Veil repo directory:\nbash server/native-host/install_linux.sh ${chrome.runtime.id}`;
   }
 
   getDefaultServerMeta() {
@@ -816,6 +844,7 @@ class SettingsManager {
       chrome.storage.local.set({ hfToken }, resolve);
     });
     this.localSecrets.hfToken = hfToken;
+    this.flashBtn('saveHfTokenButton', '✓ Saved');
     this.setMessage(hfToken ? 'HF token saved locally.' : 'HF token cleared.');
   }
 
@@ -852,6 +881,7 @@ class SettingsManager {
     this.renderModeSummary();
     this.apiKeyRevealed = false;
     this.renderApiKeyState();
+    this.flashBtn('saveApiKeyButton', '✓ Saved');
     this.setMessage('API key saved securely.');
   }
 
@@ -899,8 +929,11 @@ class SettingsManager {
 
   toggleHfTokenInputVisibility() {
     const input = document.getElementById('hfTokenInput');
+    const btn = document.getElementById('toggleHfTokenVisibility');
     if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    if (btn) btn.setAttribute('aria-label', isPassword ? 'Hide token' : 'Show token');
   }
 
   renderApiKeyState() {
@@ -1132,7 +1165,10 @@ class SettingsManager {
 
       this.settings = { ...this.settings, ...payload };
       chrome.storage.local.set(payload, () => {
-        if (showMessage) this.setMessage('Settings saved.');
+        if (showMessage) {
+          this.flashBtn('saveAdvancedButton', '✓ Saved');
+          this.setMessage('Settings saved.');
+        }
       });
     } catch (error) {
       this.setMessage(error.message || 'Invalid settings.', true);
@@ -1331,17 +1367,30 @@ class SettingsManager {
     bar.textContent = text;
     bar.classList.toggle('error', isError);
 
-    if (this.messageTimer) {
-      clearTimeout(this.messageTimer);
-    }
-    if (isError) {
+    if (this.messageTimer) clearTimeout(this.messageTimer);
+
+    const isOptionsPage = Boolean(document.getElementById('opt-main'));
+    if (isError && isOptionsPage) {
       this.messageTimer = null;
       return;
     }
     this.messageTimer = setTimeout(() => {
       bar.textContent = '';
       bar.classList.remove('error');
-    }, 3600);
+    }, isError ? 5000 : 3200);
+  }
+
+  /** Temporarily change a button's label to confirm an action, then restore it. */
+  flashBtn(id, confirmedLabel = '✓ Saved', ms = 2000) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.textContent = confirmedLabel;
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.disabled = false;
+    }, ms);
   }
 
   formatNumber(value) {
@@ -1377,7 +1426,7 @@ class OnboardingWizard {
 
   _populateInstallCmd() {
     const cmd = document.getElementById('onboardingInstallCmd');
-    if (cmd) cmd.textContent = `bash server/native-host/install_linux.sh ${chrome.runtime.id}`;
+    if (cmd) cmd.textContent = `# Run from your Veil repo directory:\nbash server/native-host/install_linux.sh ${chrome.runtime.id}`;
   }
 
   _bindEvents() {
@@ -1490,5 +1539,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const sm = new SettingsManager();
   // eslint-disable-next-line no-new
   new OnboardingWizard(sm);
+
+  // Sidebar scroll-spy for options page
+  const mainEl = document.getElementById('opt-main');
+  if (mainEl) {
+    const navItems = document.querySelectorAll('.opt-nav-item[data-section]');
+    const sections = document.querySelectorAll('.opt-section[id]');
+    const activate = () => {
+      let active = '';
+      sections.forEach((s) => {
+        if (s.getBoundingClientRect().top <= 80) active = s.id.replace('section-', '');
+      });
+      navItems.forEach((a) => {
+        a.classList.toggle('is-active', a.dataset.section === active);
+      });
+    };
+    mainEl.addEventListener('scroll', activate, { passive: true });
+    activate();
+  }
 });
 

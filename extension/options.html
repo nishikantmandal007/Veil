@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veil Settings</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+
+  <div class="opt-layout">
+
+    <!-- ══════════ SIDEBAR ══════════ -->
+    <aside class="opt-sidebar">
+
+      <div class="opt-brand">
+        <img src="assets/icons/veil-icon.svg" class="opt-brand-logo-img" alt="Veil" width="28" height="28" style="border-radius:6px">
+        <div class="opt-brand-text">
+          <span class="opt-brand-name">Veil <span class="beta-badge" style="font-size:9px;vertical-align:middle">Beta</span></span>
+          <span class="opt-brand-tag">Privacy Guard</span>
+        </div>
+      </div>
+
+      <div class="opt-status-block">
+        <div class="opt-status-row">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="opt-status-text" id="statusText">Checking…</span>
+          <span class="version-wrap" style="display:inline-flex;align-items:center;gap:3px">
+          <svg class="git-logo" viewBox="0 0 92 92" fill="#F05032" width="11" height="11" aria-hidden="true">
+            <path d="M90.16 41.88L50.12 1.84a6.29 6.29 0 00-8.9 0l-8.86 8.86 11.24 11.24a7.47 7.47 0 019.46 9.53l10.83 10.83a7.47 7.47 0 11-4.47 4.23L48.29 35.39v27.59a7.48 7.48 0 11-6.15.19V34.82a7.47 7.47 0 01-4.06-9.82L26.9 13.86 1.84 38.92a6.29 6.29 0 000 8.9l40.04 40.04a6.29 6.29 0 008.9 0l39.38-39.38a6.29 6.29 0 000-8.9z"/>
+          </svg>
+          <span class="opt-version" id="versionBadge">v1.1</span>
+        </span>
+        </div>
+        <p class="opt-status-sub" id="statusSubtext">Connecting to local model…</p>
+      </div>
+
+      <div class="opt-stats-row">
+        <div class="opt-stat-block">
+          <span class="opt-stat-num" id="redactionCount">0</span>
+          <span class="opt-stat-label">protected</span>
+        </div>
+        <div class="opt-stat-divider"></div>
+        <div class="opt-stat-block">
+          <span class="opt-stat-num" id="detectionCount">0</span>
+          <span class="opt-stat-label">detected</span>
+        </div>
+      </div>
+
+      <nav class="opt-nav" aria-label="Settings sections">
+        <a href="#section-server"     class="opt-nav-item" data-section="server">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 6c0 2.21-3.58 4-8 4S4 8.21 4 6s3.58-4 8-4 8 1.79 8 4zm0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4V9c0 2.21 3.58 4 8 4s8-1.79 8-4v2zm0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4v-2c0 2.21 3.58 4 8 4s8-1.79 8-4v2z"/></svg>
+          Server
+        </a>
+        <a href="#section-protection" class="opt-nav-item" data-section="protection">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+          Protection
+        </a>
+        <a href="#section-detection"  class="opt-nav-item" data-section="detection">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          Detection
+        </a>
+        <a href="#section-pii"        class="opt-nav-item" data-section="pii">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          PII Types
+        </a>
+        <a href="#section-advanced"   class="opt-nav-item" data-section="advanced">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          Advanced
+        </a>
+        <a href="#section-about"      class="opt-nav-item" data-section="about">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          About
+        </a>
+      </nav>
+
+      <div class="opt-sidebar-footer">
+        <a href="https://github.com/Maya-data-privacy/veil" target="_blank" rel="noreferrer" class="opt-footer-link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          GitHub
+        </a>
+        <span class="opt-footer-tagline">An open privacy tool by <a href="https://www.mayadataprivacy.com/" target="_blank" rel="noreferrer" class="maya-link"><strong>Maya Data Privacy</strong></a>, powered by GLiNER2</span>
+      </div>
+
+    </aside>
+    <!-- ══════════ End Sidebar ══════════ -->
+
+
+    <!-- ══════════ MAIN CONTENT ══════════ -->
+    <main class="opt-main" id="opt-main">
+
+      <!-- Hidden elements required by popup.js render logic -->
+      <section class="card key-card" id="redactionKeyCard" hidden>
+        <button class="key-toggle-row section-title-row" id="redactionKeyToggle" type="button"
+                aria-expanded="false" aria-controls="redactionKeyList">
+          <h2>Redaction Key</h2>
+          <span class="key-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div id="redactionKeyList" class="redaction-key-list" hidden></div>
+      </section>
+      <p class="hint" id="anonymizeHint" hidden style="margin:0 0 12px"></p>
+
+      <!-- ─── Quick Control Bar ─── -->
+      <div class="opt-control-bar">
+        <label class="opt-cb-toggle" title="Enable or disable PII protection">
+          <input type="checkbox" id="enabledToggle" class="qs-checkbox" checked>
+          <span class="qs-track"><span class="qs-thumb"></span></span>
+          <span class="opt-cb-label">Protection enabled</span>
+        </label>
+        <div class="opt-cb-right">
+          <span class="opt-cb-mode-label">Mode</span>
+          <select id="redactionModeSelect" class="qs-select">
+            <option value="mask">Mask</option>
+            <option value="anonymize" id="anonymizeOption">Anonymize</option>
+          </select>
+        </div>
+      </div>
+
+
+      <!-- ═══════════════════════════════════
+           SECTION — Local Server
+      ═══════════════════════════════════ -->
+      <section class="opt-section" id="section-server">
+        <div class="opt-section-header">
+          <h2 class="opt-section-title">Local Server</h2>
+          <p class="opt-section-desc">GLiNER2 runs entirely on your machine. Install the native bridge once, then start the server to enable AI-powered detection.</p>
+        </div>
+
+        <div class="opt-card">
+          <div class="section-title-row">
+            <h3 class="opt-card-title">Server Control</h3>
+            <button id="toggleTerminalButton" type="button" class="secondary compact">Show Logs</button>
+          </div>
+          <p class="hint">Use Start Server to launch the local GLiNER2 inference engine.</p>
+          <div class="terminal-panel" id="terminalPanel">
+            <pre class="terminal-output" id="terminalOutput">No server logs yet.</pre>
+          </div>
+          <div class="button-row">
+            <button id="startServerButton" type="button">Start Server</button>
+            <button id="stopServerButton" type="button" class="secondary">Stop Server</button>
+            <button id="refreshServerButton" type="button" class="ghost">Refresh</button>
+          </div>
+
+          <div class="install-block" id="nativeHostInstallBlock" hidden>
+            <div class="install-header">
+              <span class="install-title">Native host setup (run once)</span>
+              <button id="copyInstallCommandButton" type="button" class="ghost compact">Copy</button>
+            </div>
+            <pre class="cmd-box"><code id="nativeHostInstallCommand"></code></pre>
+            <p class="hint install-note">After install and extension reload, this block disappears automatically.</p>
+          </div>
+        </div>
+
+        <div class="opt-card opt-notice-card">
+          <span class="opt-notice-icon">🔗</span>
+          <div>
+            <div class="opt-notice-title">One server, all your browsers</div>
+            <p class="opt-notice-body">
+              GLiNER2 runs once on <code>127.0.0.1:8765</code> and is shared across Chrome, Brave,
+              Edge, and Vivaldi automatically. Using multiple browsers?
+              Pass all extension IDs when installing:
+              <code>bash server/native-host/install_linux.sh ID1 ID2</code>
+            </p>
+          </div>
+        </div>
+
+        <div class="opt-card">
+          <div class="tool-tabs-bar">
+            <button type="button" class="tool-tab is-active" data-panel="hfToken">HF Token</button>
+            <button type="button" class="tool-tab" data-panel="apiKey">API Key</button>
+            <button type="button" class="tool-tab" data-panel="diagnostics">Diagnostics</button>
+          </div>
+
+          <div id="hfTokenPanel" class="tool-panel">
+            <section class="server-tool-panel token-tools">
+              <p class="panel-title">Hugging Face Token</p>
+              <p class="hint" style="margin-top:4px">Optional — only needed if you encounter model download errors. Stored locally, never transmitted.</p>
+              <label class="field field-tight" for="hfTokenInput">
+                <div class="secret-input-row">
+                  <input id="hfTokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="hf_xxx… (optional)">
+                  <button type="button" class="ghost compact eye-btn" id="toggleHfTokenVisibility" aria-label="Show token" title="Show/hide">
+                    <svg class="eye-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path class="eye-on" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                      <path class="eye-off" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+                    </svg>
+                  </button>
+                </div>
+              </label>
+              <div class="button-row">
+                <button id="saveHfTokenButton" type="button" class="ghost">Save Token</button>
+                <button id="clearHfTokenButton" type="button" class="secondary">Clear</button>
+                <span class="saved-badge" id="hfTokenSavedBadge" hidden>&#10003; Saved</span>
+              </div>
+            </section>
+          </div>
+
+          <div id="apiKeyPanel" class="tool-panel" hidden>
+            <section class="server-tool-panel token-tools">
+              <p class="panel-title">Anonymization API Key</p>
+              <p class="hint" style="margin-top:4px">Required for Anonymize mode. Stored locally — only forwarded to your local proxy server.</p>
+              <div id="apiKeySavedState" hidden>
+                <div class="api-key-saved-card">
+                  <div class="api-key-saved-info">
+                    <div class="api-key-saved-icon" aria-hidden="true">&#128273;</div>
+                    <div>
+                      <div class="api-key-saved-title">API Key Saved</div>
+                      <div class="api-key-saved-preview" id="apiKeyPreview">&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</div>
+                    </div>
+                  </div>
+                  <div class="api-key-saved-actions">
+                    <button type="button" class="ghost compact" id="revealApiKeyButton">Show</button>
+                    <button type="button" class="secondary compact" id="removeApiKeyButton">Remove</button>
+                  </div>
+                </div>
+              </div>
+              <div id="apiKeyInputState">
+                <label class="field field-tight" for="veilApiKeyInput">
+                  <div class="secret-input-row">
+                    <input id="veilApiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key…">
+                    <button type="button" class="ghost compact eye-btn" id="toggleApiKeyVisibility" aria-label="Show key" title="Show/hide">
+                      <svg class="eye-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path class="eye-on" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                        <path class="eye-off" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </label>
+                <div class="button-row">
+                  <button id="saveApiKeyButton" type="button" class="ghost">Save API Key</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="diagnosticsPanel" class="tool-panel" hidden>
+            <section class="server-tool-panel">
+              <p class="panel-title">Diagnostics</p>
+              <label class="field field-tight" style="margin-bottom:8px">
+                <span style="font-size:11px;font-weight:600;color:var(--ink)">GLiNER2 Model</span>
+                <select id="modelSelect">
+                  <option value="fastino/gliner2-large-v1">gliner2-large-v1 — 340 M &nbsp;(best quality)</option>
+                  <option value="fastino/gliner2-base-v1">gliner2-base-v1 — 205 M &nbsp;(faster, less RAM)</option>
+                  <option value="fastino/gliner2-multi-v1">gliner2-multi-v1 — multilingual</option>
+                </select>
+                <p class="hint" style="margin:3px 0 0">Takes effect on next server start. Downloads automatically.</p>
+              </label>
+              <div class="diag-row">
+                <span class="diag-key">Active Model</span>
+                <code class="diag-value" id="modelText">—</code>
+              </div>
+              <div class="diag-row">
+                <span class="diag-key">Runtime Dir</span>
+                <code class="diag-value" id="runtimeDirText">.runtime</code>
+              </div>
+              <div class="diag-row">
+                <span class="diag-key">Log File</span>
+                <code class="diag-value" id="logFileText">.runtime/gliner2_server.log</code>
+              </div>
+              <div class="diag-cmd">
+                <div class="install-header">
+                  <span class="install-title">Log Command</span>
+                  <button id="copyLogCommandButton" type="button" class="ghost compact">Copy</button>
+                </div>
+                <pre class="cmd-box"><code id="logCommandText">tail -n 80 .runtime/gliner2_server.log</code></pre>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ═══════════════════════════════════
+           SECTION — Protection
+      ═══════════════════════════════════ -->
+      <section class="opt-section" id="section-protection">
+        <div class="opt-section-header">
+          <h2 class="opt-section-title">Protection</h2>
+          <p class="opt-section-desc">Control how and where Veil monitors for personal information.</p>
+        </div>
+
+        <div class="opt-card">
+          <label class="row">
+            <span>Auto Redact <span class="opt-row-hint">Automatically redact after 1.5 s of inactivity</span></span>
+            <input type="checkbox" id="autoRedactToggle" checked>
+          </label>
+          <label class="row">
+            <span>Monitor All Websites <span class="opt-row-hint">Watch every site, not just AI chat tools</span></span>
+            <input type="checkbox" id="monitorAllSitesToggle" checked>
+          </label>
+          <label class="row">
+            <span>Use Regex Fallback When Model Is Online <span class="opt-row-hint">Run regex patterns alongside AI detection</span></span>
+            <input type="checkbox" id="includeRegexToggle">
+          </label>
+        </div>
+      </section>
+
+
+      <!-- ═══════════════════════════════════
+           SECTION — Detection
+      ═══════════════════════════════════ -->
+      <section class="opt-section" id="section-detection">
+        <div class="opt-section-header">
+          <h2 class="opt-section-title">Detection</h2>
+          <p class="opt-section-desc">Tune how aggressively Veil identifies and replaces personal data.</p>
+        </div>
+
+        <div class="opt-card">
+          <label class="field">
+            <span>Sensitivity</span>
+            <select id="sensitivitySelect">
+              <option value="low">Low — strict, fewer detections</option>
+              <option value="medium">Medium — balanced (recommended)</option>
+              <option value="high">High — aggressive, more false positives</option>
+            </select>
+          </label>
+          <div class="mode-help">
+            <div class="mode-help-row">
+              <span class="mode-help-label">Mask</span>
+              <code>john@x.com &rarr; [EMAIL REDACTED]</code>
+            </div>
+            <div class="mode-help-row">
+              <span class="mode-help-label">Anonymize</span>
+              <code>John Doe &rarr; Alex Smith &nbsp;<span style="color:#9a7a52">(Maya Data Privacy)</span></code>
+            </div>
+          </div>
+          <p class="hint mode-summary" id="modeSummary"></p>
+        </div>
+      </section>
+
+
+      <!-- ═══════════════════════════════════
+           SECTION — PII Types
+      ═══════════════════════════════════ -->
+      <section class="opt-section" id="section-pii">
+        <div class="opt-section-header">
+          <h2 class="opt-section-title">PII Types</h2>
+          <p class="opt-section-desc">Choose which categories of personal information Veil should detect and redact.</p>
+        </div>
+
+        <div class="opt-card">
+          <div class="types-grid">
+            <label><input type="checkbox" class="type-checkbox" value="person" checked>Names</label>
+            <label><input type="checkbox" class="type-checkbox" value="email" checked>Emails</label>
+            <label><input type="checkbox" class="type-checkbox" value="phone" checked>Phone</label>
+            <label><input type="checkbox" class="type-checkbox" value="address" checked>Address</label>
+            <label title="Social Security Number / National ID"><input type="checkbox" class="type-checkbox" value="ssn" checked>SSN</label>
+            <label title="Credit or debit card number"><input type="checkbox" class="type-checkbox" value="credit_card" checked>Card</label>
+            <label title="Date of birth"><input type="checkbox" class="type-checkbox" value="date_of_birth" checked>DOB</label>
+            <label><input type="checkbox" class="type-checkbox" value="location" checked>Location</label>
+            <label title="Company or organization name"><input type="checkbox" class="type-checkbox" value="organization" checked>Org</label>
+          </div>
+        </div>
+
+        <div class="opt-card">
+          <div class="patterns-header-row">
+            <span class="patterns-section-title">Custom AI Detectors</span>
+            <button id="addEntityTypeButton" type="button" class="ghost compact">+ Add</button>
+          </div>
+          <p class="hint" style="margin:4px 0 8px">Teach GLiNER2 to detect anything — describe it in plain English.</p>
+          <div id="addEntityTypeForm" class="add-pattern-form" hidden>
+            <input id="newEntityName" type="text" class="pattern-form-input" placeholder='Name (e.g. "Employee ID")' spellcheck="false" autocomplete="off">
+            <input id="newEntityDescription" type="text" class="pattern-form-input" placeholder='What to detect (e.g. "employee ID number or staff badge number")' spellcheck="false" autocomplete="off">
+            <div class="button-row">
+              <button id="confirmAddEntityButton" type="button">Add Detector</button>
+              <button id="cancelAddEntityButton" type="button" class="secondary">Cancel</button>
+            </div>
+          </div>
+          <div id="entityTypeCardsList" class="pattern-cards-list"></div>
+        </div>
+      </section>
+
+
+      <!-- ═══════════════════════════════════
+           SECTION — Advanced
+      ═══════════════════════════════════ -->
+      <section class="opt-section" id="section-advanced">
+        <div class="opt-section-header">
+          <h2 class="opt-section-title">Advanced</h2>
+          <p class="opt-section-desc">Customize monitored websites, input selectors, and custom regex detection patterns.</p>
+        </div>
+
+        <div class="opt-card">
+          <label class="field">
+            <span>Scoped Websites <span class="opt-field-hint">One hostname per line. Only used when "Monitor All Websites" is off.</span></span>
+            <textarea id="monitoredSitesInput" rows="5" spellcheck="false" placeholder="claude.ai&#10;chatgpt.com&#10;gemini.google.com"></textarea>
+          </label>
+          <label class="field">
+            <span>Input Selectors <span class="opt-field-hint">Comma or newline separated CSS selectors.</span></span>
+            <textarea id="selectorsInput" rows="4" spellcheck="false" placeholder="textarea&#10;input[type=&quot;text&quot;]&#10;div[contenteditable=&quot;true&quot;]"></textarea>
+          </label>
+          <div class="button-row">
+            <button id="saveAdvancedButton" type="button">Save</button>
+          </div>
+        </div>
+
+        <div class="opt-card">
+          <div class="patterns-header-row">
+            <span class="patterns-section-title">Detection Patterns</span>
+            <button id="addPatternButton" type="button" class="ghost compact">+ Add</button>
+          </div>
+          <p class="hint" style="margin:4px 0 8px">Toggle built-in patterns or add your own regex-based detectors.</p>
+          <div id="addPatternForm" class="add-pattern-form" hidden>
+            <input id="newPatternName" type="text" class="pattern-form-input" placeholder="Name (e.g. Employee ID)" spellcheck="false" autocomplete="off">
+            <input id="newPatternRegex" type="text" class="pattern-form-input" placeholder="Regex: \bEMP-\d{6}\b" spellcheck="false" autocomplete="off">
+            <input id="newPatternReplacement" type="text" class="pattern-form-input" placeholder="Replacement: [ID REDACTED]" spellcheck="false" autocomplete="off">
+            <div class="button-row">
+              <button id="confirmAddPatternButton" type="button">Add Pattern</button>
+              <button id="cancelAddPatternButton" type="button" class="secondary">Cancel</button>
+            </div>
+          </div>
+          <div id="patternCardsList" class="pattern-cards-list"></div>
+          <div class="button-row" style="margin-top:6px">
+            <button id="loadDefaultsButton" type="button" class="ghost compact">Reset to Defaults</button>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ═══════════════════════════════════
+           SECTION — About
+      ═══════════════════════════════════ -->
+      <section class="opt-section" id="section-about">
+        <div class="opt-section-header">
+          <h2 class="opt-section-title">About</h2>
+          <p class="opt-section-desc">Veil is an open-source privacy guard built on top of GLiNER2 by <a href="https://www.mayadataprivacy.com/" target="_blank" rel="noreferrer" class="maya-link"><strong>Maya Data Privacy</strong></a>.</p>
+        </div>
+
+        <div class="opt-card opt-about-card">
+          <div class="opt-about-brand">
+            <div>
+              <div class="opt-about-name">Veil</div>
+              <div class="opt-about-sub">An open privacy tool by <a href="https://www.mayadataprivacy.com/" target="_blank" rel="noreferrer" class="maya-link"><strong>Maya Data Privacy</strong></a>, powered by GLiNER2</div>
+            </div>
+          </div>
+          <div class="opt-about-facts">
+            <div class="opt-about-fact">
+              <span class="opt-about-fact-key">Detection Engine</span>
+              <span class="opt-about-fact-val">GLiNER2 (zero-shot NER)</span>
+            </div>
+            <div class="opt-about-fact">
+              <span class="opt-about-fact-key">Privacy Model</span>
+              <span class="opt-about-fact-val">100% local inference — text never leaves your machine</span>
+            </div>
+            <div class="opt-about-fact">
+              <span class="opt-about-fact-key">Anonymize API</span>
+              <span class="opt-about-fact-val"><a href="https://www.mayadataprivacy.com/" target="_blank" rel="noreferrer" class="maya-link"><strong>Maya Data Privacy</strong></a> REST API (optional, key required)</span>
+            </div>
+            <div class="opt-about-fact">
+              <span class="opt-about-fact-key">License</span>
+              <span class="opt-about-fact-val">Open Source</span>
+            </div>
+          </div>
+          <div class="opt-about-links">
+            <a href="https://github.com/Maya-data-privacy/veil" target="_blank" rel="noreferrer" class="opt-about-link">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              View on GitHub
+            </a>
+            <a href="https://github.com/Maya-data-privacy/veil/issues" target="_blank" rel="noreferrer" class="opt-about-link opt-about-link-secondary">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm9 3a1 1 0 11-2 0 1 1 0 012 0zm-.25-6.25a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z"/></svg>
+              Report an Issue
+            </a>
+          </div>
+          <div class="opt-about-reset">
+            <button id="resetButton" type="button" class="secondary">Reset All Settings to Defaults</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Message bar (required by popup.js) -->
+      <div id="messageBar" class="message opt-message-bar" aria-live="polite"></div>
+
+      <!-- ─── MAYA BRANDING FOOTER ─── -->
+      <div class="opt-maya-footer">
+        <img src="assets/maya/logo.svg" alt="Maya Data Privacy" class="maya-logo" onerror="this.style.display='none'">
+        <span class="maya-tagline">An open-source privacy extension by <a href="https://www.mayadataprivacy.com/" target="_blank" rel="noreferrer" class="maya-link"><strong>Maya Data Privacy</strong></a></span>
+      </div>
+
+    </main>
+    <!-- ══════════ End Main Content ══════════ -->
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

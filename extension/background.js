@@ -66,7 +66,7 @@ const DEFAULT_MONITORED_SELECTORS = [
 ];
 
 const NATIVE_HOST_NAME = 'com.privacyshield.gliner2';
-const MDP_DEFAULT_SEED = 'org_or_project_seed';
+const MDP_DEFAULT_SEED = 'veil_' + Math.random().toString(36).slice(2, 10);
 
 const MDP_LABEL_CONFIG = Object.freeze({
   person: Object.freeze({

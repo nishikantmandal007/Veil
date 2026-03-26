@@ -10,9 +10,9 @@
   --ok: #15803d;
   --warn: #9a3412;
   --error: #991b1b;
-  --radius-lg: 20px;
-  --radius-md: 16px;
-  --radius-sm: 13px;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
 }
 
 * {
@@ -26,10 +26,10 @@ html {
 body {
   margin: 0;
   width: clamp(360px, 90vw, 440px);
-  border-radius: 22px;
+  border-radius: 14px;
   overflow: hidden;
-  -webkit-clip-path: inset(0 round 22px);
-  clip-path: inset(0 round 22px);
+  -webkit-clip-path: inset(0 round 14px);
+  clip-path: inset(0 round 14px);
   color: var(--text);
   background: transparent;
   font: 13px/1.45 "Avenir Next", "Manrope", "Segoe UI Variable", sans-serif;
@@ -37,7 +37,7 @@ body {
 
 .shell {
   padding: 12px;
-  border-radius: 22px;
+  border-radius: 14px;
   position: relative;
   /* Required: contains the absolute-positioned onboarding overlay */
   background:
@@ -614,19 +614,36 @@ button.compact.is-copied {
 
 .eye-btn {
   flex-shrink: 0;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
   padding: 0;
   display: grid;
   place-items: center;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  color: #49454F;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.eye-btn:hover {
+  background: rgba(103,80,164,0.10) !important;
+  color: #6750A4;
 }
 
 .eye-icon {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  display: block;
 }
+
+/* M3 eye toggle: show open/closed icon based on aria-label */
+.eye-btn .eye-off { display: none; }
+.eye-btn[aria-label*="Hide"] .eye-on { display: none; }
+.eye-btn[aria-label*="Hide"] .eye-off { display: block; }
 
 /* ─── Saved badge ─── */
 .saved-badge {
@@ -875,8 +892,8 @@ button.compact.is-copied {
   justify-content: center;
   background: rgba(244, 239, 230, 0.97);
   backdrop-filter: blur(3px);
-  border-radius: 22px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 12px;
   animation: onboarding-fade-in 250ms ease;
 }
 
@@ -899,10 +916,12 @@ button.compact.is-copied {
 .onboarding-card {
   width: 100%;
   max-width: 360px;
+  max-height: calc(100% - 8px);
+  overflow-y: auto;
   background: linear-gradient(180deg, #fffefb 0%, #fffbf4 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 18px;
   box-shadow: 0 4px 24px rgba(78, 62, 33, 0.12), 0 1px 0 rgba(24, 24, 27, 0.05);
 }
 
@@ -978,9 +997,9 @@ button.compact.is-copied {
 }
 
 .onboarding-title {
-  margin: 0 0 8px;
+  margin: 0 0 7px;
   font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -988,10 +1007,10 @@ button.compact.is-copied {
 }
 
 .onboarding-body {
-  margin: 0 0 10px;
+  margin: 0 0 7px;
   font-size: 12.5px;
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.5;
   text-align: center;
 }
 
@@ -1006,12 +1025,12 @@ button.compact.is-copied {
 }
 
 .onboarding-bullets li {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #433b2e;
   background: #f8f3ea;
   border: 1px solid #e9dece;
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   line-height: 1.4;
 }
 
@@ -1072,8 +1091,8 @@ button.compact.is-copied {
 .onboarding-actions {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-top: 6px;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .onboarding-primary-btn {
@@ -1118,8 +1137,588 @@ button.compact.is-copied {
   background: transparent;
 }
 /* ─── Redaction Key ─── */
+.key-toggle-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+.key-toggle-row h2 { margin: 0; }
+.key-chevron {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+  transition: transform 180ms ease;
+  display: inline-block;
+}
+.key-toggle-row[aria-expanded="true"] .key-chevron {
+  transform: rotate(180deg);
+}
 .redaction-key-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .key-row { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
 .key-token { font-family: monospace; font-size: 11px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; flex: 0 0 auto; }
 .key-arrow { color: var(--muted); flex: 0 0 auto; }
 .key-original { color: var(--text); flex: 1; word-break: break-all; }
+.github-icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; }
+.footer-tagline { color: var(--muted); font-size: 11px; }
+
+/* ═══════════════════════════════════════════════════════════
+   MATERIAL YOU — M3 Light Theme (seed #6750A4)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Critical: prevent display:flex/block from overriding [hidden] ─── */
+[hidden] { display: none !important; }
+
+/* ─── Global M3 button reset: override base dark-brown theme for all ─── */
+.shell button:not(.btn-open-settings):not(.btn-github):not(.onboarding-primary-btn):not(.onboarding-secondary-btn):not(.onboarding-copy-btn):not(.onboarding-skip-btn) {
+  background: #E8DEF8;
+  color: #21005D;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  min-height: 32px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 140ms ease;
+}
+
+.shell button:not(.btn-open-settings):not(.btn-github):not(.onboarding-primary-btn):not(.onboarding-secondary-btn):not(.onboarding-copy-btn):not(.onboarding-skip-btn):hover:not(:disabled) {
+  background: #D9CFF0;
+}
+
+.shell button.ghost:not(.btn-open-settings):not(.btn-github) {
+  background: transparent !important;
+  color: #6750A4 !important;
+  border: 1px solid #79747E !important;
+}
+
+.shell button.ghost:hover:not(:disabled) {
+  background: rgba(103,80,164,0.08) !important;
+}
+
+/* ─── Body ─── */
+body {
+  width: 360px;
+  border-radius: 0;
+  overflow: visible;
+  -webkit-clip-path: none;
+  clip-path: none;
+  font-size: 14px;
+  font-family: "Roboto", "Inter", "Google Sans", system-ui, sans-serif;
+  background: transparent;
+}
+
+/* ─── Shell: M3 dialog / elevated surface ─── */
+.shell {
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #FFFBFE;
+  border: 1px solid #CAC4D0;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.08),
+    0 4px 12px rgba(103,80,164,0.10),
+    0 12px 32px rgba(103,80,164,0.08);
+}
+
+/* ─── Header: M3 Primary surface ─── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #6750A4;
+  color: #FFFFFF;
+  padding: 14px 16px 13px;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.90);
+}
+
+.brand-name {
+  font-family: "Roboto", "Inter", "Google Sans", system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #FFFFFF;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.40);
+}
+
+.header .status-text {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.75);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header .version-badge {
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+/* Version chip wrapper (git logo + version badge inline) */
+.version-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.git-logo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 1;
+}
+
+/* Brand logo as img (Maya logo replaces shield SVG) */
+.brand-logo-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.opt-brand-logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.opt-about-logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* M3 Maya footer for settings page */
+.opt-maya-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px 16px;
+  background: #F3EDF7;
+  border-top: 1px solid #CAC4D0;
+  margin-top: 24px;
+}
+
+.opt-maya-footer .maya-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.opt-maya-footer .maya-tagline {
+  font-size: 12px;
+  color: #49454F;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.opt-maya-footer .maya-tagline strong,
+.opt-maya-footer .maya-tagline a {
+  color: #6750A4;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.opt-maya-footer .maya-tagline a:hover {
+  text-decoration: underline;
+}
+
+/* Ensure Maya Data Privacy links are properly styled everywhere */
+a.maya-link {
+  color: #6750A4;
+  font-weight: 700;
+  text-decoration: none;
+}
+a.maya-link:hover { text-decoration: underline; }
+
+/* Status dot colours on primary bg */
+.header .status-dot.active {
+  background: #B7F5C8;
+  box-shadow: 0 0 0 3px rgba(183,245,200,0.30);
+}
+.header .status-dot.warn {
+  background: #FFE082;
+  box-shadow: 0 0 0 3px rgba(255,224,130,0.30);
+}
+
+/* ─── Hero: M3 Surface Container ─── */
+.hero {
+  background: #F3EDF7;
+  padding: 14px 20px 12px;
+  text-align: center;
+  border-bottom: 1px solid #CAC4D0;
+}
+
+.hero-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.hero-number {
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #1C1B1F;
+  font-family: "Roboto", "Inter", system-ui, sans-serif;
+}
+
+.hero-unit {
+  font-size: 15px;
+  color: #49454F;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.hero-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #79747E;
+  line-height: 1.4;
+}
+
+.hero-detected {
+  font-weight: 600;
+  color: #49454F;
+}
+
+.hero-sep {
+  margin: 0 4px;
+  opacity: 0.4;
+}
+
+.hero-hint {
+  font-style: normal;
+  color: #79747E;
+}
+
+/* ─── Quick controls row: M3 Surface ─── */
+.quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #FFFBFE;
+  border-bottom: 1px solid #CAC4D0;
+}
+
+/* M3 Switch */
+.qs-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.qs-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.qs-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 52px;
+  height: 32px;
+  background: #E7E0EC;
+  border: 2px solid #79747E;
+  border-radius: 999px;
+  transition: background 200ms ease, border-color 200ms ease;
+  flex-shrink: 0;
+}
+
+.qs-thumb {
+  position: absolute;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  background: #79747E;
+  border-radius: 50%;
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), width 150ms ease, height 150ms ease, background 200ms ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.20);
+}
+
+.qs-checkbox:checked + .qs-track {
+  background: #6750A4;
+  border-color: #6750A4;
+}
+
+.qs-checkbox:checked + .qs-track .qs-thumb {
+  transform: translateX(20px);
+  background: #FFFFFF;
+  width: 24px;
+  height: 24px;
+  left: 2px;
+  top: 50%;
+  margin-top: -12px;
+}
+
+.qs-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1C1B1F;
+  letter-spacing: 0.01em;
+}
+
+/* Mode selector */
+.qs-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qs-mode-label {
+  font-size: 11px;
+  color: #49454F;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.qs-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #E7E0EC url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2349454F' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  border-bottom: 1px solid #79747E;
+  padding: 6px 28px 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1C1B1F;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms ease;
+}
+
+.qs-select:focus {
+  outline: none;
+  border-bottom-color: #6750A4;
+  border-bottom-width: 2px;
+}
+
+/* Anonymize hint */
+.qs-hint {
+  margin: 0;
+  padding: 8px 16px;
+  background: #FFF8E1;
+  border-bottom: 1px solid #FFECB3;
+  font-size: 12px;
+  color: #5D4037;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* ─── Redaction Key card ─── */
+.key-card {
+  margin: 8px 12px 0;
+  background: #F7F2FA;
+  border-color: #CAC4D0;
+}
+
+/* Neutralise base dark button theme for the transparent toggle */
+.key-toggle-row,
+.key-toggle-row:hover,
+.key-toggle-row:focus,
+.key-toggle-row:active,
+.key-toggle-row:focus-visible {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #1C1B1F !important;
+  padding: 0 !important;
+  min-height: unset !important;
+  outline: none !important;
+}
+
+.key-toggle-row:hover {
+  background: rgba(103,80,164,0.06) !important;
+  border-radius: 8px !important;
+}
+
+.key-token {
+  background: #EADDFF;
+  border-color: #CAC4D0;
+  color: #21005D;
+  font-weight: 500;
+}
+
+.key-original {
+  color: #1C1B1F;
+}
+
+.key-arrow {
+  color: #6750A4;
+}
+
+/* ─── Popup-only action bar ─── */
+.popup-action-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 12px 14px;
+  background: #FFFBFE;
+}
+
+.popup-only {
+  display: flex;
+}
+
+/* M3 Filled Button */
+.btn-open-settings {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: #6750A4;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-family: inherit;
+  transition: background 150ms ease, box-shadow 150ms ease;
+  box-shadow: 0 1px 2px rgba(103,80,164,0.30);
+}
+
+.btn-open-settings:hover {
+  background: #7965AF;
+  box-shadow: 0 2px 6px rgba(103,80,164,0.35);
+}
+
+/* M3 Outlined Button */
+.btn-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 14px;
+  background: transparent;
+  color: #6750A4;
+  border: 1px solid #79747E;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  transition: background 150ms ease;
+  white-space: nowrap;
+}
+
+.btn-github:hover {
+  background: rgba(103,80,164,0.08);
+  border-color: #6750A4;
+}
+
+/* ─── Settings panel: hidden in popup mode ─── */
+.settings-panel {
+  display: none;
+}
+
+/* ─── Maya Data Privacy branding footer ─── */
+.maya-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px 10px;
+  background: #F3EDF7;
+  border-top: 1px solid #CAC4D0;
+}
+
+.maya-logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.maya-tagline {
+  font-size: 11px;
+  color: #49454F;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.maya-tagline strong {
+  color: #6750A4;
+  font-weight: 600;
+}
+
+/* ─── Message bar ─── */
+#messageBar {
+  margin: 0;
+  border-radius: 0 0 28px 28px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+/* Override base message styles for M3 */
+.message:not(:empty) {
+  padding: 10px 16px;
+  background: #1C1B1F;
+  color: #FFFBFE;
+}
+
+.message.error:not(:empty) {
+  background: #F9DEDC;
+  color: #B3261E;
+}

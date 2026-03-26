@@ -257,6 +257,19 @@ def ensure_model_downloaded(extra_env: Dict[str, str] | None = None) -> None:
 
 
 def start_server(install_deps: bool, download_model: bool, hf_token: str = "", model_id: str = "") -> Dict[str, Any]:
+    # Health-check first: if the server is already responding (e.g. started by another
+    # browser's extension), reuse it immediately without touching the PID file.
+    if is_server_healthy():
+        state = load_state()
+        return {
+            "success": True,
+            "running": True,
+            "healthy": True,
+            "pid": state.get("pid"),
+            "message": "Server already running (detected by health check).",
+            **runtime_meta(),
+        }
+
     state = load_state()
     pid = state.get("pid")
     if is_pid_running(pid):

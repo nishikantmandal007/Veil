@@ -1,0 +1,1260 @@
+/* ═══════════════════════════════════════════════════════════
+   Veil — Settings Page
+   Full Material Design 3 implementation
+   Seed colour: #6750A4  |  https://m3.material.io/
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── M3 Reference Tokens ─── */
+:root {
+  /* ── Primary ── */
+  --md-primary:            #6750A4;
+  --md-on-primary:         #FFFFFF;
+  --md-primary-container:  #EADDFF;
+  --md-on-primary-cont:    #21005D;
+
+  /* ── Secondary ── */
+  --md-secondary:          #625B71;
+  --md-on-secondary:       #FFFFFF;
+  --md-secondary-cont:     #E8DEF8;
+  --md-on-secondary-cont:  #1D192B;
+
+  /* ── Tertiary ── */
+  --md-tertiary:           #7D5260;
+  --md-tertiary-cont:      #FFD8E4;
+  --md-on-tertiary-cont:   #31111D;
+
+  /* ── Error ── */
+  --md-error:              #B3261E;
+  --md-error-cont:         #F9DEDC;
+  --md-on-error-cont:      #410E0B;
+
+  /* ── Surface / Background ── */
+  --md-background:         #FFFBFE;
+  --md-on-background:      #1C1B1F;
+  --md-surface:            #FFFBFE;
+  --md-on-surface:         #1C1B1F;
+  --md-surface-variant:    #E7E0EC;
+  --md-on-surface-variant: #49454F;
+  --md-surface-1:          #F7F2FA;  /* elev 1 = 5% primary tint */
+  --md-surface-2:          #F3EDF7;  /* elev 2 = 8% primary tint */
+  --md-surface-3:          #EDE7F6;  /* elev 3 = 11% */
+
+  /* ── Outline ── */
+  --md-outline:            #79747E;
+  --md-outline-variant:    #CAC4D0;
+
+  /* ── Inverse ── */
+  --md-inverse-surface:    #313033;
+  --md-inverse-on-surface: #F4EFF4;
+
+  /* ── State layers (opacity over primary) ── */
+  --md-hover-opacity:    0.08;
+  --md-press-opacity:    0.12;
+  --md-focus-opacity:    0.12;
+  --md-drag-opacity:     0.16;
+
+  /* ── Shape (border-radius) ── */
+  --md-shape-xs:   4px;    /* Extra Small */
+  --md-shape-sm:   8px;    /* Small */
+  --md-shape-md:   12px;   /* Medium */
+  --md-shape-lg:   16px;   /* Large */
+  --md-shape-xl:   28px;   /* Extra Large */
+  --md-shape-full: 9999px; /* Full */
+
+  /* ── Elevation shadows ── */
+  --md-elev-1: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px 1px rgba(0,0,0,.15);
+  --md-elev-2: 0 1px 2px rgba(0,0,0,.3), 0 2px 6px 2px rgba(0,0,0,.15);
+  --md-elev-3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+
+  /* ── Typography ── */
+  --md-font: "Roboto", "Google Sans", system-ui, sans-serif;
+  --md-font-mono: "Roboto Mono", "JetBrains Mono", "SF Mono", monospace;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BASE RESET
+════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border-radius: 0 !important;
+  -webkit-clip-path: none !important;
+  clip-path: none !important;
+  overflow: hidden;
+  background: var(--md-background);
+  font-family: var(--md-font);
+  font-size: 16px;           /* M3 Body Large */
+  line-height: 1.5;
+  color: var(--md-on-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Neutralise popup.css shell card */
+.shell { display: contents; }
+
+/* Critical: prevent display:flex from overriding [hidden] */
+[hidden] { display: none !important; }
+
+/* ════════════════════════════════════════════════════════════
+   LAYOUT — sidebar + main
+════════════════════════════════════════════════════════════ */
+.opt-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--md-font);
+  color: var(--md-on-surface);
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR — M3 Navigation Drawer
+════════════════════════════════════════════════════════════ */
+.opt-sidebar {
+  flex-shrink: 0;
+  width: 240px;
+  background: var(--md-surface-1);
+  border-right: 1px solid var(--md-outline-variant);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Brand */
+.opt-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.opt-brand-logo,
+.opt-brand-logo-img {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--md-shape-sm);
+  object-fit: contain;
+}
+
+.opt-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* M3 Title Large */
+.opt-brand-name {
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 28px;
+  letter-spacing: 0;
+  color: var(--md-on-surface);
+}
+
+/* M3 Label Small */
+.opt-brand-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+/* Status block */
+.opt-status-block {
+  padding: 12px 16px;
+  background: var(--md-surface-1);
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.opt-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* M3 Label Large */
+.opt-status-text {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--md-on-surface);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Version chip */
+.version-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.git-logo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.opt-version {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-cont);
+  border-radius: var(--md-shape-full);
+  padding: 2px 8px;
+  font-size: 11px;        /* M3 Label Small */
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* M3 Body Small */
+.opt-status-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--md-on-surface-variant);
+}
+
+/* Status dots */
+.opt-status-block .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--md-outline-variant);
+}
+.opt-status-block .status-dot.active {
+  background: #1B873A;
+  box-shadow: 0 0 0 3px rgba(27,135,58,0.20);
+}
+.opt-status-block .status-dot.warn {
+  background: #7A5200;
+  box-shadow: 0 0 0 3px rgba(122,82,0,0.20);
+}
+
+/* Stats */
+.opt-stats-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-1);
+}
+
+.opt-stat-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.opt-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--md-outline-variant);
+}
+
+/* M3 Display Small */
+.opt-stat-num {
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 36px;
+  color: var(--md-primary);
+  letter-spacing: 0;
+}
+
+/* M3 Label Small */
+.opt-stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* ── Navigation — M3 Navigation Drawer items ── */
+.opt-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+/* M3 Label Large */
+.opt-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px;
+  border-radius: var(--md-shape-full);
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  user-select: none;
+  min-height: 56px;
+}
+
+.opt-nav-item svg {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  opacity: 0.72;
+}
+
+.opt-nav-item:hover {
+  background: rgba(103,80,164, var(--md-hover-opacity));
+  color: var(--md-on-surface);
+}
+.opt-nav-item:hover svg { opacity: 0.9; }
+
+.opt-nav-item.is-active {
+  background: var(--md-secondary-cont);
+  color: var(--md-on-secondary-cont);
+}
+.opt-nav-item.is-active svg { opacity: 1; }
+
+/* ── Sidebar footer ── */
+.opt-sidebar-footer {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--md-outline-variant);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* M3 Label Medium */
+.opt-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--md-primary);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+  transition: color 130ms ease;
+}
+.opt-footer-link:hover { color: var(--md-on-primary-cont); }
+
+/* M3 Body Small */
+.opt-footer-tagline {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--md-on-surface-variant);
+  display: block;
+}
+.opt-footer-tagline .maya-link,
+.opt-footer-tagline .maya-link strong {
+  color: var(--md-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.opt-footer-tagline .maya-link:hover { text-decoration: underline; }
+
+/* ════════════════════════════════════════════════════════════
+   MAIN CONTENT
+════════════════════════════════════════════════════════════ */
+.opt-main {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--md-surface-2);
+  scroll-behavior: smooth;
+}
+.opt-main::-webkit-scrollbar { width: 6px; }
+.opt-main::-webkit-scrollbar-track { background: transparent; }
+.opt-main::-webkit-scrollbar-thumb {
+  background: var(--md-outline-variant);
+  border-radius: var(--md-shape-full);
+}
+.opt-main::-webkit-scrollbar-thumb:hover { background: var(--md-outline); }
+
+/* Sticky control bar */
+.opt-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  background: var(--md-surface);
+  border-bottom: 1px solid var(--md-outline-variant);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: var(--md-elev-1);
+}
+
+.opt-cb-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* M3 Title Medium */
+.opt-cb-label {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--md-on-surface);
+}
+
+.opt-cb-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* M3 Label Small */
+.opt-cb-mode-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Sections ── */
+.opt-section {
+  padding: 36px 40px 0;
+}
+.opt-section:last-of-type { padding-bottom: 64px; }
+
+.opt-section-header { margin-bottom: 20px; }
+
+/* M3 Headline Small */
+.opt-section-title {
+  font-family: var(--md-font);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 32px;
+  letter-spacing: 0;
+  color: var(--md-on-surface);
+  margin: 0 0 8px;
+}
+
+/* M3 Body Large */
+.opt-section-desc {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+}
+
+/* ── M3 Cards ── */
+.opt-card {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
+  padding: 20px 24px;
+  margin-bottom: 12px;
+  box-shadow: var(--md-elev-1);
+}
+
+/* M3 Title Medium */
+.opt-card-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--md-on-surface);
+  margin: 0 0 6px;
+}
+
+/* Notice card — M3 Secondary Container */
+.opt-notice-card {
+  background: var(--md-secondary-cont);
+  border-color: #CCC2DC;
+  box-shadow: none;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.opt-notice-icon {
+  font-size: 22px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* M3 Title Small */
+.opt-notice-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--md-on-surface);
+  margin: 0 0 4px;
+}
+
+/* M3 Body Medium */
+.opt-notice-body {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+}
+
+.opt-notice-body code {
+  background: rgba(103,80,164,0.12);
+  border-radius: var(--md-shape-xs);
+  padding: 2px 6px;
+  font-family: var(--md-font-mono);
+  font-size: 13px;
+  color: var(--md-on-primary-cont);
+}
+
+/* M3 Body Small */
+.opt-row-hint,
+.opt-field-hint {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--md-on-surface-variant);
+  margin-top: 3px;
+  letter-spacing: 0.01em;
+}
+
+/* ── About card ── */
+.opt-about-card { padding: 24px; }
+
+.opt-about-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.opt-about-logo {
+  width: 40px;
+  height: 40px;
+  color: var(--md-primary);
+  flex-shrink: 0;
+  border-radius: var(--md-shape-sm);
+}
+
+/* M3 Title Large */
+.opt-about-name {
+  font-family: var(--md-font);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 28px;
+  color: var(--md-primary);
+  letter-spacing: 0;
+}
+
+/* M3 Body Medium */
+.opt-about-sub {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--md-on-surface-variant);
+  margin-top: 4px;
+}
+
+.opt-about-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* M3 Body Medium */
+.opt-about-fact {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+/* M3 Label Large */
+.opt-about-fact-key {
+  flex: 0 0 150px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.opt-about-fact-val {
+  color: var(--md-on-surface-variant);
+  flex: 1;
+}
+
+.opt-about-links {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+  flex-wrap: wrap;
+}
+
+/* M3 Filled Button */
+.opt-about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  border-radius: var(--md-shape-full);
+  text-decoration: none;
+  font-size: 14px;        /* M3 Label Large */
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  transition: box-shadow 150ms ease, background 150ms ease;
+  border: none;
+  box-shadow: var(--md-elev-1);
+}
+.opt-about-link:hover {
+  background: #7965AF;
+  box-shadow: var(--md-elev-2);
+}
+
+/* M3 Outlined Button */
+.opt-about-link-secondary {
+  background: transparent;
+  color: var(--md-primary);
+  border: 1px solid var(--md-outline);
+  box-shadow: none;
+}
+.opt-about-link-secondary:hover {
+  background: rgba(103,80,164, var(--md-hover-opacity));
+  border-color: var(--md-primary);
+  box-shadow: none;
+}
+
+.opt-about-reset {
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+/* ── M3 Snackbar ── */
+.opt-message-bar {
+  position: fixed !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(80px) !important;
+  margin: 0 !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  transition: transform 250ms cubic-bezier(0.2,0,0,1), opacity 200ms ease !important;
+  min-width: 288px !important;
+  max-width: 560px !important;
+  white-space: nowrap !important;
+}
+
+/* Maya footer */
+.opt-maya-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 24px 18px;
+  background: var(--md-surface-1);
+  border-top: 1px solid var(--md-outline-variant);
+  margin-top: 24px;
+}
+
+.opt-maya-footer .maya-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.opt-maya-footer .maya-tagline {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--md-on-surface-variant);
+  line-height: 20px;
+  text-align: center;
+}
+
+.opt-maya-footer .maya-tagline a,
+.opt-maya-footer .maya-tagline strong {
+  color: var(--md-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.opt-maya-footer .maya-tagline a:hover { text-decoration: underline; }
+
+/* ════════════════════════════════════════════════════════════
+   GLOBAL COMPONENT OVERRIDES  (popup.css → M3 Light)
+════════════════════════════════════════════════════════════ */
+
+/* ── Cards ── */
+.card {
+  background: var(--md-surface) !important;
+  border: 1px solid var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-lg) !important;
+  box-shadow: var(--md-elev-1) !important;
+}
+
+/* M3 Title Medium */
+.card h2,
+.section-title-row h2 {
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  line-height: 24px !important;
+  color: var(--md-on-surface) !important;
+  margin: 0 !important;
+}
+
+/* ── Rows ── */
+.row {
+  border-bottom: 1px solid var(--md-outline-variant) !important;
+  padding: 14px 0 !important;
+  font-size: 15px !important;    /* M3 Body Large */
+  line-height: 24px !important;
+  color: var(--md-on-surface) !important;
+}
+.row:last-child { border-bottom: none !important; }
+
+/* ── Fields ── */
+.field span {
+  color: var(--md-on-surface-variant) !important;
+  font-size: 14px !important;    /* M3 Body Medium */
+  line-height: 20px !important;
+}
+
+/* M3 Body Medium */
+.hint {
+  color: var(--md-on-surface-variant) !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+/* ── M3 Buttons ── */
+
+/* Base — Filled (primary) */
+button {
+  font-family: var(--md-font) !important;
+  font-size: 14px !important;     /* M3 Label Large */
+  font-weight: 500 !important;
+  line-height: 20px !important;
+  letter-spacing: 0.01em !important;
+  height: 40px !important;
+  padding: 0 24px !important;
+  border-radius: var(--md-shape-full) !important;
+  border: none !important;
+  background: var(--md-primary) !important;
+  color: var(--md-on-primary) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  transition: box-shadow 150ms ease, background 150ms ease !important;
+  box-shadow: var(--md-elev-1) !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+button:hover:not(:disabled) {
+  background: #7965AF !important;
+  box-shadow: var(--md-elev-2) !important;
+}
+
+button:active:not(:disabled) {
+  background: #5B4397 !important;
+  box-shadow: var(--md-elev-1) !important;
+}
+
+button:disabled {
+  background: rgba(28,27,31,0.12) !important;
+  color: rgba(28,27,31,0.38) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--md-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* M3 Tonal Button */
+button.secondary {
+  background: var(--md-secondary-cont) !important;
+  color: var(--md-on-secondary-cont) !important;
+  box-shadow: none !important;
+}
+button.secondary:hover:not(:disabled) {
+  background: #D9CFF0 !important;
+  box-shadow: var(--md-elev-1) !important;
+}
+
+/* M3 Outlined Button */
+button.ghost {
+  background: transparent !important;
+  color: var(--md-primary) !important;
+  border: 1px solid var(--md-outline) !important;
+  box-shadow: none !important;
+}
+button.ghost:hover:not(:disabled) {
+  background: rgba(103,80,164, var(--md-hover-opacity)) !important;
+  border-color: var(--md-primary) !important;
+}
+
+/* M3 Compact — used for inline actions */
+button.compact {
+  height: 32px !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;    /* M3 Label Medium */
+  border-radius: var(--md-shape-full) !important;
+}
+
+button.compact.is-copied {
+  background: rgba(27,135,58,0.15) !important;
+  color: #1B873A !important;
+  box-shadow: none !important;
+}
+
+/* Eye (visibility) icon button — M3 Icon Button */
+.eye-btn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: var(--md-on-surface-variant) !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  transition: background 140ms ease !important;
+  flex-shrink: 0;
+}
+.eye-btn:hover:not(:disabled) {
+  background: rgba(103,80,164, var(--md-hover-opacity)) !important;
+  color: var(--md-primary) !important;
+  box-shadow: none !important;
+}
+.eye-icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  display: block;
+  pointer-events: none;
+}
+
+/* CSS icon toggle via aria-label */
+.eye-btn .eye-off { display: none; }
+.eye-btn[aria-label*="Hide"] .eye-on { display: none; }
+.eye-btn[aria-label*="Hide"] .eye-off { display: block; }
+
+/* ── M3 Text Fields ── */
+select,
+.field input[type="password"],
+.field input[type="text"],
+input[type="password"],
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input:not([type]) {
+  font-family: var(--md-font) !important;
+  font-size: 16px !important;
+  line-height: 24px !important;
+  color: var(--md-on-surface) !important;
+  background: var(--md-surface-variant) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--md-outline) !important;
+  border-radius: var(--md-shape-xs) var(--md-shape-xs) 0 0 !important;
+  padding: 8px 12px !important;
+  height: 48px !important;
+  transition: border-color 150ms ease !important;
+  outline: none !important;
+}
+
+/* Textareas must NOT have fixed height — let content size them */
+textarea {
+  font-family: var(--md-font) !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  color: var(--md-on-surface) !important;
+  background: var(--md-surface-variant) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--md-outline) !important;
+  border-radius: var(--md-shape-xs) var(--md-shape-xs) 0 0 !important;
+  padding: 10px 12px !important;
+  height: auto !important;
+  min-height: 80px !important;
+  resize: vertical !important;
+  width: 100% !important;
+  transition: border-color 150ms ease !important;
+  outline: none !important;
+}
+textarea:focus {
+  border-bottom: 2px solid var(--md-primary) !important;
+  outline: none !important;
+}
+
+select:focus,
+textarea:focus,
+.field input[type="password"]:focus,
+.field input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="text"]:focus {
+  border-bottom: 2px solid var(--md-primary) !important;
+  outline: none !important;
+}
+
+select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: var(--md-surface-variant)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2349454F' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 12px center !important;
+  padding-right: 32px !important;
+  cursor: pointer !important;
+}
+
+/* ── Tool Tabs — M3 Secondary Tab ── */
+.tool-tabs-bar {
+  background: var(--md-surface-variant) !important;
+  border-radius: var(--md-shape-sm) !important;
+  padding: 4px !important;
+  gap: 2px !important;
+  display: flex !important;
+}
+
+.tool-tab {
+  flex: 1 !important;
+  background: transparent !important;
+  color: var(--md-on-surface-variant) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;    /* M3 Label Large */
+  line-height: 20px !important;
+  height: 36px !important;
+  padding: 0 16px !important;
+  box-shadow: none !important;
+  transition: background 140ms ease, color 140ms ease !important;
+}
+.tool-tab:hover:not(:disabled) {
+  background: rgba(103,80,164, var(--md-hover-opacity)) !important;
+  color: var(--md-on-surface) !important;
+  box-shadow: none !important;
+}
+.tool-tab.is-active {
+  background: var(--md-surface) !important;
+  color: var(--md-primary) !important;
+  font-weight: 600 !important;
+  box-shadow: var(--md-elev-1) !important;
+}
+
+/* Tool panel */
+.tool-panel {
+  background: var(--md-surface) !important;
+  border: 1px solid var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+  box-shadow: none !important;
+}
+
+/* M3 Title Small */
+.panel-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+  color: var(--md-on-surface) !important;
+}
+
+/* ── Terminal ── */
+.terminal-panel {
+  background: var(--md-inverse-surface) !important;
+  border-color: var(--md-on-surface-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.terminal-output {
+  background: var(--md-inverse-surface) !important;
+  color: #B7F5C8 !important;
+  font-family: var(--md-font-mono) !important;
+  font-size: 13px !important;
+  border-radius: var(--md-shape-md) !important;
+}
+
+/* ── Command / Code blocks ── */
+.cmd-box {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  color: var(--md-on-surface) !important;
+  border-radius: var(--md-shape-sm) !important;
+}
+.cmd-box code {
+  color: var(--md-on-primary-cont) !important;
+  font-family: var(--md-font-mono) !important;
+}
+
+.install-block {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.install-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--md-on-surface) !important;
+}
+
+/* ── Diagnostics ── */
+.diag-key {
+  font-size: 14px !important;
+  color: var(--md-on-surface-variant) !important;
+}
+.diag-value {
+  font-size: 14px !important;
+  color: var(--md-on-surface) !important;
+}
+a.diag-value { color: var(--md-primary) !important; }
+
+/* ── Mode help ── */
+.mode-help {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.mode-help-row, .mode-help-label { color: var(--md-on-surface) !important; }
+.mode-help-row code { color: var(--md-on-primary-cont) !important; }
+
+/* ── Status dots (global) ── */
+.status-dot { background: var(--md-outline-variant) !important; }
+.status-dot.active {
+  background: #1B873A !important;
+  box-shadow: 0 0 0 3px rgba(27,135,58,0.20) !important;
+}
+.status-dot.warn {
+  background: #7A5200 !important;
+  box-shadow: 0 0 0 3px rgba(122,82,0,0.20) !important;
+}
+
+/* ── PII Types grid ── */
+.types-grid label {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  color: var(--md-on-surface) !important;
+  font-size: 13px !important;
+  border-radius: var(--md-shape-sm) !important;
+}
+
+/* ── Pattern cards ── */
+.pattern-card {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.pattern-card-name {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--md-on-surface) !important;
+}
+.pattern-card-preview {
+  font-size: 13px !important;
+  color: var(--md-on-surface-variant) !important;
+}
+.pattern-card-badge {
+  background: var(--md-primary-container) !important;
+  border-color: var(--md-outline-variant) !important;
+  color: var(--md-on-primary-cont) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  border-radius: var(--md-shape-full) !important;
+  padding: 2px 8px !important;
+}
+.pattern-card-del { color: var(--md-on-surface-variant) !important; }
+.pattern-card-del:hover { color: var(--md-error) !important; }
+
+/* M3 Switch (pattern toggle) */
+.pattern-toggle-pill { background: var(--md-outline) !important; }
+.pattern-toggle-wrap input:checked + .pattern-toggle-pill {
+  background: var(--md-primary) !important;
+}
+
+/* Add-pattern form */
+.add-pattern-form {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.pattern-form-input {
+  background: var(--md-surface-variant) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-xs) var(--md-shape-xs) 0 0 !important;
+  color: var(--md-on-surface) !important;
+  font-size: 14px !important;
+}
+.pattern-form-input:focus {
+  border-bottom: 2px solid var(--md-primary) !important;
+  outline: none !important;
+}
+.pattern-form-input::placeholder {
+  color: var(--md-on-surface-variant) !important;
+}
+
+/* ── API key saved card ── */
+.api-key-saved-card {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.api-key-saved-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--md-on-surface) !important;
+}
+.api-key-saved-preview {
+  font-size: 13px !important;
+  color: var(--md-on-surface-variant) !important;
+}
+
+/* ── Saved badge ── */
+.saved-badge {
+  font-size: 12px !important;
+  color: #1B873A !important;
+  background: rgba(27,135,58,0.12) !important;
+  border-color: rgba(27,135,58,0.30) !important;
+  border-radius: var(--md-shape-full) !important;
+}
+
+/* ── M3 Snackbar: visible state ── */
+#messageBar:not(:empty) {
+  background: var(--md-inverse-surface) !important;
+  color: var(--md-inverse-on-surface) !important;
+  padding: 14px 24px !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  border-radius: var(--md-shape-xs) !important;
+  box-shadow: var(--md-elev-3) !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+#messageBar.error:not(:empty) {
+  background: var(--md-error) !important;
+  color: #FFFFFF !important;
+}
+
+/* success tint */
+#messageBar:not(.error):not(:empty) {
+  background: #313033 !important;
+  color: #F4EFF4 !important;
+}
+
+/* ── Stat tiles ── */
+.stat {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+.stat-value { color: var(--md-primary) !important; }
+.stat-label { color: var(--md-on-surface-variant) !important; }
+
+/* ── Boilerplate / code ── */
+.boilerplate {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+  color: var(--md-on-surface) !important;
+  border-radius: var(--md-shape-sm) !important;
+}
+
+/* ── Onboarding ── */
+.onboarding-overlay {
+  background: rgba(255,251,254,0.97) !important;
+}
+.onboarding-card {
+  background: var(--md-surface) !important;
+  border-color: var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-lg) !important;
+  max-height: calc(100% - 8px) !important;
+  overflow-y: auto !important;
+}
+.onboarding-primary-btn {
+  background: var(--md-primary) !important;
+  color: var(--md-on-primary) !important;
+  border-radius: var(--md-shape-full) !important;
+}
+.onboarding-secondary-btn {
+  background: var(--md-secondary-cont) !important;
+  color: var(--md-on-secondary-cont) !important;
+  border-radius: var(--md-shape-full) !important;
+}
+.onboarding-dot.is-active { background: var(--md-primary) !important; }
+.onboarding-icon {
+  background: linear-gradient(145deg, #6750A4, #7965AF) !important;
+  color: var(--md-on-primary) !important;
+}
+
+/* ── Key card ── */
+.key-card {
+  background: var(--md-surface-1) !important;
+  border-color: var(--md-outline-variant) !important;
+}
+.key-token {
+  background: var(--md-primary-container) !important;
+  border-color: var(--md-outline-variant) !important;
+  color: var(--md-on-primary-cont) !important;
+  font-size: 11px !important;
+}
+.key-arrow { color: var(--md-primary) !important; }
+.key-original { color: var(--md-on-surface) !important; }
+
+/* ── Badges ── */
+.version-badge {
+  background: var(--md-primary-container) !important;
+  border-color: var(--md-outline-variant) !important;
+  color: var(--md-on-primary-cont) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+.beta-badge {
+  background: #FFF8E1 !important;
+  border-color: #FFECB3 !important;
+  color: #7A5200 !important;
+  font-size: 9px !important;
+}
+
+/* ── Global links ── */
+a.maya-link {
+  color: var(--md-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+a.maya-link:hover { text-decoration: underline; }
+
+.links a { color: var(--md-primary) !important; }
+.footer-tagline { color: var(--md-on-surface-variant) !important; }
