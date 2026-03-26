@@ -170,7 +170,7 @@
         <div class="opt-card">
           <div class="tool-tabs-bar">
             <button type="button" class="tool-tab is-active" data-panel="hfToken">HF Token</button>
-            <button type="button" class="tool-tab" data-panel="apiKey">API Key</button>
+            <button type="button" class="tool-tab" data-panel="apiKey">Maya API Key</button>
             <button type="button" class="tool-tab" data-panel="diagnostics">Diagnostics</button>
           </div>
 
@@ -199,14 +199,36 @@
 
           <div id="apiKeyPanel" class="tool-panel" hidden>
             <section class="server-tool-panel token-tools">
-              <p class="panel-title">Anonymization API Key</p>
-              <p class="hint" style="margin-top:4px">Required for Anonymize mode. Stored locally — only forwarded to your local proxy server.</p>
+              <p class="panel-title">Maya API Key</p>
+
+              <!-- ─── Guidance card (always visible) ─── -->
+              <div class="maya-api-guidance-card">
+                <div class="maya-api-guidance-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="#6750A4"/>
+                  </svg>
+                </div>
+                <div class="maya-api-guidance-body">
+                  <p class="maya-api-guidance-title">What is Anonymize mode?</p>
+                  <p class="maya-api-guidance-desc">Instead of masking names with placeholders, Anonymize replaces them with realistic fake ones — so your prompts stay coherent while your real identity stays private.</p>
+                  <p class="maya-api-guidance-example">e.g. <span class="anon-ex-real">Nishi Kant Mandal</span> → <span class="anon-ex-fake">James Oliver Reid</span></p>
+                  <p class="maya-api-guidance-desc" style="margin-top:6px">A <strong>Maya API Key</strong> is required. Sign up free at <a href="https://app.mayadataprivacy.eu" target="_blank" rel="noreferrer" class="maya-api-link">app.mayadataprivacy.eu</a>, then copy your key from the <strong>Profile</strong> section and paste it below.</p>
+                  <a href="https://app.mayadataprivacy.eu" target="_blank" rel="noreferrer" class="maya-api-get-key-btn">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+                    </svg>
+                    Get your API Key at app.mayadataprivacy.eu
+                  </a>
+                </div>
+              </div>
+
+              <!-- ─── Saved state ─── -->
               <div id="apiKeySavedState" hidden>
                 <div class="api-key-saved-card">
                   <div class="api-key-saved-info">
                     <div class="api-key-saved-icon" aria-hidden="true">&#128273;</div>
                     <div>
-                      <div class="api-key-saved-title">API Key Saved</div>
+                      <div class="api-key-saved-title">Maya API Key Saved</div>
                       <div class="api-key-saved-preview" id="apiKeyPreview">&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</div>
                     </div>
                   </div>
@@ -216,10 +238,12 @@
                   </div>
                 </div>
               </div>
+
+              <!-- ─── Input state ─── -->
               <div id="apiKeyInputState">
                 <label class="field field-tight" for="veilApiKeyInput">
                   <div class="secret-input-row">
-                    <input id="veilApiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key…">
+                    <input id="veilApiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your Maya API key…">
                     <button type="button" class="ghost compact eye-btn" id="toggleApiKeyVisibility" aria-label="Show key" title="Show/hide">
                       <svg class="eye-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path class="eye-on" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
@@ -229,7 +253,7 @@
                   </div>
                 </label>
                 <div class="button-row">
-                  <button id="saveApiKeyButton" type="button" class="ghost">Save API Key</button>
+                  <button id="saveApiKeyButton" type="button" class="ghost">Save Maya API Key</button>
                 </div>
               </div>
             </section>

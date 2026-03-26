@@ -328,23 +328,15 @@ class SettingsManager {
 
   renderAnonymizeAvailability() {
     const hasKey = Boolean(this.localSecrets.veilApiKey);
-    const anonymizeOption = document.getElementById('anonymizeOption');
     const anonymizeHint = document.getElementById('anonymizeHint');
-    if (anonymizeOption) anonymizeOption.disabled = !hasKey;
-    // Only show hint when user has actually selected Anonymize mode but has no key
+    // Show hint only when Anonymize is selected AND no API key is saved
     if (anonymizeHint) anonymizeHint.hidden = hasKey || this.settings.redactionMode !== 'anonymize';
-    // If key removed and mode was anonymize, force mask
-    if (!hasKey && this.settings.redactionMode === 'anonymize') {
-      this.settings.redactionMode = 'mask';
-      document.getElementById('redactionModeSelect').value = 'mask';
-      this.updateSetting('redactionMode', 'mask');
-    }
   }
 
   bindEvents() {
-    document.getElementById('openSettingsTabBtn')?.addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
-    });
+    const openSettings = () => chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
+    document.getElementById('openSettingsTabBtn')?.addEventListener('click', openSettings);
+    document.getElementById('anonymizeHintSettingsBtn')?.addEventListener('click', openSettings);
 
     document.getElementById('enabledToggle').addEventListener('change', (event) => {
       this.updateSetting('enabled', event.target.checked);
@@ -365,8 +357,10 @@ class SettingsManager {
     });
 
     document.getElementById('redactionModeSelect').addEventListener('change', (event) => {
+      this.settings.redactionMode = event.target.value;
       this.updateSetting('redactionMode', event.target.value);
       this.renderModeSummary();
+      this.renderAnonymizeAvailability();
     });
 
     document.getElementById('sensitivitySelect').addEventListener('change', (event) => {

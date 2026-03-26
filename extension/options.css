@@ -1125,6 +1125,96 @@ a.diag-value { color: var(--md-primary) !important; }
 }
 
 /* ── API key saved card ── */
+/* ── Maya API Key guidance card ── */
+.maya-api-guidance-card {
+  display: flex !important;
+  gap: 12px !important;
+  margin: 0 0 16px !important;
+  padding: 14px 16px !important;
+  background: var(--md-primary-container) !important;
+  border: 1px solid var(--md-outline-variant) !important;
+  border-radius: var(--md-shape-md) !important;
+}
+
+.maya-api-guidance-icon {
+  flex-shrink: 0 !important;
+  margin-top: 2px !important;
+}
+
+.maya-api-guidance-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.maya-api-guidance-title {
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--md-on-surface) !important;
+  line-height: 1.4 !important;
+}
+
+.maya-api-guidance-desc {
+  margin: 0 !important;
+  font-size: 13px !important;
+  color: var(--md-on-surface-variant) !important;
+  line-height: 1.5 !important;
+}
+
+.maya-api-guidance-example {
+  margin: 2px 0 !important;
+  font-size: 12px !important;
+  color: var(--md-on-surface-variant) !important;
+}
+
+.maya-api-link {
+  color: var(--md-primary) !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+}
+.maya-api-link:hover { text-decoration: underline !important; }
+
+.maya-api-get-key-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+  padding: 8px 18px !important;
+  background: var(--md-primary) !important;
+  color: var(--md-on-primary) !important;
+  border: none !important;
+  border-radius: var(--md-shape-full) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  align-self: flex-start !important;
+  transition: background 150ms ease !important;
+}
+.maya-api-get-key-btn:hover {
+  background: #5B4397 !important;
+  color: var(--md-on-primary) !important;
+}
+
+/* Reuse popup pill classes in options page */
+.anon-ex-real {
+  background: #FCE4EC !important;
+  color: #B71C1C !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  font-family: monospace !important;
+  font-size: 12px !important;
+}
+.anon-ex-fake {
+  background: #E8F5E9 !important;
+  color: #1B5E20 !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  font-family: monospace !important;
+  font-size: 12px !important;
+}
+
 .api-key-saved-card {
   background: var(--md-surface-1) !important;
   border-color: var(--md-outline-variant) !important;

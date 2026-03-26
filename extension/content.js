@@ -2773,7 +2773,18 @@ class PrivacyShield {
         // Alias token: <PERSON_1>
         if (item.alias) map.set(`<${item.alias}>`, original);
         // Synthetic name (anonymize mode)
-        if (item.anonymizedText) map.set(item.anonymizedText, original);
+        if (item.anonymizedText) {
+          map.set(item.anonymizedText, original);
+          // Also map individual words so the LLM using just a first/last name
+          // still gets reverse-decoded (e.g. "Gavin" → "Nishi").
+          const fakeWords = item.anonymizedText.trim().split(/\s+/);
+          const realWords = original.trim().split(/\s+/);
+          if (fakeWords.length > 1 && fakeWords.length === realWords.length) {
+            fakeWords.forEach((word, idx) => {
+              if (word && !map.has(word)) map.set(word, realWords[idx]);
+            });
+          }
+        }
       });
     });
     return map;
