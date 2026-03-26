@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_BIN="${REPO_DIR}/.venv/bin/python"
 SERVICE_DIR="${HOME}/.config/systemd/user"
 SERVICE_FILE="${SERVICE_DIR}/privacy-shield-gliner.service"
@@ -25,10 +25,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=${REPO_DIR}
-ExecStart=${PYTHON_BIN} ${REPO_DIR}/scripts/gliner2_server.py --host 127.0.0.1 --port 8765
+ExecStart=${PYTHON_BIN} ${REPO_DIR}/server/gliner2_server.py --host 127.0.0.1 --port 8765
 Restart=on-failure
 RestartSec=2
 Environment=PYTHONUNBUFFERED=1
+Environment=HF_HOME=${REPO_DIR}/.runtime/cache/hf
+Environment=HUGGINGFACE_HUB_CACHE=${REPO_DIR}/.runtime/cache/hf/hub
+Environment=TRANSFORMERS_CACHE=${REPO_DIR}/.runtime/cache/hf/transformers
+Environment=XDG_CACHE_HOME=${REPO_DIR}/.runtime/cache/xdg
 
 [Install]
 WantedBy=default.target

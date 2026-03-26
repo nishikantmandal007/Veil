@@ -1,9 +1,4 @@
-# GLiNER2 runtime.
-# CPU-only torch is installed explicitly by scripts/native_host.py to avoid
-# pulling NVIDIA CUDA packages on non-GPU machines.
-#
-# Note: gliner2 currently imports its API client from __init__, which requires
-# requests/urllib3 even for local-only inference mode.
-gliner2
-requests>=2.31.0
-urllib3>=2.0.0
+# GLiNER2 ONNX runtime.
+# This keeps the local server Python-based while avoiding the heavyweight
+# PyTorch dependency chain.
+gliner2-onnx>=0.1.1

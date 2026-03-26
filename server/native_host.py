@@ -26,7 +26,7 @@ MODEL_ENV_VAR = "GLINER2_MODEL"
 REPO_DIR = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = REPO_DIR / "server" / "gliner2_server.py"
 VENV_DIR = REPO_DIR / ".venv"
-VENV_PYTHON = VENV_DIR / "bin" / "python"
+VENV_PYTHON = VENV_DIR / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 REQUIREMENTS = REPO_DIR / "requirements.txt"
 
 RUNTIME_DIR = REPO_DIR / ".runtime"
@@ -38,7 +38,6 @@ PIP_CACHE_DIR = CACHE_DIR / "pip"
 HF_HOME = CACHE_DIR / "hf"
 HF_HUB_CACHE = HF_HOME / "hub"
 TRANSFORMERS_CACHE = HF_HOME / "transformers"
-TORCH_HOME = CACHE_DIR / "torch"
 XDG_CACHE_HOME = CACHE_DIR / "xdg"
 
 
@@ -91,7 +90,6 @@ def ensure_runtime_dirs() -> None:
         HF_HOME,
         HF_HUB_CACHE,
         TRANSFORMERS_CACHE,
-        TORCH_HOME,
         XDG_CACHE_HOME,
     ):
         path.mkdir(parents=True, exist_ok=True)
@@ -107,7 +105,6 @@ def runtime_env(extra_env: Dict[str, str] | None = None) -> Dict[str, str]:
             "HF_HOME": str(HF_HOME),
             "HUGGINGFACE_HUB_CACHE": str(HF_HUB_CACHE),
             "TRANSFORMERS_CACHE": str(TRANSFORMERS_CACHE),
-            "TORCH_HOME": str(TORCH_HOME),
             "XDG_CACHE_HOME": str(XDG_CACHE_HOME),
         }
     )
@@ -198,7 +195,7 @@ def ensure_dependencies() -> None:
     ensure_venv()
     env = runtime_env()
     check_import = run_cmd(
-        [str(VENV_PYTHON), "-c", "from gliner2 import GLiNER2; import torch; print('ok')"],
+        [str(VENV_PYTHON), "-c", "from gliner2_onnx import GLiNER2ONNXRuntime; print('ok')"],
         cwd=REPO_DIR,
         env=env,
     )
@@ -209,29 +206,12 @@ def ensure_dependencies() -> None:
     if pip_upgrade.returncode != 0:
         raise RuntimeError(f"pip upgrade failed: {pip_upgrade.stderr.strip() or pip_upgrade.stdout.strip()}")
 
-    # Force CPU-only torch wheels to avoid pulling NVIDIA CUDA packages by default.
-    torch_install = run_cmd(
-        [
-            str(VENV_PYTHON),
-            "-m",
-            "pip",
-            "install",
-            "--index-url",
-            "https://download.pytorch.org/whl/cpu",
-            "torch>=2.0.0",
-        ],
-        cwd=REPO_DIR,
-        env=env,
-    )
-    if torch_install.returncode != 0:
-        raise RuntimeError(f"CPU torch install failed: {torch_install.stderr.strip() or torch_install.stdout.strip()}")
-
     install = run_cmd([str(VENV_PYTHON), "-m", "pip", "install", "-r", str(REQUIREMENTS)], cwd=REPO_DIR, env=env)
     if install.returncode != 0:
         raise RuntimeError(f"Dependency install failed: {install.stderr.strip() or install.stdout.strip()}")
 
     verify = run_cmd(
-        [str(VENV_PYTHON), "-c", "from gliner2 import GLiNER2; import torch; print('ok')"],
+        [str(VENV_PYTHON), "-c", "from gliner2_onnx import GLiNER2ONNXRuntime; print('ok')"],
         cwd=REPO_DIR,
         env=env,
     )
@@ -240,9 +220,12 @@ def ensure_dependencies() -> None:
         raise RuntimeError(f"Dependency verification failed:\n{details}")
 
 
-def ensure_model_downloaded(extra_env: Dict[str, str] | None = None) -> None:
+def ensure_model_downloaded(model_id: str = "", extra_env: Dict[str, str] | None = None) -> None:
+    cmd = [str(VENV_PYTHON), str(SCRIPT_PATH), "--download-only"]
+    if str(model_id or "").strip():
+        cmd.extend(["--model", str(model_id).strip()])
     download = run_cmd(
-        [str(VENV_PYTHON), str(SCRIPT_PATH), "--download-only"],
+        cmd,
         cwd=REPO_DIR,
         env=runtime_env(extra_env),
     )
@@ -250,7 +233,8 @@ def ensure_model_downloaded(extra_env: Dict[str, str] | None = None) -> None:
         details = trim_output(download.stderr or download.stdout)
         raise RuntimeError(
             "Model download failed. "
-            "If repo access is restricted, set HF_TOKEN and retry, "
+            "The default ONNX model is public, so no HF token is normally required. "
+            "If you are using a private or gated model, set HF_TOKEN and retry, "
             "or set GLINER2_MODEL to a local model directory. "
             f"Details:\n{details}"
         )
@@ -291,12 +275,14 @@ def start_server(install_deps: bool, download_model: bool, hf_token: str = "", m
 
     # Model precedence: popup selection > GLINER2_MODEL env var > server default
     resolved_model = str(model_id or "").strip() or os.environ.get(MODEL_ENV_VAR, "").strip()
+    if resolved_model:
+        extra_env[MODEL_ENV_VAR] = resolved_model
 
     if install_deps:
         ensure_dependencies()
 
     if download_model:
-        ensure_model_downloaded(extra_env)
+        ensure_model_downloaded(resolved_model, extra_env)
 
     ensure_runtime_dirs()
     log_handle = LOG_FILE.open("a", encoding="utf-8")

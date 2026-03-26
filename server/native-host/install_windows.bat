@@ -9,7 +9,7 @@ if "%~1"=="" (
 
 set "EXTENSION_ID=%~1"
 set "SCRIPT_DIR=%~dp0"
-set "REPO_DIR=%SCRIPT_DIR%.."
+set "REPO_DIR=%SCRIPT_DIR%..\.."
 
 :: Resolve absolute path
 pushd "%REPO_DIR%"
@@ -17,9 +17,9 @@ set "REPO_DIR=%CD%"
 popd
 
 set "HOST_NAME=com.privacyshield.gliner2"
-set "HOST_SCRIPT=%REPO_DIR%\scripts\native_host.py"
-set "LAUNCHER=%REPO_DIR%\scripts\native_host_win.bat"
-set "MANIFEST=%REPO_DIR%\scripts\%HOST_NAME%.json"
+set "HOST_SCRIPT=%REPO_DIR%\server\native_host.py"
+set "LAUNCHER=%REPO_DIR%\server\native-host\native_host_win.bat"
+set "MANIFEST=%REPO_DIR%\server\native-host\%HOST_NAME%.json"
 set "VENV_PYTHON=%REPO_DIR%\.venv\Scripts\python.exe"
 set "RUNTIME_DIR=%REPO_DIR%\.runtime"
 

@@ -84,6 +84,17 @@ const DEFAULT_CUSTOM_PATTERNS = [
   }
 ];
 const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
+const DEFAULT_SERVER_MODEL = 'fastino/gliner2-large-v1';
+const MODEL_SELECTION_ALIASES = {
+  'fastino/gliner2-base-v1': DEFAULT_SERVER_MODEL
+};
+const VEIL_RELEASE_BASE_URL = 'https://github.com/nishikantmandal007/Veil/releases/latest/download';
+
+function normalizeSelectedModel(modelId) {
+  const raw = String(modelId || '').trim();
+  if (!raw) return DEFAULT_SERVER_MODEL;
+  return MODEL_SELECTION_ALIASES[raw] || raw;
+}
 
 const DEFAULT_SETTINGS = {
   enabled: true,
@@ -171,7 +182,8 @@ class SettingsManager {
       hfToken: '',
       veilApiKey: ''
     };
-    this.selectedModel = 'fastino/gliner2-large-v1';
+    this.selectedModel = DEFAULT_SERVER_MODEL;
+    this.platformOs = '';
     this.apiKeyRevealed = false;
     this.hfTokenVisible = false;
     this.keyExpanded = false;
@@ -201,6 +213,7 @@ class SettingsManager {
     }
     await this.loadSettings();
     await this.loadLocalSecrets();
+    await this.loadPlatformInfo();
     this.bindEvents();
     const manifest = chrome.runtime.getManifest();
     const versionEl = document.getElementById('versionBadge');
@@ -318,12 +331,37 @@ class SettingsManager {
           hfToken: typeof result.hfToken === 'string' ? result.hfToken : '',
           veilApiKey: typeof result.veilApiKey === 'string' ? result.veilApiKey : ''
         };
-        if (result.selectedModel) {
-          this.selectedModel = result.selectedModel;
+        const normalizedModel = normalizeSelectedModel(result.selectedModel);
+        this.selectedModel = normalizedModel;
+        if (normalizedModel !== result.selectedModel) {
+          chrome.storage.local.set({ selectedModel: normalizedModel });
         }
         resolve();
       });
     });
+  }
+
+  loadPlatformInfo() {
+    return new Promise((resolve) => {
+      if (!chrome.runtime?.getPlatformInfo) {
+        resolve();
+        return;
+      }
+      chrome.runtime.getPlatformInfo((info) => {
+        if (!chrome.runtime.lastError && info?.os) {
+          this.platformOs = info.os;
+        }
+        resolve();
+      });
+    });
+  }
+
+  detectPlatformOsFallback() {
+    const platform = `${navigator.platform || ''} ${navigator.userAgent || ''}`.toLowerCase();
+    if (platform.includes('win')) return 'win';
+    if (platform.includes('mac')) return 'mac';
+    if (platform.includes('cros')) return 'cros';
+    return 'linux';
   }
 
   renderAnonymizeAvailability() {
@@ -464,7 +502,7 @@ class SettingsManager {
     document.getElementById('toggleHfTokenVisibility').addEventListener('click', () => this.toggleHfTokenInputVisibility());
 
     document.getElementById('modelSelect').addEventListener('change', (event) => {
-      this.selectedModel = event.target.value;
+      this.selectedModel = normalizeSelectedModel(event.target.value);
       chrome.storage.local.set({ selectedModel: this.selectedModel }, () => {
         this.setMessage(`Model set to ${this.selectedModel}. Restart server to apply.`);
       });
@@ -703,7 +741,11 @@ class SettingsManager {
   }
 
   getNativeHostInstallCommand() {
-    return `# Run from your Veil repo directory:\nbash server/native-host/install_linux.sh ${chrome.runtime.id}`;
+    const platformOs = this.platformOs || this.detectPlatformOsFallback();
+    if (platformOs === 'win') {
+      return `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm '${VEIL_RELEASE_BASE_URL}/install.ps1' | iex; Install-Veil -ExtensionId '${chrome.runtime.id}'"`;
+    }
+    return `curl -fsSL ${VEIL_RELEASE_BASE_URL}/install.sh | bash -s -- --extension-id ${chrome.runtime.id}`;
   }
 
   getDefaultServerMeta() {
@@ -1035,10 +1077,6 @@ class SettingsManager {
   async startServer() {
     if (this.serverBusy) return;
     const hfToken = this.getInputHfToken() || this.localSecrets.hfToken || '';
-    // Warn early if HF token is missing — model download will fail without it
-    if (!hfToken) {
-      this.setMessage('\u26A0\uFE0F HF token not set — model download may fail. Add it in the Model Access Token tab.', true);
-    }
     this.setServerPhase('connecting');
     this.appendTerminalLine('Start requested. Initializing local GLiNER2 server...');
     this.setServerButtonsDisabled(true);
@@ -1054,7 +1092,7 @@ class SettingsManager {
       this.setServerPhase('disconnected');
       this.appendTerminalLine(`Start failed: ${response?.error || 'unknown error'}`);
       if (/auth|unauthorized|401|repository not found/i.test(String(response?.error || '')) && !hfToken) {
-        this.setMessage('Model access failed. Add HF token in Model Access Token and retry.', true);
+        this.setMessage('Model access failed. Add an HF token only if you are using a private or gated model.', true);
       } else {
         this.setMessage(response?.error || 'Unable to start server.', true);
       }
@@ -1441,7 +1479,7 @@ class OnboardingWizard {
 
   _populateInstallCmd() {
     const cmd = document.getElementById('onboardingInstallCmd');
-    if (cmd) cmd.textContent = `# Run from your Veil repo directory:\nbash server/native-host/install_linux.sh ${chrome.runtime.id}`;
+    if (cmd) cmd.textContent = this.sm.getNativeHostInstallCommand();
   }
 
   _bindEvents() {
@@ -1573,4 +1611,3 @@ document.addEventListener('DOMContentLoaded', () => {
     activate();
   }
 });
-

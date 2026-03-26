@@ -44,7 +44,7 @@
         <div class="onboarding-step" data-step="1" hidden>
           <div class="onboarding-step-badge">Step 1 of 2</div>
           <h2 class="onboarding-title">Install the Native Bridge</h2>
-          <p class="onboarding-body">Run this command once. It registers a small Python helper that lets the extension control the local server.</p>
+          <p class="onboarding-body">Run this command once. It installs Veil's local server bundle and registers the native bridge so the extension can control it.</p>
           <div class="onboarding-cmd-block">
             <div class="onboarding-cmd-header">
               <span>Run in terminal</span>
@@ -62,7 +62,7 @@
         <div class="onboarding-step" data-step="2" hidden>
           <div class="onboarding-step-badge">Step 2 of 2</div>
           <h2 class="onboarding-title">Start the Local Model</h2>
-          <p class="onboarding-body">The GLiNER2 model runs entirely on your machine. The first start downloads the model (~700 MB) and may take a minute.</p>
+          <p class="onboarding-body">The GLiNER2 ONNX model runs entirely on your machine. The first start downloads the local model and may take a minute.</p>
           <p id="onboardingServerStatus" class="onboarding-status-note">Server not started yet.</p>
           <div class="onboarding-actions">
             <button id="onboardingStartServerBtn" type="button" class="onboarding-primary-btn">Start Server</button>
@@ -278,11 +278,10 @@
             <label class="field field-tight" style="margin-bottom:8px">
               <span style="font-size:11px;font-weight:600;color:var(--ink)">GLiNER2 Model</span>
               <select id="modelSelect">
-                <option value="fastino/gliner2-large-v1">gliner2-large-v1 — 340 M &nbsp;(best quality)</option>
-                <option value="fastino/gliner2-base-v1">gliner2-base-v1 — 205 M &nbsp;(faster, less RAM)</option>
-                <option value="fastino/gliner2-multi-v1">gliner2-multi-v1 — multilingual</option>
+                <option value="fastino/gliner2-large-v1">gliner2-large-v1 — ONNX default</option>
+                <option value="fastino/gliner2-multi-v1">gliner2-multi-v1 — multilingual ONNX</option>
               </select>
-              <p class="hint" style="margin:3px 0 0">Takes effect on next server start. Downloads automatically.</p>
+              <p class="hint" style="margin:3px 0 0">Takes effect on next server start. Downloads automatically. HF token is only needed for private models.</p>
             </label>
             <div class="diag-row">
               <span class="diag-key">Active Model</span>

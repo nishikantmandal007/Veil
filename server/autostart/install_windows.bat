@@ -2,13 +2,13 @@
 setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
-set "REPO_DIR=%SCRIPT_DIR%.."
+set "REPO_DIR=%SCRIPT_DIR%..\.."
 pushd "%REPO_DIR%"
 set "REPO_DIR=%CD%"
 popd
 
 set "VENV_PYTHON=%REPO_DIR%\.venv\Scripts\python.exe"
-set "SERVER_SCRIPT=%REPO_DIR%\scripts\gliner2_server.py"
+set "SERVER_SCRIPT=%REPO_DIR%\server\gliner2_server.py"
 set "TASK_NAME=PrivacyShieldGLiNER2"
 
 if not exist "%VENV_PYTHON%" (

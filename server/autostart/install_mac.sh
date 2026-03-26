@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_BIN="${REPO_DIR}/.venv/bin/python"
 PLIST_DIR="${HOME}/Library/LaunchAgents"
 PLIST_LABEL="com.privacyshield.gliner2"
@@ -30,7 +30,7 @@ cat > "${PLIST_FILE}" <<EOF
   <key>ProgramArguments</key>
   <array>
     <string>${PYTHON_BIN}</string>
-    <string>${REPO_DIR}/scripts/gliner2_server.py</string>
+    <string>${REPO_DIR}/server/gliner2_server.py</string>
     <string>--host</string>
     <string>127.0.0.1</string>
     <string>--port</string>
@@ -50,11 +50,20 @@ cat > "${PLIST_FILE}" <<EOF
   <dict>
     <key>PYTHONUNBUFFERED</key>
     <string>1</string>
+    <key>HF_HOME</key>
+    <string>${REPO_DIR}/.runtime/cache/hf</string>
+    <key>HUGGINGFACE_HUB_CACHE</key>
+    <string>${REPO_DIR}/.runtime/cache/hf/hub</string>
+    <key>TRANSFORMERS_CACHE</key>
+    <string>${REPO_DIR}/.runtime/cache/hf/transformers</string>
+    <key>XDG_CACHE_HOME</key>
+    <string>${REPO_DIR}/.runtime/cache/xdg</string>
   </dict>
 </dict>
 </plist>
 EOF
 
+launchctl unload "${PLIST_FILE}" 2>/dev/null || true
 launchctl load "${PLIST_FILE}"
 echo "Installed and started: ${PLIST_FILE}"
 echo "Status: $(launchctl list | grep ${PLIST_LABEL} || echo 'not listed yet — may take a moment')"

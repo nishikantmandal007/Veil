@@ -1,5 +1,5 @@
 """
-Unit tests for pure utility functions in scripts/gliner2_server.py.
+Unit tests for pure utility functions in server/gliner2_server.py.
 Run with: pytest tests/server/test_utils.py -v
 """
 import sys
@@ -8,7 +8,15 @@ from pathlib import Path
 # Add server dir to path so we can import without installing
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "server"))
 
-from gliner2_server import make_chunks, deduplicate_detections, flatten_gliner2_output, CHUNK_SIZE, CHUNK_OVERLAP
+from gliner2_server import (
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    deduplicate_detections,
+    flatten_gliner2_output,
+    make_chunks,
+    normalize_model_name,
+    resolve_runtime_model_name,
+)
 
 
 class TestMakeChunks:
@@ -127,3 +135,15 @@ class TestFlattenGliner2Output:
         }
         result = flatten_gliner2_output(raw)
         assert result[0]["label"] == "custom_employee_id"
+
+
+class TestModelAliases:
+    def test_default_model(self):
+        assert normalize_model_name("") == "fastino/gliner2-large-v1"
+
+    def test_base_model_aliases_to_large(self):
+        assert normalize_model_name("fastino/gliner2-base-v1") == "fastino/gliner2-large-v1"
+
+    def test_public_onnx_alias_resolution(self):
+        assert resolve_runtime_model_name("fastino/gliner2-large-v1") == "lmo3/gliner2-large-v1-onnx"
+        assert resolve_runtime_model_name("fastino/gliner2-multi-v1") == "lmo3/gliner2-multi-v1-onnx"

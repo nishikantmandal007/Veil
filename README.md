@@ -91,7 +91,7 @@ Detected by regex fallback: `OpenAI API keys` · `AWS credentials` · `GitHub to
 - Chrome or any Chromium-based browser
 - Python 3.10+
 - Node.js 18+
-- ~2 GB free disk space for GLiNER2 model weights (downloaded once, cached locally)
+- Internet access for the first local ONNX model download
 
 ---
 
@@ -102,24 +102,23 @@ Detected by regex fallback: `OpenAI API keys` · `AWS credentials` · `GitHub to
 git clone https://github.com/nishikantmandal007/Veil.git
 cd Veil
 
-# 2. Install Python dependencies (creates .venv, installs PyTorch CPU + GLiNER2)
+# 2. Install local Python dependencies (ONNX runtime, no PyTorch)
 npm run setup
 
 # 3. Load the extension in Chrome
 #    chrome://extensions → Developer mode ON → Load unpacked → select extension/
 #    Note the Extension ID shown on the card
 
-# 4. Install the native messaging host
-bash server/native-host/install_linux.sh <EXTENSION_ID>   # Linux
-bash server/native-host/install_mac.sh   <EXTENSION_ID>   # macOS
-server\native-host\install_windows.bat   <EXTENSION_ID>   # Windows
+# 4. Install the local server bundle + native bridge
+curl -fsSL https://github.com/nishikantmandal007/Veil/releases/latest/download/install.sh | bash -s -- --extension-id <EXTENSION_ID>   # Linux/macOS
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/nishikantmandal007/Veil/releases/latest/download/install.ps1' | iex; Install-Veil -ExtensionId '<EXTENSION_ID>'"   # Windows
 
 # 5. Start the local inference server
 npm run run-gliner2-lazy   # lazy-load: model warms on first detection
 npm run run-gliner2        # eager-load: model ready immediately (~30s)
 ```
 
-The first start downloads the GLiNER2 model (~1.5 GB). Subsequent starts are instant.
+The first start downloads the public GLiNER2 ONNX model into the local cache. No Hugging Face token is required for the default model.
 
 Full setup guide: [nishikantmandal007.github.io/Veil/install](https://nishikantmandal007.github.io/Veil/install)
 

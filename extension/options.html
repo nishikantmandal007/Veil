@@ -161,8 +161,8 @@
             <p class="opt-notice-body">
               GLiNER2 runs once on <code>127.0.0.1:8765</code> and is shared across Chrome, Brave,
               Edge, and Vivaldi automatically. Using multiple browsers?
-              Pass all extension IDs when installing:
-              <code>bash server/native-host/install_linux.sh ID1 ID2</code>
+              Open Veil in each browser once and run the install command shown there so that
+              browser's extension ID is registered with the same local server.
             </p>
           </div>
         </div>
@@ -273,11 +273,10 @@
               <label class="field field-tight" style="margin-bottom:8px">
                 <span style="font-size:11px;font-weight:600;color:var(--ink)">GLiNER2 Model</span>
                 <select id="modelSelect">
-                  <option value="fastino/gliner2-large-v1">gliner2-large-v1 — 340 M &nbsp;(best quality)</option>
-                  <option value="fastino/gliner2-base-v1">gliner2-base-v1 — 205 M &nbsp;(faster, less RAM)</option>
-                  <option value="fastino/gliner2-multi-v1">gliner2-multi-v1 — multilingual</option>
+                  <option value="fastino/gliner2-large-v1">gliner2-large-v1 — ONNX default</option>
+                  <option value="fastino/gliner2-multi-v1">gliner2-multi-v1 — multilingual ONNX</option>
                 </select>
-                <p class="hint" style="margin:3px 0 0">Takes effect on next server start. Downloads automatically.</p>
+                <p class="hint" style="margin:3px 0 0">Takes effect on next server start. Downloads automatically. HF token is only needed for private models.</p>
               </label>
               <div class="diag-row">
                 <span class="diag-key">Active Model</span>

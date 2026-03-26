@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "description": "Real-time PII detection and redaction for AI chat interfaces. Powered by a local GLiNER2 model — your data never leaves your machine.",
   "scripts": {
-    "setup": "python3 -m venv .venv && . .venv/bin/activate && pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.0.0' && pip install -r requirements.txt",
+    "setup": "python3 -m venv .venv && . .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt",
     "download-gliner2": ".venv/bin/python server/gliner2_server.py --download-only",
     "run-gliner2": ".venv/bin/python server/gliner2_server.py",
     "run-gliner2-lazy": ".venv/bin/python server/gliner2_server.py --lazy-load",
@@ -14,6 +14,7 @@
     "status-autostart-linux": "systemctl --user --no-pager status privacy-shield-gliner.service",
     "build": "echo 'No build step — load extension/ folder directly in Chrome'",
     "build:zip": "bash scripts/build_crx.sh",
+    "build:backend-bundle": "python3 scripts/build_backend_bundle.py",
     "lint": "eslint 'extension/*.js'",
     "format": "prettier --write 'extension/**/*.{js,json,css,html}'",
     "test": "node tests/js/test_background_utils.js",

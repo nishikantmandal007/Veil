@@ -21,10 +21,18 @@ from urllib import request as urlrequest
 from urllib.parse import urlparse
 
 DEFAULT_MODEL = "fastino/gliner2-large-v1"
-FALLBACK_MODELS = [
-    "fastino/gliner2-base-v1",
-    "fastino/gliner2-multi-v1",
-]
+MODEL_ALIASES = {
+    "fastino/gliner2-large-v1": "lmo3/gliner2-large-v1-onnx",
+    "fastino/gliner2-multi-v1": "lmo3/gliner2-multi-v1-onnx",
+}
+UNSUPPORTED_MODEL_ALIASES = {
+    "fastino/gliner2-base-v1": "fastino/gliner2-large-v1",
+}
+FALLBACK_MODELS = ["fastino/gliner2-multi-v1"]
+ONNX_PRECISION_ENV_KEY = "GLINER2_ONNX_PRECISION"
+ONNX_PROVIDERS_ENV_KEY = "GLINER2_ONNX_PROVIDERS"
+DEFAULT_ONNX_PRECISION = "fp32"
+DEFAULT_ONNX_PROVIDERS = ["CPUExecutionProvider"]
 DEFAULT_THRESHOLD = 0.42
 DEFAULT_MAX_CHARS = 9000
 DEFAULT_LABELS = {
@@ -62,6 +70,33 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = REPO_DIR / ".env"
 ANON_ENDPOINT_ENV_KEY = "MDP_ANONYMIZATION_ENDPOINT"
 ANON_REQUEST_TIMEOUT_SEC = 10.0
+
+
+def normalize_model_name(model_name: str) -> str:
+    raw = str(model_name or "").strip()
+    if not raw:
+        return DEFAULT_MODEL
+    return UNSUPPORTED_MODEL_ALIASES.get(raw, raw)
+
+
+def resolve_runtime_model_name(model_name: str) -> str:
+    normalized = normalize_model_name(model_name)
+    if Path(normalized).is_dir():
+        return str(Path(normalized))
+    return MODEL_ALIASES.get(normalized, normalized)
+
+
+def resolve_onnx_precision() -> str:
+    raw = str(os.environ.get(ONNX_PRECISION_ENV_KEY, DEFAULT_ONNX_PRECISION)).strip().lower()
+    return raw if raw in {"fp16", "fp32"} else DEFAULT_ONNX_PRECISION
+
+
+def resolve_onnx_providers() -> List[str]:
+    raw = str(os.environ.get(ONNX_PROVIDERS_ENV_KEY, "")).strip()
+    if not raw:
+        return list(DEFAULT_ONNX_PROVIDERS)
+    providers = [item.strip() for item in raw.split(",") if item.strip()]
+    return providers or list(DEFAULT_ONNX_PROVIDERS)
 
 
 def parse_simple_env_file(path: Path) -> Dict[str, str]:
@@ -220,6 +255,17 @@ def proxy_anonymization(entries: List[Any], jwt_token: str, request_id: str) -> 
         raise RuntimeError("Anonymization endpoint returned non-JSON response.") from exc
 
 
+def coerce_entity_item(raw_item: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(raw_item, dict):
+        return dict(raw_item)
+
+    fields = ("text", "label", "start", "end", "score")
+    if all(hasattr(raw_item, field) for field in fields):
+        return {field: getattr(raw_item, field) for field in fields}
+
+    return None
+
+
 def flatten_gliner2_output(raw_items: Any) -> List[Dict[str, Any]]:
     """
     Normalize GLiNER2 outputs into a flat list of entity-like dicts.
@@ -230,7 +276,12 @@ def flatten_gliner2_output(raw_items: Any) -> List[Dict[str, Any]]:
       {"entities": [...]} or {"predictions": [...]}
     """
     if isinstance(raw_items, list):
-        return [item for item in raw_items if isinstance(item, dict)]
+        flattened = []
+        for item in raw_items:
+            coerced = coerce_entity_item(item)
+            if coerced is not None:
+                flattened.append(coerced)
+        return flattened
 
     if not isinstance(raw_items, dict):
         return []
@@ -389,10 +440,12 @@ class GLiNERService:
     def __init__(self, model_name: str, default_threshold: float) -> None:
         self.model_name = model_name
         self.default_threshold = default_threshold
-        self.model_source = model_name
+        self.model_source = resolve_runtime_model_name(model_name)
         self.model = None
-        self.backend = "gliner2"
+        self.backend = "gliner2-onnx"
         self.model_lock = threading.Lock()
+        self.onnx_precision = resolve_onnx_precision()
+        self.onnx_providers = resolve_onnx_providers()
 
     def resolve_local_snapshot(self, model_name: str) -> Optional[str]:
         model = str(model_name or "").strip()
@@ -436,7 +489,7 @@ class GLiNERService:
             others.sort(key=lambda path: path.stat().st_mtime, reverse=True)
             preferred.extend(others)
 
-        required = ("config.json", "tokenizer.json")
+        required = ("config.json", "gliner2_config.json")
         for candidate in preferred:
             if all((candidate / item).exists() for item in required):
                 return str(candidate)
@@ -447,32 +500,49 @@ class GLiNERService:
             return
 
         try:
-            from gliner2 import GLiNER2
+            from gliner2_onnx import GLiNER2ONNXRuntime
         except Exception as exc:
             raise RuntimeError(
-                "GLiNER2 import failed. Reinstall local deps in the project venv: "
+                "GLiNER2 ONNX import failed. Reinstall local deps in the project venv: "
                 "pip install -r requirements.txt"
             ) from exc
 
-        candidates = [self.model_name] + [item for item in FALLBACK_MODELS if item != self.model_name]
+        normalized_model = normalize_model_name(self.model_name)
+        candidates = [normalized_model] + [item for item in FALLBACK_MODELS if item != normalized_model]
         failures: List[Tuple[str, str]] = []
         for candidate in candidates:
-            local_snapshot = self.resolve_local_snapshot(candidate)
+            runtime_model = resolve_runtime_model_name(candidate)
+            local_snapshot = self.resolve_local_snapshot(runtime_model)
             load_targets = []
             if local_snapshot:
                 load_targets.append(local_snapshot)
-            load_targets.append(candidate)
+            load_targets.append(runtime_model)
 
+            seen_targets = set()
             for load_target in load_targets:
+                if load_target in seen_targets:
+                    continue
+                seen_targets.add(load_target)
                 try:
-                    if load_target == candidate:
-                        print(f"Loading GLiNER2 model ({self.backend}): {candidate}")
+                    load_path = Path(load_target)
+                    if load_path.is_dir():
+                        print(f"Loading GLiNER2 ONNX model ({self.onnx_precision}) from local cache: {load_target}")
+                        self.model = GLiNER2ONNXRuntime(
+                            str(load_path),
+                            precision=self.onnx_precision,
+                            providers=self.onnx_providers,
+                        )
                     else:
-                        print(f"Loading GLiNER2 model ({self.backend}) from local cache: {load_target}")
-                    self.model = GLiNER2.from_pretrained(load_target)
+                        print(f"Loading GLiNER2 ONNX model ({self.onnx_precision}): {load_target}")
+                        self.model = GLiNER2ONNXRuntime.from_pretrained(
+                            load_target,
+                            precision=self.onnx_precision,
+                            providers=self.onnx_providers,
+                        )
                     self.model_name = candidate
-                    self.model_source = load_target
-                    print(f"GLiNER2 model loaded: {candidate} ({load_target})")
+                    self.model_source = str(load_path if load_path.is_dir() else runtime_model)
+                    self.backend = f"gliner2-onnx/{self.onnx_precision}"
+                    print(f"GLiNER2 ONNX model loaded: {candidate} ({self.model_source})")
                     return
                 except Exception as exc:
                     source_name = f"{candidate} via {load_target}"
@@ -486,63 +556,52 @@ class GLiNERService:
             raise RuntimeError(
                 "Model download failed (auth/repository issue). "
                 f"Tried: {', '.join(candidates)}. "
-                "Set a valid model id/path or configure Hugging Face auth (HF_TOKEN)."
+                "The default public ONNX models should not require HF_TOKEN. "
+                "Set a valid model id/path or configure Hugging Face auth only for private or gated models."
             )
         raise RuntimeError(
             f"Model load failed. Tried: {', '.join(candidates)}. Last errors: {joined}"
         )
 
     def _predict(self, text: str, labels, threshold: float) -> List[Dict[str, Any]]:
-        """
-        Call GLiNER2 with list or dict labels.
+        try:
+            return self.model.extract_entities(text, labels, threshold=threshold)
+        except TypeError:
+            return self.model.extract_entities(text, labels)
 
-        Dict labels: {internal_name: natural_language_description}
-        GLiNER2 uses the description values for zero-shot embedding matching
-        and returns detections keyed by the dict key (internal name).
-        This is the preferred format — it eliminates the need for reverse mapping.
-
-        Falls back through known API signatures for compatibility.
-        """
-        if hasattr(self.model, "extract_entities"):
-            attempts = [
-                lambda: self.model.extract_entities(
-                    text, labels,
-                    include_spans=True, include_confidence=True,
-                ),
-                lambda: self.model.extract_entities(
-                    text, labels,
-                    threshold=threshold,
-                    include_spans=True, include_confidence=True,
-                ),
-                lambda: self.model.extract_entities(text, labels, threshold=threshold, include_spans=True),
-                lambda: self.model.extract_entities(text, labels, threshold=threshold),
-                lambda: self.model.extract_entities(text, entity_types=labels, threshold=threshold),
-                lambda: self.model.extract_entities(text, labels),
-            ]
-            for attempt in attempts:
-                try:
-                    return attempt()
-                except TypeError:
+    def _prepare_labels(self, labels: Any) -> Tuple[List[str], Dict[str, str]]:
+        if isinstance(labels, dict) and labels:
+            model_labels: List[str] = []
+            label_lookup: Dict[str, str] = {}
+            for key, value in labels.items():
+                internal_name = str(key).strip().lower()
+                description = str(value).strip() or internal_name
+                if not internal_name or not description:
                     continue
-                except Exception:
-                    continue
+                model_labels.append(description)
+                label_lookup.setdefault(description.lower(), internal_name)
+                label_lookup.setdefault(internal_name, internal_name)
+            if model_labels:
+                return model_labels, label_lookup
 
-        if hasattr(self.model, "predict_entities"):
-            # predict_entities only supports list labels — convert dict to list of keys
-            label_list = list(labels.keys()) if isinstance(labels, dict) else labels
-            attempts = [
-                lambda: self.model.predict_entities(text, label_list, threshold=threshold),
-                lambda: self.model.predict_entities(text, label_list),
-            ]
-            for attempt in attempts:
-                try:
-                    return attempt()
-                except TypeError:
-                    continue
+        cleaned = [str(lbl).strip().lower() for lbl in (labels or []) if str(lbl).strip()]
+        if cleaned:
+            label_lookup = {label.lower(): label for label in cleaned}
+            return cleaned, label_lookup
 
-        raise RuntimeError("Unsupported GLiNER model API: missing extract_entities/predict_entities")
+        defaults = list(DEFAULT_LABELS.values())
+        label_lookup = {description.lower(): internal for internal, description in DEFAULT_LABELS.items()}
+        return defaults, label_lookup
 
-    def _predict_chunk(self, chunk_text: str, labels, threshold: float, source_text: str, offset: int) -> List[Dict[str, Any]]:
+    def _predict_chunk(
+        self,
+        chunk_text: str,
+        labels: List[str],
+        label_lookup: Dict[str, str],
+        threshold: float,
+        source_text: str,
+        offset: int,
+    ) -> List[Dict[str, Any]]:
         """Run prediction on one chunk and return detections with absolute offsets."""
         raw_items = flatten_gliner2_output(self._predict(chunk_text, labels, threshold))
         detections: List[Dict[str, Any]] = []
@@ -550,6 +609,7 @@ class GLiNERService:
             label = extract_label(item)
             if not label:
                 continue
+            resolved_label = label_lookup.get(label.lower(), label)
             span = extract_span(item, chunk_text)
             if span is None:
                 continue
@@ -558,73 +618,25 @@ class GLiNERService:
                 continue
             detections.append({
                 "text":  source_text[start:end],
-                "label": label,
+                "label": resolved_label,
                 "start": start,
                 "end":   end,
-                "score": max(extract_score(item), threshold),
+                "score": extract_score(item),
             })
         return detections
 
     def detect(self, text: str, labels, threshold: float) -> List[Dict[str, Any]]:
         self.load_model()
-
-        # Normalize labels.
-        # Dict {internal_name: description} — passed directly to GLiNER2 so it uses
-        # the richer descriptions for zero-shot embedding matching.
-        # List — clean and lower-case as before.
-        if isinstance(labels, dict) and labels:
-            safe_labels = {
-                str(k).strip().lower(): str(v).strip()
-                for k, v in labels.items()
-                if str(k).strip()
-            }
-            if not safe_labels:
-                safe_labels = dict(DEFAULT_LABELS)
-        else:
-            cleaned = [str(lbl).strip().lower() for lbl in (labels or []) if str(lbl).strip()]
-            safe_labels = cleaned if cleaned else list(DEFAULT_LABELS)
+        model_labels, label_lookup = self._prepare_labels(labels)
 
         chunks = make_chunks(text)
         detections: List[Dict[str, Any]] = []
 
         with self.model_lock:
-            if len(chunks) == 1:
-                detections = self._predict_chunk(chunks[0][0], safe_labels, threshold, text, 0)
-            else:
-                # Try batch inference first — one forward pass for all chunks.
-                try:
-                    if not hasattr(self.model, "batch_extract_entities"):
-                        raise AttributeError("no batch API")
-                    chunk_texts = [c[0] for c in chunks]
-                    batch = self.model.batch_extract_entities(
-                        chunk_texts, safe_labels,
-                        include_confidence=True, include_spans=True,
-                    )
-                    for raw, (chunk_text, offset) in zip(batch, chunks):
-                        flat = flatten_gliner2_output(raw)
-                        for item in flat:
-                            label = extract_label(item)
-                            if not label:
-                                continue
-                            span = extract_span(item, chunk_text)
-                            if span is None:
-                                continue
-                            start, end = span[0] + offset, span[1] + offset
-                            if start < 0 or end > len(text) or end <= start:
-                                continue
-                            detections.append({
-                                "text":  text[start:end],
-                                "label": label,
-                                "start": start,
-                                "end":   end,
-                                "score": max(extract_score(item), threshold),
-                            })
-                except (AttributeError, TypeError, Exception):
-                    # Fallback: sequential per-chunk calls
-                    for chunk_text, offset in chunks:
-                        detections.extend(
-                            self._predict_chunk(chunk_text, safe_labels, threshold, text, offset)
-                        )
+            for chunk_text, offset in chunks:
+                detections.extend(
+                    self._predict_chunk(chunk_text, model_labels, label_lookup, threshold, text, offset)
+                )
 
         result = deduplicate_detections(detections)
         for det in result:
@@ -645,15 +657,13 @@ class GLiNERService:
         if hasattr(self.model, "classify"):
             with self.model_lock:
                 try:
-                    raw = self.model.classify(text, classify_labels, include_confidence=True)
+                    raw = self.model.classify(text, classify_labels)
                     if isinstance(raw, dict):
-                        label = str(raw.get("label", "")).lower()
-                        score = float(raw.get("score", raw.get("confidence", 0.0)))
-                        return {"sensitivity": sensitivity_map.get(label, "none"), "score": score, "label": label}
-                    if isinstance(raw, list) and raw:
-                        best = max(raw, key=lambda x: float(x.get("score", 0.0)) if isinstance(x, dict) else 0.0)
-                        label = str(best.get("label", "")).lower()
-                        score = float(best.get("score", 0.0))
+                        if not raw:
+                            raise ValueError("empty classification output")
+                        label, score = max(raw.items(), key=lambda item: float(item[1]))
+                        label = str(label).lower()
+                        score = float(score)
                         return {"sensitivity": sensitivity_map.get(label, "none"), "score": score, "label": label}
                 except Exception:
                     pass
@@ -684,16 +694,6 @@ class GLiNERService:
         if schema is None:
             schema = PII_STRUCTURE_SCHEMA
 
-        if hasattr(self.model, "structure"):
-            with self.model_lock:
-                try:
-                    raw = self.model.structure(text, schema)
-                    if isinstance(raw, dict):
-                        return raw
-                except Exception:
-                    pass
-
-        # Fallback: detect and bucket by entity type
         label_to_schema_key = {
             "person": "persons", "email": "emails", "phone": "phones",
             "ssn": "ids", "credit_card": "financial", "address": "locations",
@@ -751,7 +751,7 @@ def make_handler(service: GLiNERService, max_chars: int):
                 self._write_json(
                     {
                         "ok": True,
-                        "provider": "fastino-ai/GLiNER2",
+                        "provider": "lmoe/gliner2-onnx",
                         "model": service.model_name,
                         "model_source": service.model_source,
                         "backend": service.backend,
@@ -868,7 +868,7 @@ def make_handler(service: GLiNERService, max_chars: int):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run local GLiNER2 HTTP inference server")
+    parser = argparse.ArgumentParser(description="Run local GLiNER2 ONNX HTTP inference server")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Model id/path (default: {DEFAULT_MODEL})")
     parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     parser.add_argument("--port", default=8765, type=int, help="Bind port (default: 8765)")
@@ -897,18 +897,18 @@ def main() -> None:
         return
 
     if not args.lazy_load:
-        print("Preloading GLiNER2 model into memory...")
+        print("Preloading GLiNER2 ONNX model into memory...")
         try:
             service.load_model()
         except Exception as exc:
             print(f"Model initialization error: {exc}", file=sys.stderr)
             raise SystemExit(2)
     else:
-        print("Lazy-load mode enabled: model loads on first detection request.")
+        print("Lazy-load mode enabled: ONNX model loads on first detection request.")
 
     handler = make_handler(service, args.max_chars)
     server = ThreadingHTTPServer((args.host, args.port), handler)
-    print(f"GLiNER2 local server listening on http://{args.host}:{args.port}")
+    print(f"GLiNER2 ONNX local server listening on http://{args.host}:{args.port}")
     print("Endpoints: GET /health, POST /detect, POST /anonymize, POST /classify, POST /structure")
     server.serve_forever()
 
