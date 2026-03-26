@@ -439,6 +439,18 @@ class SettingsManager {
         this.saveHfToken();
       }
     });
+    const toggleGuidance = () => {
+      const toggle = document.getElementById('mayaApiGuidanceToggle');
+      const body = document.getElementById('mayaApiGuidanceBody');
+      if (!toggle || !body) return;
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      body.hidden = expanded;
+    };
+    document.getElementById('mayaApiGuidanceToggle')?.addEventListener('click', toggleGuidance);
+    document.getElementById('mayaApiGuidanceToggle')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGuidance(); }
+    });
     document.getElementById('saveApiKeyButton').addEventListener('click', () => this.saveApiKey());
     document.getElementById('removeApiKeyButton').addEventListener('click', () => this.removeApiKey());
     document.getElementById('revealApiKeyButton').addEventListener('click', () => this.toggleApiKeyReveal());
@@ -938,6 +950,15 @@ class SettingsManager {
 
     savedState.hidden = !hasKey;
     inputState.hidden = hasKey;
+
+    // Collapse the guidance card when a key is already saved; expand when not.
+    const toggle = document.getElementById('mayaApiGuidanceToggle');
+    const body = document.getElementById('mayaApiGuidanceBody');
+    if (toggle && body) {
+      const shouldExpand = !hasKey;
+      toggle.setAttribute('aria-expanded', String(shouldExpand));
+      body.hidden = !shouldExpand;
+    }
 
     if (hasKey) {
       const preview = document.getElementById('apiKeyPreview');

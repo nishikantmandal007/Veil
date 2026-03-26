@@ -1408,7 +1408,21 @@ class PrivacyShield {
         if (item.maskIndex != null) this.sessionDecodeMap.set(this.getMaskText(item.label, item.maskIndex), original);
         this.sessionDecodeMap.set(this.getMaskText(item.label), original);
         if (item.alias) this.sessionDecodeMap.set(`<${item.alias}>`, original);
-        if (item.anonymizedText) this.sessionDecodeMap.set(item.anonymizedText, original);
+        if (item.anonymizedText) {
+          this.sessionDecodeMap.set(item.anonymizedText, original);
+          // Also persist sub-word mappings so individual words used by the AI
+          // (e.g. "Angela" from "Angela Antonio Arthur") are decoded after
+          // clearElementState wipes the active redaction state.
+          const fakeWords = item.anonymizedText.trim().split(/\s+/);
+          const realWords = original.trim().split(/\s+/);
+          if (fakeWords.length > 1 && fakeWords.length === realWords.length) {
+            fakeWords.forEach((word, idx) => {
+              if (word && !this.sessionDecodeMap.has(word)) {
+                this.sessionDecodeMap.set(word, realWords[idx]);
+              }
+            });
+          }
+        }
       });
       this._persistSessionDecodeMap();
       this.renderElement(element);
