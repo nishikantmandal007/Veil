@@ -88,7 +88,10 @@ const DEFAULT_SERVER_MODEL = 'fastino/gliner2-large-v1';
 const MODEL_SELECTION_ALIASES = {
   'fastino/gliner2-base-v1': DEFAULT_SERVER_MODEL
 };
-const VEIL_RELEASE_BASE_URL = 'https://github.com/nishikantmandal007/Veil/releases/latest/download';
+const VEIL_RELEASE_REPO_SLUG = 'nishikantmandal007/Veil';
+const VEIL_RELEASE_BASE_URL = `https://github.com/${VEIL_RELEASE_REPO_SLUG}/releases/latest/download`;
+const VEIL_RELEASE_PAGE_URL = `https://github.com/${VEIL_RELEASE_REPO_SLUG}/releases`;
+const VEIL_RELEASE_API_URL = `https://api.github.com/repos/${VEIL_RELEASE_REPO_SLUG}/releases/latest`;
 
 function normalizeSelectedModel(modelId) {
   const raw = String(modelId || '').trim();
@@ -199,6 +202,7 @@ class SettingsManager {
       pid: null
     };
     this.serverMeta = this.getDefaultServerMeta();
+    this.releaseInfo = this.getDefaultReleaseInfo();
     this.serverPollTimer = null;
     this.statsPollTimer = null;
     this.messageTimer = null;
@@ -222,6 +226,7 @@ class SettingsManager {
     }
     this.render();
     await this.loadPageStats();
+    await this.refreshReleaseInfo({ silent: true });
     await this.refreshServerStatus();
     await this.refreshServerLogs({ silent: true });
     this.startServerPolling();
@@ -463,6 +468,8 @@ class SettingsManager {
     document.getElementById('stopServerButton').addEventListener('click', () => this.stopServer());
     document.getElementById('toggleTerminalButton').addEventListener('click', () => this.toggleTerminalVisibility());
     document.getElementById('copyInstallCommandButton').addEventListener('click', () => this.copyInstallCommand());
+    document.getElementById('copyUpdateCommandButton')?.addEventListener('click', () => this.copyFromCode('serverUpdateCommand', 'copyUpdateCommandButton'));
+    document.getElementById('copyUninstallCommandButton')?.addEventListener('click', () => this.copyFromCode('nativeHostUninstallCommand', 'copyUninstallCommandButton'));
     document.getElementById('copyLogCommandButton').addEventListener('click', () => this.copyFromCode('logCommandText', 'copyLogCommandButton'));
     document.querySelector('.tool-tabs-bar').addEventListener('click', (event) => {
       const tab = event.target.closest('.tool-tab');
@@ -521,6 +528,7 @@ class SettingsManager {
 
     window.addEventListener('focus', () => {
       this.loadPageStats().catch(() => { });
+      this.refreshReleaseInfo({ silent: true }).catch(() => { });
     });
   }
 
@@ -554,6 +562,7 @@ class SettingsManager {
     this.renderServerDiagnostics();
     this.renderTerminalVisibility();
     this.renderServerToolsPanel();
+    this.renderReleaseInfo();
   }
 
   renderStatus() {
@@ -746,6 +755,147 @@ class SettingsManager {
       return `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm '${VEIL_RELEASE_BASE_URL}/install.ps1' | iex; Install-Veil -ExtensionId '${chrome.runtime.id}'"`;
     }
     return `curl -fsSL ${VEIL_RELEASE_BASE_URL}/install.sh | bash -s -- --extension-id ${chrome.runtime.id}`;
+  }
+
+  getNativeHostUninstallCommand() {
+    const platformOs = this.platformOs || this.detectPlatformOsFallback();
+    if (platformOs === 'win') {
+      return `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm '${VEIL_RELEASE_BASE_URL}/uninstall.ps1' | iex; Uninstall-Veil"`;
+    }
+    return `curl -fsSL ${VEIL_RELEASE_BASE_URL}/uninstall.sh | bash`;
+  }
+
+  getDefaultReleaseInfo() {
+    return {
+      status: 'idle',
+      latestTag: '',
+      publishedAt: '',
+      htmlUrl: VEIL_RELEASE_PAGE_URL,
+      available: false,
+      error: ''
+    };
+  }
+
+  normalizeVersionTag(tag) {
+    return String(tag || '').trim().replace(/^v/i, '');
+  }
+
+  parseVersionParts(tag) {
+    const normalized = this.normalizeVersionTag(tag);
+    const match = normalized.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+    if (!match) return null;
+    return match.slice(1, 4).map((part) => Number(part));
+  }
+
+  compareVersionParts(left, right) {
+    for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+      const lhs = Number(left[index] || 0);
+      const rhs = Number(right[index] || 0);
+      if (lhs > rhs) return 1;
+      if (lhs < rhs) return -1;
+    }
+    return 0;
+  }
+
+  isReleaseUpdateAvailable(tag) {
+    const manifestVersion = chrome.runtime.getManifest()?.version || '';
+    const latestParts = this.parseVersionParts(tag);
+    const currentParts = this.parseVersionParts(manifestVersion);
+    if (latestParts && currentParts) {
+      return this.compareVersionParts(latestParts, currentParts) > 0;
+    }
+    const normalizedTag = this.normalizeVersionTag(tag);
+    return Boolean(normalizedTag) && normalizedTag !== String(manifestVersion).trim();
+  }
+
+  formatReleaseTimestamp(value) {
+    if (!value) return 'Unknown';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString();
+  }
+
+  async refreshReleaseInfo(options = {}) {
+    const silent = Boolean(options.silent);
+    this.releaseInfo = {
+      ...this.releaseInfo,
+      status: 'loading',
+      error: ''
+    };
+    this.renderReleaseInfo();
+
+    try {
+      const response = await fetch(VEIL_RELEASE_API_URL, {
+        headers: { Accept: 'application/vnd.github+json' },
+        cache: 'no-store'
+      });
+      if (!response.ok) {
+        throw new Error(`GitHub release check failed (${response.status}).`);
+      }
+
+      const payload = await response.json();
+      const latestTag = String(payload?.tag_name || payload?.name || '').trim();
+      this.releaseInfo = {
+        status: 'ready',
+        latestTag,
+        publishedAt: String(payload?.published_at || payload?.created_at || '').trim(),
+        htmlUrl: String(payload?.html_url || VEIL_RELEASE_PAGE_URL).trim() || VEIL_RELEASE_PAGE_URL,
+        available: this.isReleaseUpdateAvailable(latestTag),
+        error: ''
+      };
+    } catch (error) {
+      this.releaseInfo = {
+        ...this.getDefaultReleaseInfo(),
+        status: 'error',
+        error: error?.message || 'GitHub release check failed.'
+      };
+      if (!silent) {
+        this.setMessage(this.releaseInfo.error, true);
+      }
+    }
+
+    this.renderReleaseInfo();
+  }
+
+  renderReleaseInfo() {
+    const updateCode = document.getElementById('serverUpdateCommand');
+    if (updateCode) updateCode.textContent = this.getNativeHostInstallCommand();
+
+    const uninstallCode = document.getElementById('nativeHostUninstallCommand');
+    if (uninstallCode) uninstallCode.textContent = this.getNativeHostUninstallCommand();
+
+    const releaseText = document.getElementById('releaseStatusText');
+    const releaseSubtext = document.getElementById('releaseStatusSubtext');
+    const releaseLink = document.getElementById('releaseLink');
+
+    if (releaseLink) {
+      releaseLink.href = this.releaseInfo.htmlUrl || VEIL_RELEASE_PAGE_URL;
+    }
+
+    if (!releaseText || !releaseSubtext) return;
+
+    if (this.releaseInfo.status === 'loading') {
+      releaseText.textContent = 'Checking GitHub for the latest release…';
+      releaseSubtext.textContent = 'Re-run this command after a new release to update the local server bundle while keeping your cache and local config.';
+      return;
+    }
+
+    if (this.releaseInfo.status === 'error') {
+      releaseText.textContent = 'GitHub release check unavailable right now.';
+      releaseSubtext.textContent = this.releaseInfo.error || 'You can still re-run the update command manually any time.';
+      return;
+    }
+
+    const latestTag = this.releaseInfo.latestTag || 'latest';
+    const published = this.formatReleaseTimestamp(this.releaseInfo.publishedAt);
+    if (this.releaseInfo.available) {
+      releaseText.textContent = `New GitHub release available: ${latestTag}`;
+      releaseSubtext.textContent = `Published ${published}. Re-run the update command below to refresh the local server bundle after you install or reload the latest extension release.`;
+      return;
+    }
+
+    releaseText.textContent = `Latest GitHub release: ${latestTag}`;
+    releaseSubtext.textContent = `Published ${published}. Re-running the update command still refreshes the local server bundle in place if you want to repair or resync it.`;
   }
 
   getDefaultServerMeta() {
@@ -1462,6 +1612,7 @@ class OnboardingWizard {
     this.sm = settingsManager;
     this.currentStep = 0;
     this.hostPollTimer = null;
+    this.hostDetected = false;
     this.overlay = document.getElementById('onboardingOverlay');
     if (!this.overlay) return;
     this.sm.wizard = this; // wire back so server state updates reach wizard
@@ -1498,7 +1649,13 @@ class OnboardingWizard {
       if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
     });
 
-    on('onboardingCheckHost', () => this._pollHostNow());
+    on('onboardingCheckHost', () => {
+      if (this.hostDetected) {
+        this._goToStep(2);
+        return;
+      }
+      this._pollHostNow();
+    });
 
     on('onboardingStartServerBtn', async () => {
       const btn = document.getElementById('onboardingStartServerBtn');
@@ -1526,10 +1683,22 @@ class OnboardingWizard {
       else if (dotIndex < index) dot.classList.add('is-done');
     });
 
-    if (index === 1) this._startHostPolling();
-    else this._stopHostPolling();
+    if (index === 1) {
+      this._populateInstallCmd();
+      this._setHostActionState(false);
+      this._startHostPolling();
+    } else {
+      this._stopHostPolling();
+    }
 
     if (index === 2) this._updateServerStep();
+  }
+
+  _setHostActionState(installed) {
+    this.hostDetected = Boolean(installed);
+    const button = document.getElementById('onboardingCheckHost');
+    if (!button) return;
+    button.textContent = installed ? 'Continue' : 'Check Again';
   }
 
   _startHostPolling() {
@@ -1545,12 +1714,12 @@ class OnboardingWizard {
     const statusEl = document.getElementById('onboardingHostStatus');
     const response = await this.sm.requestServerControl('status');
     const installed = response?.installed !== false && response?.success !== false;
+    this._setHostActionState(installed && response?.success);
     if (statusEl) {
       if (installed && response?.success) {
-        statusEl.textContent = '✓ Native host detected!';
+        statusEl.textContent = '✓ Native host detected. You can still copy the command above if you want it, then click Continue.';
         statusEl.className = 'onboarding-status-note is-ok';
         this._stopHostPolling();
-        setTimeout(() => this._goToStep(2), 800);
       } else {
         statusEl.textContent = 'Native host not found yet. Run the command above and click Check Again.';
         statusEl.className = 'onboarding-status-note';

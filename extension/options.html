@@ -150,7 +150,27 @@
               <button id="copyInstallCommandButton" type="button" class="ghost compact">Copy</button>
             </div>
             <pre class="cmd-box"><code id="nativeHostInstallCommand"></code></pre>
-            <p class="hint install-note">After install and extension reload, this block disappears automatically.</p>
+            <p class="hint install-note">After install and extension reload, this block disappears automatically. Re-running this same command later updates the local server bundle in place.</p>
+          </div>
+
+          <div class="install-block">
+            <div class="install-header">
+              <span class="install-title">Update local server</span>
+              <button id="copyUpdateCommandButton" type="button" class="ghost compact">Copy</button>
+            </div>
+            <pre class="cmd-box"><code id="serverUpdateCommand"></code></pre>
+            <p class="hint install-note" id="releaseStatusText">Checking GitHub for the latest release…</p>
+            <p class="hint install-note" id="releaseStatusSubtext">Re-run this command after a new release to update the local server bundle while keeping your cache and local config.</p>
+            <p class="hint install-note"><a id="releaseLink" href="#" target="_blank" rel="noreferrer">Open latest GitHub release</a></p>
+          </div>
+
+          <div class="install-block">
+            <div class="install-header">
+              <span class="install-title">Uninstall local server</span>
+              <button id="copyUninstallCommandButton" type="button" class="ghost compact">Copy</button>
+            </div>
+            <pre class="cmd-box"><code id="nativeHostUninstallCommand"></code></pre>
+            <p class="hint install-note">This removes the native bridge, autostart entry, and installed local server bundle from this machine.</p>
           </div>
         </div>
 

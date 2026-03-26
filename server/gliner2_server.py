@@ -69,6 +69,7 @@ CHUNK_OVERLAP = 80
 REPO_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = REPO_DIR / ".env"
 ANON_ENDPOINT_ENV_KEY = "MDP_ANONYMIZATION_ENDPOINT"
+DEFAULT_ANONYMIZATION_ENDPOINT = "https://app.mayadataprivacy.in/mdp/engine/anonymization"
 ANON_REQUEST_TIMEOUT_SEC = 10.0
 
 
@@ -135,7 +136,10 @@ def resolve_anonymization_endpoint() -> str:
         return direct
 
     file_values = parse_simple_env_file(ENV_FILE)
-    return str(file_values.get(ANON_ENDPOINT_ENV_KEY, "")).strip()
+    from_file = str(file_values.get(ANON_ENDPOINT_ENV_KEY, "")).strip()
+    if from_file:
+        return from_file
+    return DEFAULT_ANONYMIZATION_ENDPOINT
 
 
 def extract_bearer_token(header_value: str) -> str:

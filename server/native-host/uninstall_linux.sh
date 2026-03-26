@@ -11,7 +11,18 @@ remove_manifest() {
   fi
 }
 
-remove_manifest "${HOME}/.config/google-chrome/NativeMessagingHosts"
-remove_manifest "${HOME}/.config/chromium/NativeMessagingHosts"
+declare -a BROWSER_PATHS=(
+  "${HOME}/.config/google-chrome/NativeMessagingHosts"
+  "${HOME}/.config/chromium/NativeMessagingHosts"
+  "${HOME}/.snap/chromium/current/.config/chromium/NativeMessagingHosts"
+  "${HOME}/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+  "${HOME}/.config/microsoft-edge/NativeMessagingHosts"
+  "${HOME}/.config/vivaldi/NativeMessagingHosts"
+  "${HOME}/.config/opera/NativeMessagingHosts"
+)
+
+for path in "${BROWSER_PATHS[@]}"; do
+  remove_manifest "${path}"
+done
 
 echo "Native host manifests removed."

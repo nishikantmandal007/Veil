@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_SLUG="nishikantmandal007/Veil"
 RELEASE_BASE="https://github.com/${REPO_SLUG}/releases/latest/download"
 ASSET_NAME="veil-backend-unix.tar.gz"
+DEFAULT_ANON_ENDPOINT="https://app.mayadataprivacy.in/mdp/engine/anonymization"
 
 EXTENSION_ID=""
 INSTALL_DIR="${VEIL_INSTALL_DIR:-}"
@@ -56,8 +57,17 @@ curl -fsSL "${RELEASE_BASE}/${ASSET_NAME}" -o "${ARCHIVE_PATH}"
 mkdir -p "${EXTRACT_DIR}" "${INSTALL_DIR}"
 tar -xzf "${ARCHIVE_PATH}" -C "${EXTRACT_DIR}"
 
-find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 ! -name ".venv" ! -name ".runtime" -exec rm -rf {} +
+find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 ! -name ".venv" ! -name ".runtime" ! -name ".env" -exec rm -rf {} +
 cp -R "${EXTRACT_DIR}/." "${INSTALL_DIR}/"
+
+ENV_FILE="${INSTALL_DIR}/.env"
+if [[ ! -f "${ENV_FILE}" ]]; then
+  cat > "${ENV_FILE}" <<EOF
+MDP_ANONYMIZATION_ENDPOINT=${DEFAULT_ANON_ENDPOINT}
+EOF
+elif ! grep -q '^MDP_ANONYMIZATION_ENDPOINT=' "${ENV_FILE}"; then
+  printf '\nMDP_ANONYMIZATION_ENDPOINT=%s\n' "${DEFAULT_ANON_ENDPOINT}" >> "${ENV_FILE}"
+fi
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 is required but was not found in PATH." >&2
