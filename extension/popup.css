@@ -1552,16 +1552,90 @@ a.maya-link:hover { text-decoration: underline; }
 }
 
 /* Anonymize hint */
-.qs-hint {
+/* ─── Anonymize hint card ─── */
+.anonymize-hint-card {
+  display: flex;
+  gap: 10px;
+  margin: 8px 12px 4px;
+  padding: 12px 14px;
+  background: #F3EDF7;
+  border: 1px solid #CAC4D0;
+  border-radius: 12px;
+}
+
+.anon-hint-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.anon-hint-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.anon-hint-title {
   margin: 0;
-  padding: 8px 16px;
-  background: #FFF8E1;
-  border-bottom: 1px solid #FFECB3;
   font-size: 12px;
-  color: #5D4037;
-  font-weight: 400;
+  font-weight: 600;
+  color: #1D1B20;
   line-height: 1.4;
 }
+
+.anon-hint-example {
+  margin: 0;
+  font-size: 11px;
+  color: #49454F;
+  line-height: 1.4;
+}
+
+.anon-ex-real {
+  background: #FCE4EC;
+  color: #B71C1C;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.anon-ex-fake {
+  background: #E8F5E9;
+  color: #1B5E20;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.anon-hint-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #49454F;
+  line-height: 1.5;
+}
+
+.anon-hint-link {
+  color: #6750A4;
+  font-weight: 500;
+  text-decoration: none;
+}
+.anon-hint-link:hover { text-decoration: underline; }
+
+.anon-hint-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: #6750A4;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 150ms ease;
+}
+.anon-hint-settings-btn:hover { background: #5B4397; }
 
 /* ─── Redaction Key card ─── */
 .key-card {

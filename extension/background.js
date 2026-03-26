@@ -608,7 +608,10 @@ class GLiNERDetector {
     }
     detections.push(...this.detectWithCustomPatterns(text, customPatterns, threshold));
 
-    return this.mergeOverlapping(this.postProcessDetections(detections, threshold));
+    return this.mergeAdjacentSameLabel(
+      this.mergeOverlapping(this.postProcessDetections(detections, threshold)),
+      text
+    );
   }
 
   postProcessDetections(detections, threshold) {
@@ -914,6 +917,32 @@ class GLiNERDetector {
     const raw = String(flags || 'g');
     const filtered = raw.replace(/[^dgimsuvy]/g, '');
     return filtered.includes('g') ? filtered : `${filtered}g`;
+  }
+
+  mergeAdjacentSameLabel(detections, originalText) {
+    if (detections.length <= 1) return detections;
+    const result = [];
+    let current = { ...detections[0] };
+    for (let i = 1; i < detections.length; i++) {
+      const next = detections[i];
+      if (
+        current.label === next.label &&
+        next.start >= current.end &&
+        /^\s*$/.test(originalText.slice(current.end, next.start))
+      ) {
+        current = {
+          ...current,
+          end: next.end,
+          text: originalText.slice(current.start, next.end),
+          score: Math.max(current.score, next.score)
+        };
+      } else {
+        result.push(current);
+        current = { ...next };
+      }
+    }
+    result.push(current);
+    return result;
   }
 
   mergeOverlapping(detections) {
