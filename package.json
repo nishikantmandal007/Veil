@@ -11,7 +11,7 @@
     "remove-native-host-linux": "bash server/native-host/uninstall_linux.sh",
     "install-autostart-linux": "bash server/autostart/install_linux.sh",
     "remove-autostart-linux": "bash server/autostart/uninstall_linux.sh",
-    "status-autostart-linux": "systemctl --user --no-pager status privacy-shield-gliner.service",
+    "status-autostart-linux": "systemctl --user --no-pager status veil-gliner-server.service",
     "build": "echo 'No build step — load extension/ folder directly in Chrome'",
     "build:zip": "bash scripts/build_crx.sh",
     "build:backend-bundle": "uv run --no-sync python scripts/build_backend_bundle.py",

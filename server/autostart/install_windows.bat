@@ -9,12 +9,16 @@ popd
 
 set "VENV_PYTHON=%REPO_DIR%\.venv\Scripts\python.exe"
 set "SERVER_SCRIPT=%REPO_DIR%\server\gliner2_server.py"
-set "TASK_NAME=PrivacyShieldGLiNER2"
+set "TASK_NAME=Veil GLiNER Server"
+set "LEGACY_TASK_NAME=PrivacyShieldGLiNER2"
 
 if not exist "%VENV_PYTHON%" (
     echo ERROR: .venv not found. Run install_native_host_windows.bat first.
     exit /b 1
 )
+
+schtasks /delete /tn "%LEGACY_TASK_NAME%" /f >nul 2>&1
+schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1
 
 :: Create scheduled task to run at logon
 schtasks /create /tn "%TASK_NAME%" ^
@@ -27,7 +31,7 @@ if errorlevel 1 (
 )
 
 echo Scheduled task created: %TASK_NAME%
-echo The GLiNER2 server will start automatically at next login.
+echo The Veil GLiNER server will start automatically at next login.
 echo.
 echo To start it now (in a new window):
 echo   start "" "%VENV_PYTHON%" "%SERVER_SCRIPT%" --host 127.0.0.1 --port 8765

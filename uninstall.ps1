@@ -4,8 +4,12 @@ function Stop-VeilWindowsProcesses {
         [string]$InstallDir
     )
 
-    & schtasks /end /tn "PrivacyShieldGLiNER2" > $null 2>&1
-    $null = $LASTEXITCODE
+    foreach ($taskName in @("Veil GLiNER Server", "PrivacyShieldGLiNER2")) {
+        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($null -ne $task) {
+            Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null
+        }
+    }
 
     $patterns = @(
         [regex]::Escape((Join-Path $InstallDir "server\gliner2_server.py")),

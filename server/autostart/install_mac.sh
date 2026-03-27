@@ -4,7 +4,8 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_BIN="${REPO_DIR}/.venv/bin/python"
 PLIST_DIR="${HOME}/Library/LaunchAgents"
-PLIST_LABEL="com.privacyshield.gliner2"
+PLIST_LABEL="com.veil.gliner.server"
+LEGACY_PLIST_LABEL="com.privacyshield.gliner2"
 PLIST_FILE="${PLIST_DIR}/${PLIST_LABEL}.plist"
 LOG_FILE="${REPO_DIR}/.runtime/gliner2_server.log"
 
@@ -17,6 +18,12 @@ fi
 mkdir -p "${PLIST_DIR}"
 mkdir -p "${REPO_DIR}/.runtime"
 touch "${LOG_FILE}"
+
+LEGACY_PLIST_FILE="${PLIST_DIR}/${LEGACY_PLIST_LABEL}.plist"
+if [[ -f "${LEGACY_PLIST_FILE}" ]]; then
+  launchctl unload "${LEGACY_PLIST_FILE}" 2>/dev/null || true
+  rm -f "${LEGACY_PLIST_FILE}"
+fi
 
 cat > "${PLIST_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

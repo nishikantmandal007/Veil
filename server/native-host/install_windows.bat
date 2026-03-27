@@ -16,10 +16,12 @@ pushd "%REPO_DIR%"
 set "REPO_DIR=%CD%"
 popd
 
-set "HOST_NAME=com.privacyshield.gliner2"
+set "HOST_NAME=com.veil.gliner.server"
+set "LEGACY_HOST_NAME=com.privacyshield.gliner2"
 set "HOST_SCRIPT=%REPO_DIR%\server\native_host.py"
 set "LAUNCHER=%REPO_DIR%\server\native-host\native_host_win.bat"
 set "MANIFEST=%REPO_DIR%\server\native-host\%HOST_NAME%.json"
+set "LEGACY_MANIFEST=%REPO_DIR%\server\native-host\%LEGACY_HOST_NAME%.json"
 set "VENV_PYTHON=%REPO_DIR%\.venv\Scripts\python.exe"
 set "RUNTIME_DIR=%REPO_DIR%\.runtime"
 
@@ -40,6 +42,8 @@ echo @echo off
 echo "%VENV_PYTHON%" "%HOST_SCRIPT%"
 ) > "%LAUNCHER%"
 
+del "%LEGACY_MANIFEST%" >nul 2>&1
+
 :: Escape backslashes for JSON
 set "LAUNCHER_JSON=%LAUNCHER:\=\\%"
 
@@ -47,7 +51,7 @@ set "LAUNCHER_JSON=%LAUNCHER:\=\\%"
 (
 echo {
 echo   "name": "%HOST_NAME%",
-echo   "description": "Privacy Shield GLiNER2 Native Host",
+echo   "description": "Veil GLiNER Server Native Host",
 echo   "path": "%LAUNCHER_JSON%",
 echo   "type": "stdio",
 echo   "allowed_origins": [
@@ -56,8 +60,9 @@ echo   ]
 echo }
 ) > "%MANIFEST%"
 
-:: Escape manifest path for registry
-set "MANIFEST_REG=%MANIFEST:\=\\%"
+reg delete "HKCU\Software\Google\Chrome\NativeMessagingHosts\%LEGACY_HOST_NAME%" /f >nul 2>&1
+reg delete "HKCU\Software\Chromium\NativeMessagingHosts\%LEGACY_HOST_NAME%" /f >nul 2>&1
+reg delete "HKCU\Software\Microsoft\Edge\NativeMessagingHosts\%LEGACY_HOST_NAME%" /f >nul 2>&1
 
 :: Register for Chrome
 reg add "HKCU\Software\Google\Chrome\NativeMessagingHosts\%HOST_NAME%" /ve /t REG_SZ /d "%MANIFEST%" /f >nul

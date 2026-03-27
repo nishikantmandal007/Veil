@@ -36,14 +36,52 @@ function Get-VeilPythonVersion {
     }
 }
 
+function Get-VeilScheduledTaskNames {
+    return @(
+        "Veil GLiNER Server",
+        "PrivacyShieldGLiNER2"
+    )
+}
+
+function Stop-VeilScheduledTask {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TaskName
+    )
+
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($null -eq $task) {
+        return $false
+    }
+
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Out-Null
+    return $true
+}
+
+function Start-VeilScheduledTask {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TaskName
+    )
+
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($null -eq $task) {
+        return $false
+    }
+
+    Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Out-Null
+    return $true
+}
+
 function Stop-VeilWindowsProcesses {
     param(
         [Parameter(Mandatory = $true)]
         [string]$InstallDir
     )
 
-    & schtasks /end /tn "PrivacyShieldGLiNER2" > $null 2>&1
-    $null = $LASTEXITCODE
+    foreach ($taskName in Get-VeilScheduledTaskNames) {
+        Stop-VeilScheduledTask -TaskName $taskName | Out-Null
+    }
 
     $patterns = @(
         [regex]::Escape((Join-Path $InstallDir "server\gliner2_server.py")),
@@ -312,8 +350,11 @@ function Install-Veil {
 
         Invoke-VeilCommand -Command @((Join-Path $InstallDir "server\native-host\install_windows.bat"), $ExtensionId) -FailureMessage "Failed to register the Veil native host"
         Invoke-VeilCommand -Command @((Join-Path $InstallDir "server\autostart\install_windows.bat")) -FailureMessage "Failed to register Veil autostart"
-        & schtasks /run /tn "PrivacyShieldGLiNER2" | Out-Null
-        $null = $LASTEXITCODE
+        foreach ($taskName in Get-VeilScheduledTaskNames) {
+            if (Start-VeilScheduledTask -TaskName $taskName) {
+                break
+            }
+        }
 
         Write-Host ""
         Write-Host "Veil install complete."

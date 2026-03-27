@@ -4,7 +4,9 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_BIN="${REPO_DIR}/.venv/bin/python"
 SERVICE_DIR="${HOME}/.config/systemd/user"
-SERVICE_FILE="${SERVICE_DIR}/privacy-shield-gliner.service"
+SERVICE_NAME="veil-gliner-server.service"
+LEGACY_SERVICE_NAME="privacy-shield-gliner.service"
+SERVICE_FILE="${SERVICE_DIR}/${SERVICE_NAME}"
 LOG_FILE="${REPO_DIR}/.runtime/gliner2_server.log"
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
@@ -17,9 +19,14 @@ mkdir -p "${SERVICE_DIR}"
 mkdir -p "${REPO_DIR}/.runtime"
 touch "${LOG_FILE}"
 
+if systemctl --user list-unit-files | grep -q "^${LEGACY_SERVICE_NAME}$"; then
+  systemctl --user disable --now "${LEGACY_SERVICE_NAME}" || true
+fi
+rm -f "${SERVICE_DIR}/${LEGACY_SERVICE_NAME}"
+
 cat > "${SERVICE_FILE}" <<EOF
 [Unit]
-Description=Privacy Shield GLiNER2 Local Server
+Description=Veil GLiNER Server
 After=network-online.target
 Wants=network-online.target
 
@@ -42,8 +49,8 @@ WantedBy=default.target
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now privacy-shield-gliner.service
+systemctl --user enable --now "${SERVICE_NAME}"
 
-echo "Installed and started: privacy-shield-gliner.service"
+echo "Installed and started: ${SERVICE_NAME}"
 echo "Status:"
-systemctl --user --no-pager status privacy-shield-gliner.service || true
+systemctl --user --no-pager status "${SERVICE_NAME}" || true

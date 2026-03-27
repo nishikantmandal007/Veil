@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced the ad-hoc `venv + pip + requirements.txt` bootstrap path with a pinned `uv` runtime contract: `uv 0.10.7`, managed Python `3.11.11`, project metadata in `pyproject.toml`, and a committed `uv.lock` for deterministic installs.
 - Updated the Linux and Windows installers to provision Veil’s runtime inside the install directory, preserve `.env` and `.runtime`, rebuild incompatible environments in place, and stop Veil-owned processes before overwriting backend files.
 - Switched backend bundle creation to ship the uv metadata files required for offline-consistent runtime sync and removed the now-obsolete `requirements.txt` dependency definition.
+- Fixed the Windows PowerShell installer path that previously failed on fresh systems when `schtasks /end` was called for a missing legacy task, and migrated autostart/native-host identifiers from the old `PrivacyShield...` naming to Veil-branded names with cleanup for both generations during reinstall and uninstall.
 
 ### Native Host and Local Server Control
 

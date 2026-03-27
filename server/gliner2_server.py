@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local GLiNER2 inference bridge for the Privacy Shield extension.
+Local GLiNER2 inference bridge for the Veil extension.
 
 The service binds to localhost by default and never forwards prompt text to any
 external API except optional anonymization proxy requests made to a configured

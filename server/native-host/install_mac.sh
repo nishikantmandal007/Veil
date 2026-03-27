@@ -10,7 +10,8 @@ EXTENSION_ID="$1"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOST_SCRIPT="${REPO_DIR}/server/native_host.py"
 HOST_LAUNCHER="${REPO_DIR}/server/native-host/native_host_unix.sh"
-HOST_NAME="com.privacyshield.gliner2"
+HOST_NAME="com.veil.gliner.server"
+LEGACY_HOST_NAME="com.privacyshield.gliner2"
 RUNTIME_DIR="${REPO_DIR}/.runtime"
 
 if [[ ! -f "${HOST_SCRIPT}" ]]; then
@@ -36,11 +37,12 @@ fi
 write_manifest() {
   local target_dir="$1"
   mkdir -p "${target_dir}"
+  rm -f "${target_dir}/${LEGACY_HOST_NAME}.json"
   local manifest_file="${target_dir}/${HOST_NAME}.json"
   cat > "${manifest_file}" <<EOF
 {
   "name": "${HOST_NAME}",
-  "description": "Privacy Shield GLiNER2 Native Host",
+  "description": "Veil GLiNER Server Native Host",
   "path": "${HOST_LAUNCHER}",
   "type": "stdio",
   "allowed_origins": [

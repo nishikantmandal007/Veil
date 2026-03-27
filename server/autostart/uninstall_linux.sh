@@ -2,15 +2,17 @@
 set -euo pipefail
 
 SERVICE_DIR="${HOME}/.config/systemd/user"
-SERVICE_FILE="${SERVICE_DIR}/privacy-shield-gliner.service"
+remove_service() {
+  local service_name="$1"
+  local service_file="${SERVICE_DIR}/${service_name}"
+  if systemctl --user list-unit-files | grep -q "^${service_name}$"; then
+    systemctl --user disable --now "${service_name}" || true
+  fi
+  rm -f "${service_file}"
+}
 
-if systemctl --user list-unit-files | grep -q '^privacy-shield-gliner\.service'; then
-  systemctl --user disable --now privacy-shield-gliner.service || true
-fi
-
-if [[ -f "${SERVICE_FILE}" ]]; then
-  rm "${SERVICE_FILE}"
-fi
+remove_service "veil-gliner-server.service"
+remove_service "privacy-shield-gliner.service"
 
 systemctl --user daemon-reload
-echo "Removed privacy-shield-gliner.service"
+echo "Removed Veil GLiNER Server autostart units."

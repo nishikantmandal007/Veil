@@ -1,7 +1,21 @@
 @echo off
-schtasks /delete /tn "PrivacyShieldGLiNER2" /f >nul 2>&1
-if errorlevel 1 (
-    echo Task PrivacyShieldGLiNER2 not found.
-) else (
-    echo Removed scheduled task: PrivacyShieldGLiNER2
+setlocal
+set "REMOVED_ANY=0"
+
+call :remove_task "Veil GLiNER Server"
+call :remove_task "PrivacyShieldGLiNER2"
+
+if "%REMOVED_ANY%"=="0" (
+    echo Veil GLiNER Server scheduled task not found.
 )
+
+endlocal
+exit /b 0
+
+:remove_task
+schtasks /delete /tn "%~1" /f >nul 2>&1
+if not errorlevel 1 (
+    echo Removed scheduled task: %~1
+    set "REMOVED_ANY=1"
+)
+exit /b 0

@@ -23,7 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
 
-HOST_NAME = "com.privacyshield.gliner2"
+HOST_NAME = "com.veil.gliner.server"
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8765
 SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}/health"

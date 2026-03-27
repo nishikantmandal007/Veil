@@ -169,7 +169,7 @@ function normalizeCustomPatterns(storedPatterns, defaults) {
   return [...mergedDefaults, ...extras, ...customOnly];
 }
 
-class PrivacyShield {
+class VeilContentController {
   constructor() {
     this.settings = null;
     this.isEnabled = false;
@@ -2941,7 +2941,7 @@ class PrivacyShield {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new PrivacyShield());
+  document.addEventListener('DOMContentLoaded', () => new VeilContentController());
 } else {
-  new PrivacyShield();
+  new VeilContentController();
 }

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLIST_LABEL="com.privacyshield.gliner2"
-PLIST_FILE="${HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
+remove_plist() {
+  local plist_label="$1"
+  local plist_file="${HOME}/Library/LaunchAgents/${plist_label}.plist"
+  if [[ -f "${plist_file}" ]]; then
+    launchctl unload "${plist_file}" 2>/dev/null || true
+    rm -f "${plist_file}"
+    echo "Removed ${plist_file}"
+  fi
+}
 
-if [[ -f "${PLIST_FILE}" ]]; then
-  launchctl unload "${PLIST_FILE}" 2>/dev/null || true
-  rm -f "${PLIST_FILE}"
-  echo "Removed ${PLIST_FILE}"
-else
-  echo "LaunchAgent not found: ${PLIST_FILE}"
-fi
+remove_plist "com.veil.gliner.server"
+remove_plist "com.privacyshield.gliner2"

@@ -65,7 +65,7 @@ const DEFAULT_MONITORED_SELECTORS = [
   '.ProseMirror'
 ];
 
-const NATIVE_HOST_NAME = 'com.privacyshield.gliner2';
+const NATIVE_HOST_NAMES = ['com.veil.gliner.server', 'com.privacyshield.gliner2'];
 const MDP_DEFAULT_SEED = 'veil_' + Math.random().toString(36).slice(2, 10);
 
 const MDP_LABEL_CONFIG = Object.freeze({
@@ -484,12 +484,23 @@ function isNativeHostMissingError(message) {
 }
 
 function sendNativeHostMessage(payload) {
-  return new Promise((resolve, reject) => {
+  const tryHost = (index) => new Promise((resolve, reject) => {
+    const hostName = NATIVE_HOST_NAMES[index];
+    if (!hostName) {
+      reject(new Error('No response from native host.'));
+      return;
+    }
+
     try {
-      chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, payload, (response) => {
+      chrome.runtime.sendNativeMessage(hostName, payload, (response) => {
         const lastError = chrome.runtime.lastError;
         if (lastError) {
-          reject(new Error(lastError.message));
+          const error = new Error(lastError.message);
+          if (isNativeHostMissingError(error.message) && index < NATIVE_HOST_NAMES.length - 1) {
+            resolve(tryHost(index + 1));
+            return;
+          }
+          reject(error);
           return;
         }
         if (!response) {
@@ -506,6 +517,8 @@ function sendNativeHostMessage(payload) {
       reject(error);
     }
   });
+
+  return tryHost(0);
 }
 
 class GLiNERDetector {

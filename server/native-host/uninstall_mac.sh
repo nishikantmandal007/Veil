@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST_NAME="com.privacyshield.gliner2"
-
 remove_manifest() {
-  local manifest_file="$1/${HOST_NAME}.json"
-  if [[ -f "${manifest_file}" ]]; then
-    rm "${manifest_file}"
-    echo "Removed: ${manifest_file}"
-  fi
+  local target_dir="$1"
+  local host_name
+  for host_name in "com.veil.gliner.server" "com.privacyshield.gliner2"; do
+    local manifest_file="${target_dir}/${host_name}.json"
+    if [[ -f "${manifest_file}" ]]; then
+      rm "${manifest_file}"
+      echo "Removed: ${manifest_file}"
+    fi
+  done
 }
 
 declare -a BROWSER_PATHS=(
