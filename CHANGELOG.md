@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-03-27
+
+### Runtime and Packaging
+
+- Replaced the ad-hoc `venv + pip + requirements.txt` bootstrap path with a pinned `uv` runtime contract: `uv 0.10.7`, managed Python `3.11.11`, project metadata in `pyproject.toml`, and a committed `uv.lock` for deterministic installs.
+- Updated the Linux and Windows installers to provision Veil’s runtime inside the install directory, preserve `.env` and `.runtime`, rebuild incompatible environments in place, and stop Veil-owned processes before overwriting backend files.
+- Switched backend bundle creation to ship the uv metadata files required for offline-consistent runtime sync and removed the now-obsolete `requirements.txt` dependency definition.
+
+### Native Host and Local Server Control
+
+- Extended the native messaging host with explicit `restart` support, richer runtime metadata, and settings-page diagnostics for the managed Python path, pinned uv binary, and local port ownership state.
+- Tightened server lifecycle semantics so Veil only stops Veil-owned backend processes discovered from tracked PID state or Veil-specific command lines under the current install directory.
+- Added non-destructive port-conflict handling for `127.0.0.1:8765`: when another local process owns the port, Veil now reports the conflict in the settings UI instead of attempting to terminate it.
+- Added a dedicated Unix native-host launcher that always executes the Veil-managed interpreter, aligning Chrome native-messaging startup with the same local `.venv` used by manual start, autostart, and backend tests.
+
+### Settings Experience
+
+- Promoted the settings page into the primary post-install control surface by adding an explicit `Restart Server` action alongside the existing start/stop/refresh controls.
+- Expanded diagnostics to expose the active GLiNER2 model, runtime directory, managed interpreter version, uv version, log path, and live port state so runtime failures are debuggable without opening a terminal.
+- Carried forward the last 20 upstream commits’ release and installer work into a single technical release narrative: manual tag-based publishing, backend release metadata, richer update notices, improved popup/options server management, backend server tests, and hardened reinstall/uninstall paths.
+
+### Release Engineering and Tests
+
+- Migrated Python CI and release jobs to `astral-sh/setup-uv` and `uv sync --frozen`, so test and release workflows now validate the same locked runtime that end users install.
+- Added native-host unit coverage for port-conflict detection, ownership-safe stop behavior, and restart sequencing, plus popup/options E2E coverage for the new restart control.
+- Cleaned up release documentation so contributor setup, test commands, and manual release steps all reference the uv-managed runtime rather than the removed `requirements.txt` flow.
+
 ## [1.2.0] - 2026-03-27
 
 

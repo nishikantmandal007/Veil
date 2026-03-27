@@ -9,8 +9,8 @@ Everything you need to run Veil locally, make changes, and test them end-to-end.
 | Tool | Version |
 |------|---------|
 | Google Chrome (or Chromium) | 120+ |
-| Python | 3.10+ |
-| pip | latest |
+| uv | 0.10.7+ |
+| Python | 3.11.x |
 | Node.js (optional, for linting) | 18+ |
 
 ---
@@ -26,21 +26,17 @@ cd veil-extension
 
 ## 2. Start the GLiNER2 inference server
 
-The extension sends text to a local Python HTTP server for NER inference. No text ever leaves your machine.
+The extension sends text to a local Python HTTP server for NER inference. No text ever leaves your machine. Veil now uses a pinned `uv`-managed runtime instead of an ad-hoc `venv + pip` flow.
 
 ```bash
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r server/requirements.txt
+# Create/update the managed .venv from uv.lock
+npm run setup
 
 # (First run only) Download the model weights
-python server/download_model.py
+npm run download-gliner2
 
 # Start the server — listens on http://127.0.0.1:8765
-python server/server.py
+npm run run-gliner2
 ```
 
 You should see:
@@ -100,17 +96,18 @@ All three should exit silently (no output = no syntax errors).
 
 ```
 veil-extension/
-├── manifest.json          # MV3 extension manifest
-├── content.js             # Content script: DOM observation, PII render, UI
-├── background.js          # Service worker: detection, anonymisation, storage
-├── popup.html             # Extension popup markup
-├── popup.js               # Popup logic
-├── popup.css              # Popup styles
-├── styles.css             # In-page styles injected by content script
+├── extension/             # MV3 extension source
+│   ├── manifest.json
+│   ├── background.js
+│   ├── popup.html / popup.js / popup.css
+│   └── options.html / options.css
 ├── server/                # Local GLiNER2 Python server
-│   ├── server.py
-│   ├── download_model.py
-│   └── requirements.txt
+│   ├── gliner2_server.py
+│   ├── native_host.py
+│   ├── native-host/
+│   └── autostart/
+├── pyproject.toml         # Pinned Python dependency metadata
+├── uv.lock                # Locked Python dependency graph
 ├── docs/
 │   └── architecture.drawio
 ├── .github/
@@ -120,6 +117,8 @@ veil-extension/
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
+├── .python-version
+├── package.json
 ├── DEVELOPMENT.md         # ← you are here
 ├── SECURITY.md
 ├── LICENSE

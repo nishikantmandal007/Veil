@@ -12,6 +12,7 @@ fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOST_SCRIPT="${REPO_DIR}/server/native_host.py"
+HOST_LAUNCHER="${REPO_DIR}/server/native-host/native_host_unix.sh"
 HOST_NAME="com.privacyshield.gliner2"
 RUNTIME_DIR="${REPO_DIR}/.runtime"
 VENV_PYTHON="${REPO_DIR}/.venv/bin/python"
@@ -21,13 +22,19 @@ if [[ ! -f "${HOST_SCRIPT}" ]]; then
   exit 1
 fi
 
-chmod +x "${HOST_SCRIPT}"
+if [[ ! -f "${HOST_LAUNCHER}" ]]; then
+  echo "Error: Native host launcher not found: ${HOST_LAUNCHER}"
+  exit 1
+fi
+
+chmod +x "${HOST_SCRIPT}" "${HOST_LAUNCHER}"
 mkdir -p "${RUNTIME_DIR}/cache"
 touch "${RUNTIME_DIR}/gliner2_server.log"
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
-  python3 -m venv "${REPO_DIR}/.venv"
-  echo "Created virtual environment: ${REPO_DIR}/.venv"
+  echo "Error: Veil managed runtime not found at ${VENV_PYTHON}" >&2
+  echo "Run the Veil installer first so uv can provision the local runtime." >&2
+  exit 1
 fi
 
 # Build JSON allowed_origins array from all provided extension IDs
@@ -56,7 +63,7 @@ write_manifest() {
 {
   "name": "${HOST_NAME}",
   "description": "Privacy Shield GLiNER2 Native Host",
-  "path": "${HOST_SCRIPT}",
+  "path": "${HOST_LAUNCHER}",
   "type": "stdio",
   "allowed_origins": ${ORIGINS}
 }

@@ -621,8 +621,8 @@ class GLiNERService:
             from gliner2_onnx import GLiNER2ONNXRuntime
         except Exception as exc:
             raise RuntimeError(
-                "GLiNER2 ONNX import failed. Reinstall local deps in the project venv: "
-                "pip install -r requirements.txt"
+                "GLiNER2 ONNX import failed. Re-sync the managed runtime with "
+                "`uv sync --frozen --no-dev --no-install-project`."
             ) from exc
 
         normalized_model = normalize_model_name(self.model_name)

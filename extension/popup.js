@@ -199,7 +199,8 @@ class SettingsManager {
       installed: true,
       running: false,
       healthy: false,
-      pid: null
+      pid: null,
+      portConflict: false
     };
     this.serverMeta = this.getDefaultServerMeta();
     this.releaseInfo = this.getDefaultReleaseInfo();
@@ -466,6 +467,7 @@ class SettingsManager {
     });
     document.getElementById('startServerButton').addEventListener('click', () => this.startServer());
     document.getElementById('stopServerButton').addEventListener('click', () => this.stopServer());
+    document.getElementById('restartServerButton')?.addEventListener('click', () => this.restartServer());
     document.getElementById('toggleTerminalButton').addEventListener('click', () => this.toggleTerminalVisibility());
     document.getElementById('copyInstallCommandButton').addEventListener('click', () => this.copyInstallCommand());
     document.getElementById('copyUpdateCommandButton')?.addEventListener('click', () => this.copyFromCode('serverUpdateCommand', 'copyUpdateCommandButton'));
@@ -619,6 +621,11 @@ class SettingsManager {
       sub.textContent = 'Native host missing. Install once for one-click server control.';
       return;
     }
+    if (this.serverState.portConflict) {
+      text.textContent = 'Active (Port Busy)';
+      sub.textContent = 'Another local process owns port 8765. Veil will not stop it automatically.';
+      return;
+    }
     if (this.serverState.running && !this.serverState.healthy) {
       text.textContent = 'Active (Connecting)';
       sub.textContent = 'Local server process is starting.';
@@ -732,19 +739,24 @@ class SettingsManager {
   renderServerButtons() {
     const startButton = document.getElementById('startServerButton');
     const stopButton = document.getElementById('stopServerButton');
+    const restartButton = document.getElementById('restartServerButton');
     const refreshButton = document.getElementById('refreshServerButton');
     if (!startButton || !stopButton || !refreshButton) return;
 
     if (this.serverBusy) {
       startButton.disabled = true;
       stopButton.disabled = true;
+      if (restartButton) restartButton.disabled = true;
       refreshButton.disabled = true;
       return;
     }
 
     const running = Boolean(this.serverState.running);
-    startButton.disabled = running;
+    const installed = this.serverState.installed !== false;
+    const portConflict = Boolean(this.serverState.portConflict);
+    startButton.disabled = running || !installed || portConflict;
     stopButton.disabled = !running;
+    if (restartButton) restartButton.disabled = !running || !installed || portConflict;
     refreshButton.disabled = false;
   }
 
@@ -1015,6 +1027,12 @@ class SettingsManager {
       logFile: '.runtime/gliner2_server.log',
       logCommand: 'tail -n 80 .runtime/gliner2_server.log',
       runtimeDir: '.runtime',
+      runtimePython: '.venv/bin/python',
+      runtimePythonVersion: null,
+      uvBinary: null,
+      uvVersion: null,
+      uvPinnedVersion: null,
+      pythonPinnedVersion: null,
       modelOverride: null,
       bundleReleaseTag: null,
       bundleReleasePublishedAt: null,
@@ -1040,6 +1058,32 @@ class SettingsManager {
     document.getElementById('logFileText').textContent = String(this.serverMeta.logFile || '.runtime/gliner2_server.log');
     document.getElementById('logCommandText').textContent = String(this.serverMeta.logCommand || 'tail -n 80 .runtime/gliner2_server.log');
     document.getElementById('runtimeDirText').textContent = String(this.serverMeta.runtimeDir || '.runtime');
+    const runtimePython = document.getElementById('runtimePythonText');
+    if (runtimePython) {
+      const runtimeValue = this.serverMeta.runtimePythonVersion
+        ? `${this.serverMeta.runtimePython || '.venv/bin/python'} (${this.serverMeta.runtimePythonVersion})`
+        : String(this.serverMeta.runtimePython || '.venv/bin/python');
+      runtimePython.textContent = runtimeValue;
+    }
+    const uvBinary = document.getElementById('uvBinaryText');
+    if (uvBinary) {
+      const uvValue = this.serverMeta.uvVersion
+        ? `${this.serverMeta.uvVersion} · ${this.serverMeta.uvBinary || 'managed locally'}`
+        : `Pinned ${this.serverMeta.uvPinnedVersion || 'uv'} pending install`;
+      uvBinary.textContent = uvValue;
+    }
+    const portStatus = document.getElementById('portStatusText');
+    if (portStatus) {
+      if (this.serverState.portConflict) {
+        portStatus.textContent = 'Occupied by another local process';
+      } else if (this.serverState.running && this.serverState.healthy) {
+        portStatus.textContent = `Veil server online${this.serverState.pid ? ` (PID ${this.serverState.pid})` : ''}`;
+      } else if (this.serverState.running) {
+        portStatus.textContent = 'Veil server starting';
+      } else {
+        portStatus.textContent = 'Available';
+      }
+    }
   }
 
   setCopyButtonState(label = 'Copy', copied = false) {
@@ -1288,7 +1332,8 @@ class SettingsManager {
       installed: payload.installed !== false,
       running: Boolean(payload.running),
       healthy: Boolean(payload.healthy),
-      pid: payload.pid || null
+      pid: payload.pid || null,
+      portConflict: Boolean(payload.portConflict)
     };
     if (!this.serverState.installed) {
       this.setServerPhase('disconnected');
@@ -1338,7 +1383,8 @@ class SettingsManager {
       installed,
       running: Boolean(response.running),
       healthy: Boolean(response.healthy),
-      pid: response.pid
+      pid: response.pid,
+      portConflict: Boolean(response.portConflict)
     });
   }
 
@@ -1387,7 +1433,8 @@ class SettingsManager {
       installed,
       running: Boolean(response.running),
       healthy: Boolean(response.healthy),
-      pid: response.pid
+      pid: response.pid,
+      portConflict: Boolean(response.portConflict)
     });
     this.appendTerminalLine(response.message || 'Server started.');
     await this.refreshServerLogs({ silent: true });
@@ -1428,11 +1475,50 @@ class SettingsManager {
       installed,
       running: Boolean(response.running),
       healthy: Boolean(response.healthy),
-      pid: response.pid
+      pid: response.pid,
+      portConflict: Boolean(response.portConflict)
     });
     this.appendTerminalLine(response.message || 'Server stopped.');
     await this.refreshServerLogs({ silent: true });
     this.setMessage(response.message || 'Server stopped.');
+  }
+
+  async restartServer() {
+    if (this.serverBusy) return;
+    const hfToken = this.getInputHfToken() || this.localSecrets.hfToken || '';
+    this.setServerPhase('connecting');
+    this.appendTerminalLine('Restart requested. Recycling local GLiNER2 server...');
+    this.setServerButtonsDisabled(true);
+    const response = await this.requestServerControl('restart', {
+      installDeps: true,
+      downloadModel: true,
+      hfToken,
+      modelId: this.selectedModel
+    });
+    this.setServerButtonsDisabled(false);
+
+    if (!response?.success) {
+      this.setServerPhase('disconnected');
+      this.appendTerminalLine(`Restart failed: ${response?.error || 'unknown error'}`);
+      this.setMessage(response?.error || 'Unable to restart server.', true);
+      await this.refreshServerStatus();
+      await this.refreshServerLogs({ silent: true });
+      return;
+    }
+
+    const installed = response.installed !== false;
+    this.updateServerMeta(response);
+    this.renderNativeHostInstallBlock(installed);
+    this.updateServerState({
+      installed,
+      running: Boolean(response.running),
+      healthy: Boolean(response.healthy),
+      pid: response.pid,
+      portConflict: Boolean(response.portConflict)
+    });
+    this.appendTerminalLine(response.message || 'Server restarted.');
+    await this.refreshServerLogs({ silent: true });
+    this.setMessage(response.message || 'Server restarted.');
   }
 
   updateSetting(key, value) {

@@ -209,6 +209,7 @@
         <div class="button-row">
           <button id="startServerButton" type="button">Start Server</button>
           <button id="stopServerButton" type="button" class="secondary">Stop Server</button>
+          <button id="restartServerButton" type="button" class="secondary">Restart Server</button>
           <button id="refreshServerButton" type="button" class="ghost">Refresh</button>
         </div>
         <div class="install-block" id="nativeHostInstallBlock" hidden>
@@ -311,8 +312,20 @@
               <code class="diag-value" id="runtimeDirText">.runtime</code>
             </div>
             <div class="diag-row">
+              <span class="diag-key">Runtime Python</span>
+              <code class="diag-value" id="runtimePythonText">.venv/bin/python</code>
+            </div>
+            <div class="diag-row">
+              <span class="diag-key">Pinned uv</span>
+              <code class="diag-value" id="uvBinaryText">uv unavailable</code>
+            </div>
+            <div class="diag-row">
               <span class="diag-key">Log File</span>
               <code class="diag-value" id="logFileText">.runtime/gliner2_server.log</code>
+            </div>
+            <div class="diag-row">
+              <span class="diag-key">Port 8765</span>
+              <code class="diag-value" id="portStatusText">Available</code>
             </div>
             <div class="diag-cmd">
               <div class="install-header">

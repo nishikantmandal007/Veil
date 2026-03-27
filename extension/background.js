@@ -1055,6 +1055,21 @@ async function handleServerControl(command, options = {}) {
       return { success: true, ...response, detectionMode: detector.mode };
     }
 
+    if (command === 'restart') {
+      const hfToken = typeof options.hfToken === 'string' ? options.hfToken.trim() : '';
+      const modelId = typeof options.modelId === 'string' ? options.modelId.trim() : '';
+      const payload = {
+        action: 'restart',
+        installDeps: options.installDeps !== false,
+        downloadModel: options.downloadModel !== false
+      };
+      if (hfToken) payload.hfToken = hfToken;
+      if (modelId) payload.modelId = modelId;
+      const response = await sendNativeHostMessage(payload);
+      await detector.initialize(true);
+      return { success: true, ...response, detectionMode: detector.mode };
+    }
+
     return { success: false, error: `Unknown server control command: ${command}` };
   } catch (error) {
     if (isNativeHostMissingError(error.message)) {

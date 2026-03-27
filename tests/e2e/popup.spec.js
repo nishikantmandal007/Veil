@@ -120,6 +120,18 @@ test.describe('Onboarding Wizard', () => {
     });
 });
 
+test.describe('Server Controls UI', () => {
+    test('Start Server button is visible', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+        await expect(page.locator('#startServerButton')).toBeVisible();
+    });
+
+    test('Restart Server button is visible', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+        await expect(page.locator('#restartServerButton')).toBeVisible();
+    });
+});
+
 test.describe('Server Status (with mock server)', () => {
     let mockServer;
 
@@ -129,11 +141,6 @@ test.describe('Server Status (with mock server)', () => {
 
     test.afterEach(async () => {
         if (mockServer) await stopMockServer(mockServer); // stopMockServer handles null safely
-    });
-
-    test('Start Server button is visible', async ({ extensionOptions }) => {
-        const { page } = extensionOptions;
-        await expect(page.locator('#startServerButton')).toBeVisible();
     });
 
     test('status dot gets active class when server is healthy', async ({ extensionOptions }) => {

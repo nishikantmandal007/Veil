@@ -1,4 +1,0 @@
-# GLiNER2 ONNX runtime.
-# This keeps the local server Python-based while avoiding the heavyweight
-# PyTorch dependency chain.
-gliner2-onnx>=0.1.1

@@ -23,19 +23,10 @@ set "MANIFEST=%REPO_DIR%\server\native-host\%HOST_NAME%.json"
 set "VENV_PYTHON=%REPO_DIR%\.venv\Scripts\python.exe"
 set "RUNTIME_DIR=%REPO_DIR%\.runtime"
 
-:: Check Python
-where python >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Python not found. Install Python 3.10+ from https://python.org and add to PATH.
-    exit /b 1
-)
-
-:: Create venv if needed
 if not exist "%VENV_PYTHON%" (
-    echo Creating virtual environment...
-    python -m venv "%REPO_DIR%\.venv"
-    if errorlevel 1 ( echo ERROR: Failed to create venv & exit /b 1 )
-    echo Virtual environment created: %REPO_DIR%\.venv
+    echo ERROR: Veil managed runtime not found at %VENV_PYTHON%
+    echo Run the Veil installer first so uv can provision the local runtime.
+    exit /b 1
 )
 
 :: Create runtime dirs
@@ -85,5 +76,5 @@ echo Native host installed for extension: %EXTENSION_ID%
 echo Manifest:  %MANIFEST%
 echo Launcher:  %LAUNCHER%
 echo.
-echo Next step: run install_autostart_windows.bat to start GLiNER2 at login.
+echo Next step: run install_autostart_windows.bat to register Veil autostart at login.
 endlocal
