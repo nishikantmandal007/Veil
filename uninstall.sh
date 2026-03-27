@@ -3,6 +3,37 @@ set -euo pipefail
 
 INSTALL_DIR="${VEIL_INSTALL_DIR:-}"
 
+kill_veil_processes() {
+  local install_dir="$1"
+  local -a patterns=(
+    "${install_dir}/server/gliner2_server.py"
+    "${install_dir}/server/native_host.py"
+    "${install_dir}/server/native-host/native_host_unix.sh"
+    "${install_dir}/server/native-host/native_host_win.bat"
+  )
+  local -a pids=()
+  while IFS= read -r line; do
+    local pid cmd pattern
+    pid="${line%% *}"
+    cmd="${line#* }"
+    for pattern in "${patterns[@]}"; do
+      if [[ "${cmd}" == *"${pattern}"* ]]; then
+        pids+=("${pid}")
+        break
+      fi
+    done
+  done < <(ps -eo pid=,args=)
+
+  local pid
+  for pid in "${pids[@]}"; do
+    kill "${pid}" >/dev/null 2>&1 || true
+  done
+  sleep 1
+  for pid in "${pids[@]}"; do
+    kill -0 "${pid}" >/dev/null 2>&1 && kill -KILL "${pid}" >/dev/null 2>&1 || true
+  done
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-dir)
@@ -36,13 +67,14 @@ fi
 echo "Removing Veil local server from ${INSTALL_DIR}..."
 
 if [[ "${PLATFORM}" == "linux" ]]; then
-  [[ -f "${INSTALL_DIR}/server/autostart/uninstall_linux.sh" ]] && bash "${INSTALL_DIR}/server/autostart/uninstall_linux.sh"
-  [[ -f "${INSTALL_DIR}/server/native-host/uninstall_linux.sh" ]] && bash "${INSTALL_DIR}/server/native-host/uninstall_linux.sh"
+  [[ -f "${INSTALL_DIR}/server/autostart/uninstall_linux.sh" ]] && bash "${INSTALL_DIR}/server/autostart/uninstall_linux.sh" || true
+  [[ -f "${INSTALL_DIR}/server/native-host/uninstall_linux.sh" ]] && bash "${INSTALL_DIR}/server/native-host/uninstall_linux.sh" || true
 else
-  [[ -f "${INSTALL_DIR}/server/autostart/uninstall_mac.sh" ]] && bash "${INSTALL_DIR}/server/autostart/uninstall_mac.sh"
-  [[ -f "${INSTALL_DIR}/server/native-host/uninstall_mac.sh" ]] && bash "${INSTALL_DIR}/server/native-host/uninstall_mac.sh"
+  [[ -f "${INSTALL_DIR}/server/autostart/uninstall_mac.sh" ]] && bash "${INSTALL_DIR}/server/autostart/uninstall_mac.sh" || true
+  [[ -f "${INSTALL_DIR}/server/native-host/uninstall_mac.sh" ]] && bash "${INSTALL_DIR}/server/native-host/uninstall_mac.sh" || true
 fi
 
+kill_veil_processes "${INSTALL_DIR}"
 rm -rf "${INSTALL_DIR}"
 
 echo

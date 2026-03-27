@@ -19,7 +19,13 @@ INSTALLER_FILES = [
     ROOT / "uninstall.sh",
     ROOT / "uninstall.ps1",
 ]
-INCLUDE_PATHS = [ROOT / "server", ROOT / "requirements.txt", ROOT / "LICENSE"]
+INCLUDE_PATHS = [
+    ROOT / "server",
+    ROOT / "pyproject.toml",
+    ROOT / "uv.lock",
+    ROOT / ".python-version",
+    ROOT / "LICENSE",
+]
 SKIP_DIRS = {"__pycache__", ".pytest_cache"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".DS_Store"}
 

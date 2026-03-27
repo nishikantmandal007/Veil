@@ -177,6 +177,7 @@ To enable, add your MAYA DATA PRIVACY API key under Advanced Settings in the ext
 ## Testing
 
 ```bash
+npm run setup               # pinned uv + Python 3.11 runtime sync
 npm run test:unit           # JavaScript unit tests
 npm run test:unit:python    # Python unit tests (pytest)
 npm run test:e2e            # Playwright end-to-end tests (headless)
@@ -192,14 +193,14 @@ npm run build:zip
 # → dist/veil-extension.zip  ready for Chrome Web Store upload
 ```
 
-Releases are cut manually from `main` with a semver tag such as `v1.2.0`.
-Before tagging, make sure `package.json`, `package-lock.json`, `extension/manifest.json`, and `CHANGELOG.md` already contain the same release version on `main`.
+Releases are cut manually from `main` with a semver tag such as `v1.2.1`.
+Before tagging, make sure `package.json`, `package-lock.json`, `extension/manifest.json`, `pyproject.toml`, `uv.lock`, and `CHANGELOG.md` already contain the same release version on `main`.
 
 ```bash
 git checkout main
 git pull origin main
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.2.1
+git push origin v1.2.1
 ```
 
 Pushing the `v*` tag triggers the release workflow, which first verifies the version metadata, then runs the JavaScript, Python, and Playwright test suites, and finally uploads the extension zip plus backend installer assets to the GitHub release for that tag.

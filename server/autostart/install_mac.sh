@@ -10,9 +10,7 @@ LOG_FILE="${REPO_DIR}/.runtime/gliner2_server.log"
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   echo "Missing virtualenv python: ${PYTHON_BIN}"
-  echo "Create it first:"
-  echo "  cd ${REPO_DIR}"
-  echo "  python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  echo "Run the Veil installer first so uv can provision the managed runtime."
   exit 1
 fi
 

@@ -6,9 +6,163 @@ RELEASE_BASE="https://github.com/${REPO_SLUG}/releases/latest/download"
 RELEASE_API="https://api.github.com/repos/${REPO_SLUG}/releases/latest"
 ASSET_NAME="veil-backend-unix.tar.gz"
 DEFAULT_ANON_ENDPOINT="https://app.mayadataprivacy.in/mdp/engine/anonymization"
+PINNED_UV_VERSION="0.10.7"
+PINNED_PYTHON_VERSION="3.11.11"
 
 EXTENSION_ID=""
 INSTALL_DIR="${VEIL_INSTALL_DIR:-}"
+RECREATE_VENV=0
+UV_VERSION="${VEIL_UV_VERSION:-${PINNED_UV_VERSION}}"
+UV_BIN_OVERRIDE=""
+UV_BIN=""
+
+fail() {
+  echo "$1" >&2
+  exit 1
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+python_version_of() {
+  local python_bin="$1"
+  if [[ ! -x "${python_bin}" ]]; then
+    return 1
+  fi
+  "${python_bin}" -c "import sys; print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null || true
+}
+
+kill_veil_processes() {
+  local install_dir="$1"
+  local -a patterns=(
+    "${install_dir}/server/gliner2_server.py"
+    "${install_dir}/server/native_host.py"
+    "${install_dir}/server/native-host/native_host_unix.sh"
+    "${install_dir}/server/native-host/native_host_win.bat"
+  )
+  local -a pids=()
+  while IFS= read -r line; do
+    local pid cmd pattern
+    pid="${line%% *}"
+    cmd="${line#* }"
+    for pattern in "${patterns[@]}"; do
+      if [[ "${cmd}" == *"${pattern}"* ]]; then
+        pids+=("${pid}")
+        break
+      fi
+    done
+  done < <(ps -eo pid=,args=)
+
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  local pid
+  for pid in "${pids[@]}"; do
+    kill "${pid}" >/dev/null 2>&1 || true
+  done
+  sleep 1
+  for pid in "${pids[@]}"; do
+    kill -0 "${pid}" >/dev/null 2>&1 && kill -KILL "${pid}" >/dev/null 2>&1 || true
+  done
+}
+
+remove_install_contents() {
+  local install_dir="$1"
+  find "${install_dir}" -mindepth 1 -maxdepth 1 ! -name ".venv" ! -name ".runtime" ! -name ".env" -exec rm -rf {} +
+}
+
+stamp_release_metadata() {
+  local release_info_path="$1"
+  local target_path="$2"
+  local installed_at tag published html_url payload
+  installed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  if [[ ! -f "${release_info_path}" ]]; then
+    cat > "${target_path}" <<EOF
+{
+  "tag": "",
+  "published_at": "",
+  "html_url": "",
+  "repository": "${REPO_SLUG}",
+  "installed_at": "${installed_at}"
+}
+EOF
+    return 0
+  fi
+
+  payload="$(tr -d '\n' < "${release_info_path}")"
+  tag="$(printf '%s' "${payload}" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+  published="$(printf '%s' "${payload}" | sed -n 's/.*"published_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+  html_url="$(printf '%s' "${payload}" | sed -n 's/.*"html_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+  cat > "${target_path}" <<EOF
+{
+  "tag": "$(json_escape "${tag}")",
+  "published_at": "$(json_escape "${published}")",
+  "html_url": "$(json_escape "${html_url}")",
+  "repository": "${REPO_SLUG}",
+  "installed_at": "${installed_at}"
+}
+EOF
+}
+
+ensure_local_uv() {
+  if [[ -n "${UV_BIN_OVERRIDE}" ]]; then
+    [[ -x "${UV_BIN_OVERRIDE}" ]] || fail "Specified uv binary is not executable: ${UV_BIN_OVERRIDE}"
+    UV_BIN="${UV_BIN_OVERRIDE}"
+    return 0
+  fi
+
+  local uv_install_dir="${INSTALL_DIR}/.runtime/tools/uv"
+  local uv_candidate="${uv_install_dir}/uv"
+  local current_version=""
+  mkdir -p "${uv_install_dir}"
+
+  if [[ -x "${uv_candidate}" ]]; then
+    current_version="$("${uv_candidate}" --version 2>/dev/null || true)"
+  fi
+
+  if [[ "${current_version}" != "uv ${UV_VERSION}" ]]; then
+    local installer_path="${TMP_DIR}/uv-install.sh"
+    curl -fsSL "https://astral.sh/uv/${UV_VERSION}/install.sh" -o "${installer_path}"
+    env UV_UNMANAGED_INSTALL="${uv_install_dir}" UV_NO_MODIFY_PATH=1 sh "${installer_path}"
+  fi
+
+  [[ -x "${uv_candidate}" ]] || fail "Failed to install pinned uv ${UV_VERSION} into ${uv_install_dir}"
+  UV_BIN="${uv_candidate}"
+}
+
+sync_runtime() {
+  local runtime_dir="${INSTALL_DIR}/.runtime"
+  local venv_python="${INSTALL_DIR}/.venv/bin/python"
+  local venv_version=""
+
+  if (( RECREATE_VENV == 1 )) && [[ -d "${INSTALL_DIR}/.venv" ]]; then
+    rm -rf "${INSTALL_DIR}/.venv"
+  fi
+
+  if [[ -x "${venv_python}" ]]; then
+    venv_version="$(python_version_of "${venv_python}")"
+    if [[ -z "${venv_version}" || "${venv_version}" != 3.11.* ]]; then
+      rm -rf "${INSTALL_DIR}/.venv"
+    fi
+  fi
+
+  env \
+    UV_CACHE_DIR="${runtime_dir}/cache/uv" \
+    UV_PYTHON_INSTALL_DIR="${runtime_dir}/python" \
+    UV_PROJECT_ENVIRONMENT="${INSTALL_DIR}/.venv" \
+    UV_LINK_MODE=copy \
+    "${UV_BIN}" python install "${PINNED_PYTHON_VERSION}" --install-dir "${runtime_dir}/python"
+
+  env \
+    UV_CACHE_DIR="${runtime_dir}/cache/uv" \
+    UV_PYTHON_INSTALL_DIR="${runtime_dir}/python" \
+    UV_PROJECT_ENVIRONMENT="${INSTALL_DIR}/.venv" \
+    UV_LINK_MODE=copy \
+    "${UV_BIN}" sync --frozen --no-dev --no-install-project --directory "${INSTALL_DIR}" --python "${PINNED_PYTHON_VERSION}" --managed-python
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,16 +174,26 @@ while [[ $# -gt 0 ]]; do
       INSTALL_DIR="${2:-}"
       shift 2
       ;;
+    --recreate-venv)
+      RECREATE_VENV=1
+      shift
+      ;;
+    --uv-version)
+      UV_VERSION="${2:-}"
+      shift 2
+      ;;
+    --uv-bin)
+      UV_BIN_OVERRIDE="${2:-}"
+      shift 2
+      ;;
     *)
-      echo "Unknown argument: $1" >&2
-      exit 1
+      fail "Unknown argument: $1"
       ;;
   esac
 done
 
 if [[ -z "${EXTENSION_ID}" ]]; then
-  echo "Usage: curl .../install.sh | bash -s -- --extension-id <EXTENSION_ID> [--install-dir <dir>]" >&2
-  exit 1
+  fail "Usage: curl .../install.sh | bash -s -- --extension-id <EXTENSION_ID> [--install-dir <dir>] [--recreate-venv]"
 fi
 
 OS_NAME="$(uname -s)"
@@ -37,8 +201,7 @@ case "${OS_NAME}" in
   Linux*) PLATFORM="linux"; DEFAULT_INSTALL_DIR="${HOME}/.local/share/veil" ;;
   Darwin*) PLATFORM="mac"; DEFAULT_INSTALL_DIR="${HOME}/Library/Application Support/Veil" ;;
   *)
-    echo "Unsupported OS for install.sh: ${OS_NAME}" >&2
-    exit 1
+    fail "Unsupported OS for install.sh: ${OS_NAME}"
     ;;
 esac
 
@@ -58,7 +221,16 @@ curl -fsSL "${RELEASE_BASE}/${ASSET_NAME}" -o "${ARCHIVE_PATH}"
 mkdir -p "${EXTRACT_DIR}" "${INSTALL_DIR}"
 tar -xzf "${ARCHIVE_PATH}" -C "${EXTRACT_DIR}"
 
-find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 ! -name ".venv" ! -name ".runtime" ! -name ".env" -exec rm -rf {} +
+if [[ "${PLATFORM}" == "linux" ]]; then
+  [[ -f "${INSTALL_DIR}/server/autostart/uninstall_linux.sh" ]] && bash "${INSTALL_DIR}/server/autostart/uninstall_linux.sh" || true
+  [[ -f "${INSTALL_DIR}/server/native-host/uninstall_linux.sh" ]] && bash "${INSTALL_DIR}/server/native-host/uninstall_linux.sh" || true
+else
+  [[ -f "${INSTALL_DIR}/server/autostart/uninstall_mac.sh" ]] && bash "${INSTALL_DIR}/server/autostart/uninstall_mac.sh" || true
+  [[ -f "${INSTALL_DIR}/server/native-host/uninstall_mac.sh" ]] && bash "${INSTALL_DIR}/server/native-host/uninstall_mac.sh" || true
+fi
+
+kill_veil_processes "${INSTALL_DIR}"
+remove_install_contents "${INSTALL_DIR}"
 cp -R "${EXTRACT_DIR}/." "${INSTALL_DIR}/"
 
 ENV_FILE="${INSTALL_DIR}/.env"
@@ -70,44 +242,16 @@ elif ! grep -q '^MDP_ANONYMIZATION_ENDPOINT=' "${ENV_FILE}"; then
   printf '\nMDP_ANONYMIZATION_ENDPOINT=%s\n' "${DEFAULT_ANON_ENDPOINT}" >> "${ENV_FILE}"
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required but was not found in PATH." >&2
-  exit 1
-fi
-
 mkdir -p "${INSTALL_DIR}/.runtime"
 RELEASE_INFO_PATH="${TMP_DIR}/release.json"
 if curl -fsSL "${RELEASE_API}" -o "${RELEASE_INFO_PATH}"; then
-  python3 - "${RELEASE_INFO_PATH}" "${INSTALL_DIR}/.runtime/bundle_release.json" "${REPO_SLUG}" <<'PY'
-import json
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
-
-source_path = Path(sys.argv[1])
-target_path = Path(sys.argv[2])
-repo_slug = sys.argv[3]
-payload = json.loads(source_path.read_text(encoding="utf-8"))
-metadata = {
-    "tag": str(payload.get("tag_name") or "").strip(),
-    "published_at": str(payload.get("published_at") or payload.get("created_at") or "").strip(),
-    "html_url": str(payload.get("html_url") or "").strip(),
-    "repository": repo_slug,
-    "installed_at": datetime.now(timezone.utc).isoformat(),
-}
-target_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-PY
+  stamp_release_metadata "${RELEASE_INFO_PATH}" "${INSTALL_DIR}/.runtime/bundle_release.json"
 fi
+
+ensure_local_uv
+sync_runtime
 
 cd "${INSTALL_DIR}"
-
-if [[ ! -x ".venv/bin/python" ]]; then
-  python3 -m venv .venv
-fi
-
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
-
 if [[ "${PLATFORM}" == "linux" ]]; then
   bash server/native-host/install_linux.sh "${EXTENSION_ID}"
   bash server/autostart/install_linux.sh

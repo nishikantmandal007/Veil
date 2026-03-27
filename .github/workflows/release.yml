@@ -119,12 +119,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.verify-release-version.outputs.tag_name }}
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v7
         with:
+          version: '0.10.7'
           python-version: '3.11'
-      - run: python -m pip install --upgrade pip
-      - run: pip install -r requirements.txt pytest
-      - run: pytest tests/server/ -v
+          enable-cache: true
+          cache-python: true
+      - run: uv sync --frozen --dev --no-install-project
+      - run: uv run --no-sync pytest tests/server/ -v
 
   test-e2e:
     name: End-to-End Tests
@@ -166,21 +168,23 @@ jobs:
           cache: 'npm'
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: astral-sh/setup-uv@v7
         with:
+          version: '0.10.7'
           python-version: '3.11'
+          enable-cache: true
+          cache-python: true
 
       - name: Install build dependencies
         run: |
           npm ci
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          uv sync --frozen --no-dev --no-install-project
 
       - name: Build extension ZIP
         run: bash scripts/build_crx.sh dist/veil-extension.zip
 
       - name: Build backend release bundle
-        run: python3 scripts/build_backend_bundle.py
+        run: uv run --no-sync python scripts/build_backend_bundle.py
 
       - name: Rename extension ZIP with version
         run: mv dist/veil-extension.zip "dist/veil-extension-${{ needs.verify-release-version.outputs.release_version }}.zip"
