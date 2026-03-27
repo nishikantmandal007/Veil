@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.2.0](https://github.com/MAYA-DATA-PRIVACY/Veil/compare/veil-v1.1.1...veil-v1.2.0) (2026-03-27)
+## [1.2.0] - 2026-03-27
 
 
 ### Features
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Update CI pip install to use `--extra-index-url` for PyTorch wheels. ([7593711](https://github.com/MAYA-DATA-PRIVACY/Veil/commit/75937111bf759cf4219a91adedcc4e6751776e7e))
 * Update README to enhance clarity and improve branding with new logo and descriptions ([bf8c9ed](https://github.com/MAYA-DATA-PRIVACY/Veil/commit/bf8c9edebd22457905103b881482f75dd28c92eb))
 
-## [1.1.1](https://github.com/MAYA-DATA-PRIVACY/Veil/compare/veil-v1.1.0...veil-v1.1.1) (2026-03-27)
+## [1.1.1] - 2026-03-27
 
 
 ### Bug Fixes
