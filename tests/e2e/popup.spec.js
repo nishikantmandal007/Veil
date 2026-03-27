@@ -22,12 +22,12 @@ test.describe('Popup UI', () => {
         await expect(page).toHaveTitle(/Veil/i);
     });
 
-    test('Veil branding h1 is visible', async ({ extensionPopup }) => {
+    test('Veil branding is visible', async ({ extensionPopup }) => {
         const { page } = extensionPopup;
         await markOnboardingDone(page);
         await page.reload();
         await page.waitForLoadState('domcontentloaded');
-        await expect(page.locator('h1').first()).toContainText('Veil');
+        await expect(page.locator('.brand-name')).toHaveText('Veil');
     });
 
     test('status card is visible', async ({ extensionPopup }) => {
@@ -131,19 +131,13 @@ test.describe('Server Status (with mock server)', () => {
         if (mockServer) await stopMockServer(mockServer); // stopMockServer handles null safely
     });
 
-    test('Start Server button is visible', async ({ extensionPopup }) => {
-        const { page } = extensionPopup;
-        await markOnboardingDone(page);
-        await page.reload();
-        await page.waitForLoadState('domcontentloaded');
+    test('Start Server button is visible', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
         await expect(page.locator('#startServerButton')).toBeVisible();
     });
 
-    test('status dot gets active class when server is healthy', async ({ extensionPopup }) => {
-        const { page } = extensionPopup;
-        await markOnboardingDone(page);
-        await page.reload();
-        await page.waitForLoadState('domcontentloaded');
+    test('status dot gets active class when server is healthy', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
         // Allow polling cycle to detect the mock server (up to 5s)
         await page.waitForTimeout(4000);
         const dot = page.locator('#statusDot');
@@ -154,12 +148,10 @@ test.describe('Server Status (with mock server)', () => {
 });
 
 test.describe('Settings Persistence', () => {
-    test('sensitivity selection persists across reload', async ({ extensionPopup }) => {
-        const { page } = extensionPopup;
-        await markOnboardingDone(page);
-        await page.reload();
-        await page.waitForLoadState('domcontentloaded');
+    test('sensitivity selection persists across reload', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
 
+        await expect(page.locator('#sensitivitySelect')).toBeVisible();
         await page.locator('#sensitivitySelect').selectOption('high');
         await page.waitForTimeout(500);
 
@@ -171,15 +163,13 @@ test.describe('Settings Persistence', () => {
         expect(value).toBe('high');
     });
 
-    test('protection toggle persists when unchecked', async ({ extensionPopup }) => {
-        const { page } = extensionPopup;
-        await markOnboardingDone(page);
-        await page.reload();
-        await page.waitForLoadState('domcontentloaded');
+    test('protection toggle persists when unchecked', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
 
         const toggle = page.locator('#enabledToggle');
+        await expect(toggle).toBeVisible();
         const isChecked = await toggle.isChecked();
-        if (isChecked) await toggle.click({ force: true });
+        if (isChecked) await toggle.uncheck();
         await page.waitForTimeout(500);
 
         await page.reload();

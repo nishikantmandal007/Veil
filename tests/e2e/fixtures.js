@@ -54,6 +54,18 @@ const test = base.extend({
         await use({ page, context, extensionId });
         await context.close();
     },
+
+    /**
+     * extensionOptions fixture — options page pre-opened, ready for interaction.
+     */
+    extensionOptions: async ({ }, use) => {
+        const { context, extensionId } = await launchWithExtension();
+        const page = await context.newPage();
+        await page.goto(`chrome-extension://${extensionId}/options.html`);
+        await page.waitForLoadState('domcontentloaded');
+        await use({ page, context, extensionId });
+        await context.close();
+    },
 });
 
 module.exports = { test, expect };
