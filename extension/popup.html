@@ -195,6 +195,14 @@
           <button id="toggleTerminalButton" type="button" class="secondary compact">Show Logs</button>
         </div>
         <p class="hint">Install script registers the bridge once. Use Start Server to launch GLiNER2.</p>
+        <div class="opt-card opt-update-notice" id="releaseNoticeCard" hidden>
+          <div class="opt-update-notice-copy">
+            <div class="opt-update-notice-badge" id="releaseNoticeBadge">Update available</div>
+            <div class="opt-update-notice-title" id="releaseNoticeTitle">A newer Veil extension release is ready.</div>
+            <p class="opt-update-notice-body" id="releaseNoticeBody">Install or reload the latest extension build, then refresh the local server bundle below so both stay in sync.</p>
+          </div>
+          <a id="releaseNoticeLink" href="#" target="_blank" rel="noreferrer" class="opt-update-notice-link">Open release</a>
+        </div>
         <div class="terminal-panel" id="terminalPanel">
           <pre class="terminal-output" id="terminalOutput">No server logs yet.</pre>
         </div>
@@ -213,10 +221,11 @@
         </div>
         <div class="install-block">
           <div class="install-header">
-            <span class="install-title">Update local server</span>
+            <span class="install-title">Refresh local server bundle</span>
             <button id="copyUpdateCommandButton" type="button" class="ghost compact">Copy</button>
           </div>
           <pre class="cmd-box"><code id="serverUpdateCommand"></code></pre>
+          <p class="hint install-note">This command updates the local server bundle only. Extension updates still come from GitHub or your reloaded unpacked build.</p>
           <p class="hint install-note" id="releaseStatusText">Checking GitHub for the latest release…</p>
           <p class="hint install-note" id="releaseStatusSubtext">Re-run this command after a new release to update the local server bundle while keeping your cache and local config.</p>
           <p class="hint install-note"><a id="releaseLink" href="#" target="_blank" rel="noreferrer">Open latest GitHub release</a></p>

@@ -7,6 +7,7 @@ function Install-Veil {
 
     $repoSlug = "nishikantmandal007/Veil"
     $releaseBase = "https://github.com/$repoSlug/releases/latest/download"
+    $releaseApi = "https://api.github.com/repos/$repoSlug/releases/latest"
     $assetName = "veil-backend-windows.zip"
     $defaultAnonEndpoint = "https://app.mayadataprivacy.in/mdp/engine/anonymization"
 
@@ -41,6 +42,23 @@ function Install-Veil {
             if ($envContent -notmatch "(?m)^MDP_ANONYMIZATION_ENDPOINT=") {
                 Add-Content -LiteralPath $envFile -Value "`r`nMDP_ANONYMIZATION_ENDPOINT=$defaultAnonEndpoint"
             }
+        }
+
+        $runtimeDir = Join-Path $InstallDir ".runtime"
+        New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+        try {
+            $releaseInfo = Invoke-RestMethod -UseBasicParsing -Uri $releaseApi
+            $releaseMeta = @{
+                tag = [string]($releaseInfo.tag_name)
+                published_at = [string]($releaseInfo.published_at)
+                html_url = [string]($releaseInfo.html_url)
+                repository = $repoSlug
+                installed_at = (Get-Date).ToUniversalTime().ToString("o")
+            }
+            $releaseMeta | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runtimeDir "bundle_release.json") -Encoding UTF8
+        }
+        catch {
+            Write-Host "Warning: could not stamp release metadata. Update notices may stay conservative until the next refresh."
         }
 
         $python = Get-Command python -ErrorAction Stop
