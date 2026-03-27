@@ -2,23 +2,42 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'   # Trigger on version tags: v1.0.0, v1.2.3, etc.
+    branches:
+      - main
 
 permissions:
-  contents: write   # Required to create GitHub Releases and upload assets
+  contents: write
+  pull-requests: write
 
 jobs:
-  build-and-release:
-    name: Build Extension Package & Create Release
+  release-please:
+    name: Automated Changelog & Release PR
     runs-on: ubuntu-latest
-    needs: unit-tests
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      body: ${{ steps.release.outputs.body }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          # changelog-path and release-type are read from release-please-config.json
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
+  publish-release-assets:
+    name: Build And Upload Release Assets
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: write
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0   # full history so CHANGELOG.md is present
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -26,8 +45,33 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dev dependencies
-        run: npm ci
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          npm ci
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify release version matches package metadata
+        env:
+          RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          MANIFEST_VERSION=$(node -p "require('./extension/manifest.json').version")
+
+          if [[ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "package.json version $PACKAGE_VERSION does not match release version $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+          if [[ "$MANIFEST_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "extension/manifest.json version $MANIFEST_VERSION does not match release version $RELEASE_VERSION" >&2
+            exit 1
+          fi
 
       - name: Build extension ZIP
         run: bash scripts/build_crx.sh dist/veil-extension.zip
@@ -35,89 +79,55 @@ jobs:
       - name: Build backend release bundle
         run: python3 scripts/build_backend_bundle.py
 
-      - name: Get version from manifest
-        id: version
-        run: |
-          VERSION=$(node -p "require('./extension/manifest.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+      - name: Rename extension ZIP with version
+        run: mv dist/veil-extension.zip "dist/veil-extension-${{ needs.release-please.outputs.version }}.zip"
 
-      - name: Rename ZIP with version
+      - name: Compose release notes
         run: |
-          mv dist/veil-extension.zip "dist/veil-extension-${{ steps.version.outputs.version }}.zip"
+          cat > release-notes.md <<'EOF'
+          ## Veil Extension ${{ needs.release-please.outputs.tag_name }}
 
-      - name: Extract changelog for this version
-        id: changelog
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          # Pull out the block between this version's header and the next
-          NOTES=$(awk "/^## \\[$VERSION\\]/,/^## \\[/{ if (/^## \\[/ && !/^## \\[$VERSION\\]/) exit; print }" CHANGELOG.md | tail -n +2)
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$NOTES" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          ### Installation
+          1. Download **veil-extension-${{ needs.release-please.outputs.version }}.zip** below
+          2. Extract the zip file
+          3. Open Chrome -> `chrome://extensions` -> Enable **Developer mode**
+          4. Click **Load unpacked** and select the extracted folder
 
-      - name: Create GitHub Release
+          ### Local Server Install / Update
+          Linux/macOS:
+          `curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh | bash -s -- --extension-id <EXTENSION_ID>`
+
+          Windows:
+          `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/${{ github.repository }}/releases/latest/download/install.ps1' | iex; Install-Veil -ExtensionId '<EXTENSION_ID>'"`
+
+          ### Local Server Uninstall
+          Linux/macOS:
+          `curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/uninstall.sh | bash`
+
+          Windows:
+          `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/${{ github.repository }}/releases/latest/download/uninstall.ps1' | iex; Uninstall-Veil"`
+
+          ### Chrome Web Store
+          Submit the zip to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole).
+
+          ---
+
+          ${{ needs.release-please.outputs.body }}
+          EOF
+
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          name: "Veil ${{ steps.version.outputs.tag }}"
-          body: |
-            ## Veil Extension ${{ steps.version.outputs.tag }}
-
-            ### Installation
-            1. Download **veil-extension-${{ steps.version.outputs.version }}.zip** below
-            2. Extract the zip file
-            3. Open Chrome → `chrome://extensions` → Enable **Developer mode**
-            4. Click **Load unpacked** and select the extracted folder
-
-            ### Local Server Install / Update
-            Linux/macOS:
-            `curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh | bash -s -- --extension-id <EXTENSION_ID>`
-
-            Windows:
-            `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/${{ github.repository }}/releases/latest/download/install.ps1' | iex; Install-Veil -ExtensionId '<EXTENSION_ID>'"`
-
-            ### Local Server Uninstall
-            Linux/macOS:
-            `curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/uninstall.sh | bash`
-
-            Windows:
-            `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/${{ github.repository }}/releases/latest/download/uninstall.ps1' | iex; Uninstall-Veil"`
-
-            ### Chrome Web Store
-            Submit the zip to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole).
-
-            ---
-
-            ${{ steps.changelog.outputs.notes }}
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          name: "Veil ${{ needs.release-please.outputs.tag_name }}"
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(needs.release-please.outputs.tag_name, '-') }}
           files: |
-            dist/veil-extension-${{ steps.version.outputs.version }}.zip
+            dist/veil-extension-${{ needs.release-please.outputs.version }}.zip
             dist/install.sh
             dist/install.ps1
             dist/uninstall.sh
             dist/uninstall.ps1
             dist/veil-backend-unix.tar.gz
             dist/veil-backend-windows.zip
-          draft: false
-          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
-
-  # Optional: run unit tests before packaging
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-      - name: Run JS unit tests
-        run: node tests/js/test_background_utils.js
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-      - name: Install Python test deps
-        run: pip install pytest
-      - name: Install Python runtime deps
-        run: pip install -r requirements.txt
-      - name: Run Python unit tests
-        run: pytest tests/server/ -v

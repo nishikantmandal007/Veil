@@ -193,7 +193,8 @@ npm run build:zip
 ```
 
 Releases are managed automatically via [release-please](https://github.com/googleapis/release-please-action).
-Merge the open `chore: release vX.Y.Z` pull request to tag a release and publish to GitHub Releases.
+When the `chore: release vX.Y.Z` pull request is merged, the same workflow creates the GitHub release, uploads the extension zip and backend installer assets, and publishes the generated changelog in one place.
+The Chrome Web Store upload is still manual after the GitHub release is published.
 
 ---
 
