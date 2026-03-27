@@ -26,6 +26,16 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Summarize release decision
+        run: |
+          {
+            echo "## Release Please"
+            echo ""
+            echo "- release_created: \`${{ steps.release.outputs.release_created || 'false' }}\`"
+            echo "- tag_name: \`${{ steps.release.outputs.tag_name || 'n/a' }}\`"
+            echo "- version: \`${{ steps.release.outputs.version || 'n/a' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish-release-assets:
     name: Build And Upload Release Assets
     runs-on: ubuntu-latest
