@@ -8,8 +8,7 @@
  * Usage:
  *   const { startMockServer, stopMockServer, isPortBusy } = require('./mock_server');
  *   const server = await startMockServer({ port: 8765, detections: [...] });
- *   // server is null if port is already in use
- *   if (server) await stopMockServer(server);
+ *   await stopMockServer(server);
  */
 const http = require('http');
 const net = require('net');
@@ -31,21 +30,20 @@ function isPortBusy(port) {
 
 /**
  * Start a mock GLiNER2 server.
- * Returns null (instead of throwing) if port is already in use.
+ * Throws if port 8765 is already in use so E2E does not silently depend on
+ * a stray real local server.
  *
  * @param {object}  opts
  * @param {number}  [opts.port]
  * @param {Array}   [opts.detections]
  * @param {boolean} [opts.loaded]
  * @param {boolean} [opts.healthy]
- * @returns {Promise<http.Server|null>}
+ * @returns {Promise<http.Server>}
  */
 async function startMockServer({ port = DEFAULT_PORT, detections = [], loaded = true, healthy = true } = {}) {
     const busy = await isPortBusy(port);
     if (busy) {
-        // Real server already running — tests will use it instead of the mock
-        console.warn(`[mock_server] Port ${port} in use — skipping mock, using real server`);
-        return null;
+        throw new Error(`[mock_server] Port ${port} is already in use. Stop the local Veil server before running E2E tests.`);
     }
 
     return new Promise((resolve, reject) => {
@@ -97,7 +95,7 @@ async function startMockServer({ port = DEFAULT_PORT, detections = [], loaded = 
 }
 
 /**
- * @param {http.Server|null} server — pass null safely (no-op)
+ * @param {http.Server|undefined} server
  * @returns {Promise<void>}
  */
 function stopMockServer(server) {

@@ -5,7 +5,7 @@ function Install-Veil {
         [string]$InstallDir = $env:VEIL_INSTALL_DIR
     )
 
-    $repoSlug = "nishikantmandal007/Veil"
+    $repoSlug = "Maya-Data-Privacy/Veil"
     $releaseBase = "https://github.com/$repoSlug/releases/latest/download"
     $releaseApi = "https://api.github.com/repos/$repoSlug/releases/latest"
     $assetName = "veil-backend-windows.zip"

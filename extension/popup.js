@@ -88,7 +88,7 @@ const DEFAULT_SERVER_MODEL = 'fastino/gliner2-large-v1';
 const MODEL_SELECTION_ALIASES = {
   'fastino/gliner2-base-v1': DEFAULT_SERVER_MODEL
 };
-const VEIL_RELEASE_REPO_SLUG = 'nishikantmandal007/Veil';
+const VEIL_RELEASE_REPO_SLUG = 'Maya-Data-Privacy/Veil';
 const VEIL_RELEASE_BASE_URL = `https://github.com/${VEIL_RELEASE_REPO_SLUG}/releases/latest/download`;
 const VEIL_RELEASE_PAGE_URL = `https://github.com/${VEIL_RELEASE_REPO_SLUG}/releases`;
 const VEIL_RELEASE_API_URL = `https://api.github.com/repos/${VEIL_RELEASE_REPO_SLUG}/releases/latest`;

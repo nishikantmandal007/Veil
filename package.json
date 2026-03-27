@@ -31,11 +31,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/nishikantmandal007/Veil.git"
+    "url": "https://github.com/Maya-Data-Privacy/Veil.git"
   },
-  "homepage": "https://nishikantmandal007.github.io/Veil",
+  "homepage": "https://maya-data-privacy.github.io/Veil/",
   "bugs": {
-    "url": "https://github.com/nishikantmandal007/Veil/issues"
+    "url": "https://github.com/Maya-Data-Privacy/Veil/issues"
   },
   "keywords": [
     "chrome-extension",

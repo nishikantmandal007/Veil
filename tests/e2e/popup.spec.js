@@ -46,6 +46,15 @@ test.describe('Popup UI', () => {
         await expect(page.locator('#detectionCount')).toBeVisible();
         await expect(page.locator('#redactionCount')).toBeVisible();
     });
+
+    test('installer commands point at the Maya release repo', async ({ extensionPopup }) => {
+        const { page } = extensionPopup;
+        await markOnboardingDone(page);
+        await page.reload();
+        await page.waitForLoadState('domcontentloaded');
+        await expect(page.locator('#nativeHostInstallCommand')).toContainText('github.com/Maya-Data-Privacy/Veil/releases/latest/download');
+        await expect(page.locator('#nativeHostUninstallCommand')).toContainText('github.com/Maya-Data-Privacy/Veil/releases/latest/download');
+    });
 });
 
 test.describe('Onboarding Wizard', () => {

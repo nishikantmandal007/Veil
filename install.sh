@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_SLUG="nishikantmandal007/Veil"
+REPO_SLUG="Maya-Data-Privacy/Veil"
 RELEASE_BASE="https://github.com/${REPO_SLUG}/releases/latest/download"
 RELEASE_API="https://api.github.com/repos/${REPO_SLUG}/releases/latest"
 ASSET_NAME="veil-backend-unix.tar.gz"
