@@ -771,7 +771,8 @@ class SettingsManager {
       latestTag: '',
       publishedAt: '',
       htmlUrl: VEIL_RELEASE_PAGE_URL,
-      available: false,
+      extensionUpdateAvailable: false,
+      comparableToExtension: false,
       error: ''
     };
   }
@@ -797,15 +798,20 @@ class SettingsManager {
     return 0;
   }
 
-  isReleaseUpdateAvailable(tag) {
+  getReleaseComparison(tag) {
     const manifestVersion = chrome.runtime.getManifest()?.version || '';
     const latestParts = this.parseVersionParts(tag);
     const currentParts = this.parseVersionParts(manifestVersion);
     if (latestParts && currentParts) {
-      return this.compareVersionParts(latestParts, currentParts) > 0;
+      return {
+        comparableToExtension: true,
+        extensionUpdateAvailable: this.compareVersionParts(latestParts, currentParts) > 0
+      };
     }
-    const normalizedTag = this.normalizeVersionTag(tag);
-    return Boolean(normalizedTag) && normalizedTag !== String(manifestVersion).trim();
+    return {
+      comparableToExtension: false,
+      extensionUpdateAvailable: false
+    };
   }
 
   formatReleaseTimestamp(value) {
@@ -835,12 +841,14 @@ class SettingsManager {
 
       const payload = await response.json();
       const latestTag = String(payload?.tag_name || payload?.name || '').trim();
+      const comparison = this.getReleaseComparison(latestTag);
       this.releaseInfo = {
         status: 'ready',
         latestTag,
         publishedAt: String(payload?.published_at || payload?.created_at || '').trim(),
         htmlUrl: String(payload?.html_url || VEIL_RELEASE_PAGE_URL).trim() || VEIL_RELEASE_PAGE_URL,
-        available: this.isReleaseUpdateAvailable(latestTag),
+        extensionUpdateAvailable: comparison.extensionUpdateAvailable,
+        comparableToExtension: comparison.comparableToExtension,
         error: ''
       };
     } catch (error) {
@@ -867,9 +875,43 @@ class SettingsManager {
     const releaseText = document.getElementById('releaseStatusText');
     const releaseSubtext = document.getElementById('releaseStatusSubtext');
     const releaseLink = document.getElementById('releaseLink');
+    const sidebarBlock = document.getElementById('sidebarUpdateBlock');
+    const sidebarPill = document.getElementById('sidebarUpdatePill');
+    const sidebarTitle = document.getElementById('sidebarUpdateTitle');
+    const sidebarSubtext = document.getElementById('sidebarUpdateSubtext');
+    const noticeCard = document.getElementById('releaseNoticeCard');
+    const noticeBadge = document.getElementById('releaseNoticeBadge');
+    const noticeTitle = document.getElementById('releaseNoticeTitle');
+    const noticeBody = document.getElementById('releaseNoticeBody');
+    const noticeLink = document.getElementById('releaseNoticeLink');
+    const installedBundleTag = String(this.serverMeta.bundleReleaseTag || '').trim();
 
     if (releaseLink) {
       releaseLink.href = this.releaseInfo.htmlUrl || VEIL_RELEASE_PAGE_URL;
+    }
+    if (noticeLink) {
+      noticeLink.href = this.releaseInfo.htmlUrl || VEIL_RELEASE_PAGE_URL;
+    }
+
+    const applySidebarState = (state, pill, title, subtext) => {
+      if (!sidebarBlock) return;
+      sidebarBlock.classList.remove('is-loading', 'is-available', 'is-current', 'is-error');
+      sidebarBlock.classList.add(state);
+      if (sidebarPill) sidebarPill.textContent = pill;
+      if (sidebarTitle) sidebarTitle.textContent = title;
+      if (sidebarSubtext) sidebarSubtext.textContent = subtext;
+    };
+
+    const showNotice = (badge, title, body) => {
+      if (!noticeCard) return;
+      noticeCard.hidden = false;
+      if (noticeBadge) noticeBadge.textContent = badge;
+      if (noticeTitle) noticeTitle.textContent = title;
+      if (noticeBody) noticeBody.textContent = body;
+    };
+
+    if (noticeCard) {
+      noticeCard.hidden = true;
     }
 
     if (!releaseText || !releaseSubtext) return;
@@ -877,25 +919,67 @@ class SettingsManager {
     if (this.releaseInfo.status === 'loading') {
       releaseText.textContent = 'Checking GitHub for the latest release…';
       releaseSubtext.textContent = 'Re-run this command after a new release to update the local server bundle while keeping your cache and local config.';
+      applySidebarState('is-loading', 'Checking', 'Checking GitHub releases…', 'We’ll tell you here when a newer Veil extension build is available.');
       return;
     }
 
     if (this.releaseInfo.status === 'error') {
       releaseText.textContent = 'GitHub release check unavailable right now.';
       releaseSubtext.textContent = this.releaseInfo.error || 'You can still re-run the update command manually any time.';
+      applySidebarState('is-error', 'Offline', 'Update check unavailable', this.releaseInfo.error || 'GitHub could not be reached right now.');
       return;
     }
 
     const latestTag = this.releaseInfo.latestTag || 'latest';
     const published = this.formatReleaseTimestamp(this.releaseInfo.publishedAt);
-    if (this.releaseInfo.available) {
-      releaseText.textContent = `New GitHub release available: ${latestTag}`;
-      releaseSubtext.textContent = `Published ${published}. Re-run the update command below to refresh the local server bundle after you install or reload the latest extension release.`;
+    const currentVersion = chrome.runtime.getManifest()?.version || 'unknown';
+    const bundleIsCurrent = Boolean(installedBundleTag) && installedBundleTag === latestTag;
+    const bundleNeedsRefresh = Boolean(latestTag) && installedBundleTag !== latestTag;
+
+    if (this.releaseInfo.comparableToExtension && this.releaseInfo.extensionUpdateAvailable) {
+      releaseText.textContent = `Extension update available: ${latestTag} (you have v${currentVersion})`;
+      releaseSubtext.textContent = `Published ${published}. Update or reload the extension build first. Then re-run the local server update command below to refresh the installed backend bundle.`;
+      applySidebarState('is-available', 'Update', `Veil ${latestTag} is ready`, `You’re on v${currentVersion}. Open the release and update the extension.`);
+      showNotice(
+        'Update available',
+        `Veil ${latestTag} is ready to install`,
+        `You’re currently on v${currentVersion}. Update or reload the extension first, then run the refresh local server bundle command below so the backend matches the new release.`
+      );
       return;
     }
 
-    releaseText.textContent = `Latest GitHub release: ${latestTag}`;
-    releaseSubtext.textContent = `Published ${published}. Re-running the update command still refreshes the local server bundle in place if you want to repair or resync it.`;
+    if (bundleNeedsRefresh) {
+      const installedText = installedBundleTag || 'unknown bundle version';
+      releaseText.textContent = `Local server bundle update available: ${latestTag}`;
+      releaseSubtext.textContent = `Published ${published}. Installed bundle is ${installedText}. Run the refresh command below; once the local server bundle matches ${latestTag}, this notice will clear.`;
+      applySidebarState('is-available', 'Update', `Server bundle ${latestTag} is ready`, installedBundleTag ? `Installed bundle: ${installedBundleTag}` : 'Installed bundle version is not stamped yet.');
+      showNotice(
+        'Server update',
+        `Refresh the local server bundle to ${latestTag}`,
+        installedBundleTag
+          ? `Your installed local server bundle is ${installedBundleTag}. Run the refresh command below and this update notice will clear once the installed bundle matches ${latestTag}.`
+          : `This install does not have release metadata yet. Run the refresh command below once, and future update checks will track the installed server bundle precisely.`
+      );
+      return;
+    }
+
+    if (bundleIsCurrent) {
+      releaseText.textContent = `Local server bundle is up to date: ${latestTag}`;
+      releaseSubtext.textContent = `Published ${published}. Installed bundle matches the latest GitHub release, so there is nothing to update right now.`;
+      applySidebarState('is-current', 'Current', 'Local server is current', `Installed bundle ${installedBundleTag} matches the latest published release.`);
+      return;
+    }
+
+    if (this.releaseInfo.comparableToExtension) {
+      releaseText.textContent = `Extension is up to date: v${currentVersion}`;
+      releaseSubtext.textContent = `Latest GitHub release is ${latestTag}, published ${published}. Refresh the local server bundle below if you want to stamp this install with the latest release metadata or repair it in place.`;
+      applySidebarState('is-current', 'Current', `You’re on the latest version`, `Veil v${currentVersion} matches the latest published extension release.`);
+      return;
+    }
+
+    releaseText.textContent = `Latest GitHub release channel: ${latestTag}`;
+    releaseSubtext.textContent = `Published ${published}. This tag does not map cleanly to the installed extension version, so treat the command below as a local server refresh command, not as proof that the extension itself is outdated.`;
+    applySidebarState('is-loading', 'Channel', `Release channel: ${latestTag}`, 'This looks like a fork or test release, so we are not flagging the extension as outdated.');
   }
 
   getDefaultServerMeta() {
@@ -903,7 +987,11 @@ class SettingsManager {
       logFile: '.runtime/gliner2_server.log',
       logCommand: 'tail -n 80 .runtime/gliner2_server.log',
       runtimeDir: '.runtime',
-      modelOverride: null
+      modelOverride: null,
+      bundleReleaseTag: null,
+      bundleReleasePublishedAt: null,
+      bundleReleaseUrl: null,
+      bundleReleaseInstalledAt: null
     };
   }
 

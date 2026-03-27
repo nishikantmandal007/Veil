@@ -39,6 +39,7 @@ HF_HOME = CACHE_DIR / "hf"
 HF_HUB_CACHE = HF_HOME / "hub"
 TRANSFORMERS_CACHE = HF_HOME / "transformers"
 XDG_CACHE_HOME = CACHE_DIR / "xdg"
+RELEASE_INFO_FILE = RUNTIME_DIR / "bundle_release.json"
 
 
 def read_native_message() -> Dict[str, Any]:
@@ -61,6 +62,7 @@ def runtime_meta() -> Dict[str, Any]:
         "logCommand": f"tail -n 80 {LOG_FILE}",
         "runtimeDir": str(RUNTIME_DIR),
         "modelOverride": model_override or None,
+        **read_bundle_release_info(),
     }
 
 
@@ -72,6 +74,28 @@ def read_recent_logs(lines: int = 120) -> list[str]:
         return []
     keep = max(1, min(int(lines), 500))
     return all_lines[-keep:]
+
+
+def read_bundle_release_info() -> Dict[str, Any]:
+    ensure_runtime_dirs()
+    defaults = {
+        "bundleReleaseTag": None,
+        "bundleReleasePublishedAt": None,
+        "bundleReleaseUrl": None,
+        "bundleReleaseInstalledAt": None,
+    }
+    if not RELEASE_INFO_FILE.exists():
+        return defaults
+    try:
+        payload = json.loads(RELEASE_INFO_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return defaults
+    return {
+        "bundleReleaseTag": str(payload.get("tag") or "").strip() or None,
+        "bundleReleasePublishedAt": str(payload.get("published_at") or "").strip() or None,
+        "bundleReleaseUrl": str(payload.get("html_url") or "").strip() or None,
+        "bundleReleaseInstalledAt": str(payload.get("installed_at") or "").strip() or None,
+    }
 
 
 def send_native_message(message: Dict[str, Any]) -> None:
