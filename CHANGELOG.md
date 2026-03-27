@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1](https://github.com/MAYA-DATA-PRIVACY/Veil/compare/veil-v1.1.0...veil-v1.1.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* **ci:** summarize release-please outputs in workflow summary ([36d26df](https://github.com/MAYA-DATA-PRIVACY/Veil/commit/36d26df90cb8e5c12f304d8fbd05d7124540ae63))
+
 ## [1.1.0](https://github.com/nishikantmandal007/Veil/compare/veil-v1.0.0...veil-v1.1.0) (2026-03-09)
 
 
