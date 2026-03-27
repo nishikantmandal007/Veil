@@ -2,45 +2,154 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing version tag to publish (for example, v1.2.0)
+        required: true
+        type: string
 
 permissions:
   contents: write
-  pull-requests: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
 
 jobs:
-  release-please:
-    name: Automated Changelog & Release PR
+  verify-release-version:
+    name: Verify Release Version
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
-      body: ${{ steps.release.outputs.body }}
+      tag_name: ${{ steps.release_meta.outputs.tag_name }}
+      release_version: ${{ steps.release_meta.outputs.release_version }}
     steps:
-      - uses: googleapis/release-please-action@v4
-        id: release
+      - name: Checkout source
+        uses: actions/checkout@v6
         with:
-          # changelog-path and release-type are read from release-please-config.json
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
-      - name: Summarize release decision
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Resolve release metadata
+        id: release_meta
+        run: |
+          TAG_NAME="${RELEASE_TAG}"
+          RELEASE_VERSION="${TAG_NAME#v}"
+
+          if [[ -z "$TAG_NAME" || "$TAG_NAME" == "$RELEASE_VERSION" ]]; then
+            echo "Expected a v-prefixed tag like v1.2.0, got '$TAG_NAME'." >&2
+            exit 1
+          fi
+
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+].*)?$ ]]; then
+            echo "Tag '$TAG_NAME' does not map to a valid semantic version." >&2
+            exit 1
+          fi
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release metadata matches repository versions
+        env:
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          MANIFEST_VERSION=$(node -p "require('./extension/manifest.json').version")
+
+          if [[ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "package.json version $PACKAGE_VERSION does not match release version $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+          if [[ "$MANIFEST_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "extension/manifest.json version $MANIFEST_VERSION does not match release version $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Verify changelog section exists
+        env:
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
+        run: |
+          awk -v version="$RELEASE_VERSION" '
+            $0 ~ "^## \\[" version "\\]" {capture=1}
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" {exit}
+            capture {print}
+          ' CHANGELOG.md > changelog-section.md
+
+          if [[ ! -s changelog-section.md ]]; then
+            echo "CHANGELOG.md is missing a section for version $RELEASE_VERSION." >&2
+            exit 1
+          fi
+
+      - name: Summarize manual release inputs
         run: |
           {
-            echo "## Release Please"
+            echo "## Manual Release"
             echo ""
-            echo "- release_created: \`${{ steps.release.outputs.release_created || 'false' }}\`"
-            echo "- tag_name: \`${{ steps.release.outputs.tag_name || 'n/a' }}\`"
-            echo "- version: \`${{ steps.release.outputs.version || 'n/a' }}\`"
+            echo "- tag_name: \`${{ steps.release_meta.outputs.tag_name }}\`"
+            echo "- release_version: \`${{ steps.release_meta.outputs.release_version }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  test-js:
+    name: JavaScript Tests
+    runs-on: ubuntu-latest
+    needs: verify-release-version
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify-release-version.outputs.tag_name }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+
+  test-python:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    needs: verify-release-version
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify-release-version.outputs.tag_name }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt pytest
+      - run: pytest tests/server/ -v
+
+  test-e2e:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: verify-release-version
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify-release-version.outputs.tag_name }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: xvfb-run -a npm run test:e2e
 
   publish-release-assets:
     name: Build And Upload Release Assets
     runs-on: ubuntu-latest
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs:
+      - verify-release-version
+      - test-js
+      - test-python
+      - test-e2e
     permissions:
       contents: write
     steps:
@@ -48,6 +157,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ needs.verify-release-version.outputs.tag_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -66,23 +176,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify release version matches package metadata
-        env:
-          RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          MANIFEST_VERSION=$(node -p "require('./extension/manifest.json').version")
-
-          if [[ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]]; then
-            echo "package.json version $PACKAGE_VERSION does not match release version $RELEASE_VERSION" >&2
-            exit 1
-          fi
-
-          if [[ "$MANIFEST_VERSION" != "$RELEASE_VERSION" ]]; then
-            echo "extension/manifest.json version $MANIFEST_VERSION does not match release version $RELEASE_VERSION" >&2
-            exit 1
-          fi
-
       - name: Build extension ZIP
         run: bash scripts/build_crx.sh dist/veil-extension.zip
 
@@ -90,15 +183,24 @@ jobs:
         run: python3 scripts/build_backend_bundle.py
 
       - name: Rename extension ZIP with version
-        run: mv dist/veil-extension.zip "dist/veil-extension-${{ needs.release-please.outputs.version }}.zip"
+        run: mv dist/veil-extension.zip "dist/veil-extension-${{ needs.verify-release-version.outputs.release_version }}.zip"
 
       - name: Compose release notes
+        env:
+          TAG_NAME: ${{ needs.verify-release-version.outputs.tag_name }}
+          RELEASE_VERSION: ${{ needs.verify-release-version.outputs.release_version }}
         run: |
-          cat > release-notes.md <<'EOF'
-          ## Veil Extension ${{ needs.release-please.outputs.tag_name }}
+          awk -v version="$RELEASE_VERSION" '
+            $0 ~ "^## \\[" version "\\]" {capture=1}
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" {exit}
+            capture {print}
+          ' CHANGELOG.md > changelog-section.md
+
+          cat > release-notes.md <<EOF
+          ## Veil Extension ${TAG_NAME}
 
           ### Installation
-          1. Download **veil-extension-${{ needs.release-please.outputs.version }}.zip** below
+          1. Download **veil-extension-${RELEASE_VERSION}.zip** below
           2. Extract the zip file
           3. Open Chrome -> `chrome://extensions` -> Enable **Developer mode**
           4. Click **Load unpacked** and select the extracted folder
@@ -120,21 +222,22 @@ jobs:
           ### Chrome Web Store
           Submit the zip to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole).
 
-          ---
-
-          ${{ needs.release-please.outputs.body }}
+          ### Changelog
           EOF
+
+          cat changelog-section.md >> release-notes.md
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
-          name: "Veil ${{ needs.release-please.outputs.tag_name }}"
+          tag_name: ${{ needs.verify-release-version.outputs.tag_name }}
+          name: "Veil ${{ needs.verify-release-version.outputs.tag_name }}"
           body_path: release-notes.md
           draft: false
-          prerelease: ${{ contains(needs.release-please.outputs.tag_name, '-') }}
+          prerelease: ${{ contains(needs.verify-release-version.outputs.tag_name, '-') }}
+          fail_on_unmatched_files: true
           files: |
-            dist/veil-extension-${{ needs.release-please.outputs.version }}.zip
+            dist/veil-extension-${{ needs.verify-release-version.outputs.release_version }}.zip
             dist/install.sh
             dist/install.ps1
             dist/uninstall.sh

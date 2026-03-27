@@ -192,8 +192,18 @@ npm run build:zip
 # → dist/veil-extension.zip  ready for Chrome Web Store upload
 ```
 
-Releases are managed automatically via [release-please](https://github.com/googleapis/release-please-action).
-When the `chore: release vX.Y.Z` pull request is merged, the same workflow creates the GitHub release, uploads the extension zip and backend installer assets, and publishes the generated changelog in one place.
+Releases are cut manually from `main` with a semver tag such as `v1.2.0`.
+Before tagging, make sure `package.json`, `package-lock.json`, `extension/manifest.json`, and `CHANGELOG.md` already contain the same release version on `main`.
+
+```bash
+git checkout main
+git pull origin main
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+Pushing the `v*` tag triggers the release workflow, which first verifies the version metadata, then runs the JavaScript, Python, and Playwright test suites, and finally uploads the extension zip plus backend installer assets to the GitHub release for that tag.
+If you ever need to republish assets for an existing tag, re-run the `Release` workflow with the `workflow_dispatch` `tag_name` input.
 The Chrome Web Store upload is still manual after the GitHub release is published.
 
 ---
