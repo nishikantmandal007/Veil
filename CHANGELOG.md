@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1](https://github.com/nishikantmandal007/Veil/compare/veil-v1.1.0...veil-v1.1.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* **ci:** summarize release-please outputs in workflow summary ([fcfc912](https://github.com/nishikantmandal007/Veil/commit/fcfc91241dc889b3b51b651035dd1327f89ace5d))
+
 ## [1.1.0](https://github.com/nishikantmandal007/Veil/compare/veil-v1.0.0...veil-v1.1.0) (2026-03-09)
 
 
