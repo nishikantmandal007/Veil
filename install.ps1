@@ -205,9 +205,12 @@ function Ensure-VeilUv {
         try {
             $env:UV_UNMANAGED_INSTALL = $uvInstallDir
             $env:UV_NO_MODIFY_PATH = "1"
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $uvInstaller
-            if ($LASTEXITCODE -ne 0) {
-                throw "uv installer failed with exit code $LASTEXITCODE."
+            # Keep the installer's console output visible without letting it leak
+            # into this function's return value.
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $uvInstaller | Out-Host
+            $uvInstallExitCode = $LASTEXITCODE
+            if ($uvInstallExitCode -ne 0) {
+                throw "uv installer failed with exit code $uvInstallExitCode."
             }
         }
         finally {
