@@ -836,14 +836,36 @@ class GLiNERService:
 
 def make_handler(service: GLiNERService, max_chars: int):
     class Handler(BaseHTTPRequestHandler):
+        def _allowed_origin(self) -> str:
+            """Return the request Origin if it is from a trusted local source,
+            otherwise return an empty string (request will still be served but
+            without ACAO — browsers will block the response for cross-origin JS).
+            Trusted: chrome-extension://, moz-extension://, localhost, 127.0.0.1."""
+            origin = self.headers.get("Origin", "")
+            if not origin:
+                return ""
+            if (
+                origin.startswith("chrome-extension://")
+                or origin.startswith("moz-extension://")
+                or origin in ("http://localhost", "https://localhost",
+                               "http://127.0.0.1", "https://127.0.0.1")
+                or origin.startswith("http://localhost:")
+                or origin.startswith("http://127.0.0.1:")
+            ):
+                return origin
+            return ""
+
         def _write_json(self, payload: Any, status_code: int = 200) -> None:
             body = json.dumps(payload).encode("utf-8")
             try:
                 self.send_response(status_code)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                allowed = self._allowed_origin()
+                if allowed:
+                    self.send_header("Access-Control-Allow-Origin", allowed)
+                    self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                    self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                    self.send_header("Vary", "Origin")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)

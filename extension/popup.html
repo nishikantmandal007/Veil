@@ -22,11 +22,7 @@
 
         <div class="onboarding-step" data-step="0">
           <div class="onboarding-icon" aria-hidden="true">
-            <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18 3C11.5 3 6 9 6 16C6 23 10.5 27.5 18 34C25.5 27.5 30 23 30 16C30 9 24.5 3 18 3Z" fill="currentColor" opacity="0.12"/>
-              <path d="M18 3C11.5 3 6 9 6 16C6 23 10.5 27.5 18 34C25.5 27.5 30 23 30 16C30 9 24.5 3 18 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M13 16.5L16.5 20.5L23 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <img src="assets/icons/veil-icon.svg" alt="Veil" class="onboarding-logo-img">
           </div>
           <h2 class="onboarding-title">Welcome to Veil</h2>
           <p class="onboarding-body">Veil detects and redacts personal data <strong>before it leaves your browser</strong> — powered by a local AI model with no cloud calls.</p>
@@ -149,6 +145,11 @@
           Open Settings → Add Maya API Key
         </button>
       </div>
+    </div>
+
+    <!-- ─── MASK HINT CARD (shown once on first use) ─── -->
+    <div class="mask-hint-card popup-only" id="maskHintCard" hidden>
+      <p class="mask-hint-text">Your data is replaced with <strong>[TYPE&nbsp;REDACTED]</strong> tags — private, zero setup. Want smarter replacements that keep your prompts natural? Try <strong>Anonymize</strong> mode in Settings.</p>
     </div>
 
     <!-- ─── REDACTION KEY (collapsed) ─── -->

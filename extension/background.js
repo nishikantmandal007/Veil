@@ -66,7 +66,8 @@ const DEFAULT_MONITORED_SELECTORS = [
 ];
 
 const NATIVE_HOST_NAMES = ['com.veil.gliner.server', 'com.privacyshield.gliner2'];
-const MDP_DEFAULT_SEED = 'veil_' + Math.random().toString(36).slice(2, 10);
+const MDP_SEED_STORAGE_KEY = 'veilAnonymizationSeed';
+const MDP_SEED_PREFIX = 'veil_';
 
 const MDP_LABEL_CONFIG = Object.freeze({
   person: Object.freeze({
@@ -170,12 +171,18 @@ class VeilAnonymizer {
 
   async getCredentials() {
     const result = await new Promise((resolve) => {
-      chrome.storage.local.get(['veilApiKey'], resolve);
+      chrome.storage.local.get(['veilApiKey', MDP_SEED_STORAGE_KEY], resolve);
     });
+
+    let seed = String(result?.[MDP_SEED_STORAGE_KEY] || '').trim();
+    if (!seed) {
+      seed = MDP_SEED_PREFIX + Math.random().toString(36).slice(2, 10);
+      chrome.storage.local.set({ [MDP_SEED_STORAGE_KEY]: seed });
+    }
 
     return {
       apiKey: String(result?.veilApiKey || '').trim(),
-      seed: MDP_DEFAULT_SEED
+      seed
     };
   }
 
@@ -1177,7 +1184,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({
     enabled: true,
     autoRedact: true,
-    redactionMode: 'anonymize',
+    redactionMode: 'mask',
     sensitivity: 'medium',
     includeRegexWhenModelOnline: false,
     monitorAllSites: true,

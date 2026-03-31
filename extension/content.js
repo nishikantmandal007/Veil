@@ -112,6 +112,7 @@ const SUPPRESS_INPUT_MS = 300;
 const AUTO_REDACT_DELAY_MS = 1500;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
+const MASK_MODE_HINT_STORAGE_KEY = 'maskModeHintSeen';
 
 // ── Selectors that identify known LLM response / output areas ──
 const RESPONSE_AREA_SELECTORS = [
@@ -191,6 +192,7 @@ class VeilContentController {
     this.actionBars = new WeakMap();
     this.autoRedactTimers = new Map();
     this.dismissedDetections = new WeakMap(); // element → Set of "start:end:label"
+    this.maskModeHintChecked = false;
 
     // Per-site alias ledger — ensures PERSON_1 stays PERSON_1 across sessions
     // on the same site. Loaded from chrome.storage on init, 30-day TTL.
@@ -216,6 +218,7 @@ class VeilContentController {
 
     this.domObserver = null;
     this.stateReconcileTimer = null;
+    this._pollingInterval = null;
     this.handleViewportChange = () => {
       this.repositionTokenTrays();
       this.repositionScanningPills();
@@ -468,6 +471,7 @@ class VeilContentController {
   }
 
   findInputElements() {
+    if (!this.settings.enabled || !this.isSiteMonitored()) return;
     this.pruneDisconnectedMonitoredElements();
 
     this.settings.monitoredSelectors.forEach((selector) => {
@@ -1444,6 +1448,11 @@ class VeilContentController {
       this.renderElement(element);
       this.persistCache(element);
       this.showNotification(`${count} item${count === 1 ? '' : 's'} protected`, 'info');
+      if (state.mode === 'mask') {
+        setTimeout(() => {
+          void this.showMaskModeHintOnce();
+        }, 1100);
+      }
       this.updateStats(0, count);
       // Decode any matching tokens in AI response areas now that new redactions exist
       this.scanExistingResponseAreas();
@@ -2304,6 +2313,9 @@ class VeilContentController {
 
     this.renderElement(element, index);
     this.persistCache(element);
+    if (state.mode === 'mask') {
+      void this.showMaskModeHintOnce();
+    }
   }
 
   restoreSingle(element, index) {
@@ -2641,10 +2653,30 @@ class VeilContentController {
     return false;
   }
 
-  showNotification(message, type = 'info') {
+  async showMaskModeHintOnce() {
+    if (this.maskModeHintChecked) return;
+    this.maskModeHintChecked = true;
+
+    const result = await new Promise((resolve) => {
+      chrome.storage.local.get([MASK_MODE_HINT_STORAGE_KEY], resolve);
+    });
+    if (result?.[MASK_MODE_HINT_STORAGE_KEY]) return;
+
+    chrome.storage.local.set({ [MASK_MODE_HINT_STORAGE_KEY]: true });
+    this.showNotification(
+      'Mask mode replaces sensitive text with [TYPE REDACTED] tags. For more natural replacements later, switch to Anonymize in Veil settings.',
+      'info',
+      3600
+    );
+  }
+
+  showNotification(message, type = 'info', durationMs = 1900) {
     const toast = document.createElement('div');
     toast.className = `ps-notification ps-notification-${type}`;
-    toast.innerHTML = `<div class="ps-notification-message">${message}</div>`;
+    const inner = document.createElement('div');
+    inner.className = 'ps-notification-message';
+    inner.textContent = message;
+    toast.appendChild(inner);
 
     document.body.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('ps-notification-visible'));
@@ -2652,7 +2684,7 @@ class VeilContentController {
     setTimeout(() => {
       toast.classList.remove('ps-notification-visible');
       setTimeout(() => toast.remove(), 260);
-    }, 1900);
+    }, durationMs);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -2704,6 +2736,10 @@ class VeilContentController {
     if (this.stateReconcileTimer) {
       clearInterval(this.stateReconcileTimer);
       this.stateReconcileTimer = null;
+    }
+    if (this._pollingInterval) {
+      clearInterval(this._pollingInterval);
+      this._pollingInterval = null;
     }
 
     window.removeEventListener('scroll', this.handleViewportChange, true);
