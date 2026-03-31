@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.3] - 2026-03-31
+
+### Runtime and Packaging
+
+- Included the Windows installer follow-up fix and regression test that harden the PowerShell install path and keep the release line aligned with commit `b26472e258d48cc0ca1631cbb409fa6d8d0d5a4c`.
+- Tightened the local GLiNER2 server CORS behavior so it only reflects trusted browser-extension and localhost origins instead of sending a wildcard allow-origin header.
+
+### Privacy UX and Settings
+
+- Persisted the Maya anonymization seed in extension storage so anonymized replacements stay stable across sessions instead of changing on each browser restart.
+- Switched first-use defaults and guidance toward mask mode, including one-time mask-mode hints in both the popup and content-script flow so users understand the zero-setup path before opting into anonymization.
+- Polished the onboarding overlay layout for popup-sized surfaces and replaced the welcome icon with the Veil brand asset for a cleaner first-run experience.
+- Escaped custom pattern and custom entity labels before rendering them in the popup/settings UI, closing an HTML injection path in user-supplied display text.
+
 ## [1.2.2] - 2026-03-27
 
 ### Runtime and Packaging
