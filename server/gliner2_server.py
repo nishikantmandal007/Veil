@@ -852,7 +852,9 @@ def make_handler(service: GLiNERService, max_chars: int):
                 or origin.startswith("http://localhost:")
                 or origin.startswith("http://127.0.0.1:")
             ):
-                return origin
+                # Strip any CR/LF characters to prevent HTTP response splitting
+                sanitized = origin.replace("\r", "").replace("\n", "")
+                return sanitized
             return ""
 
         def _write_json(self, payload: Any, status_code: int = 200) -> None:
