@@ -103,6 +103,7 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   autoRedact: true,
   redactionMode: 'mask',
+  maskModeHintSeen: false,
   sensitivity: 'medium',
   includeRegexWhenModelOnline: false,
   monitorAllSites: true,
@@ -375,6 +376,21 @@ class SettingsManager {
     const anonymizeHint = document.getElementById('anonymizeHint');
     // Show hint only when Anonymize is selected AND no API key is saved
     if (anonymizeHint) anonymizeHint.hidden = hasKey || this.settings.redactionMode !== 'anonymize';
+    this.renderMaskHint();
+  }
+
+  renderMaskHint() {
+    const card = document.getElementById('maskHintCard');
+    if (!card) return;
+    const isMask = this.settings.redactionMode === 'mask';
+    const alreadySeen = Boolean(this.settings.maskModeHintSeen);
+    if (isMask && !alreadySeen) {
+      card.hidden = false;
+      this.settings.maskModeHintSeen = true;
+      chrome.storage.local.set({ maskModeHintSeen: true });
+    } else {
+      card.hidden = true;
+    }
   }
 
   bindEvents() {
@@ -392,6 +408,7 @@ class SettingsManager {
     });
 
     document.getElementById('monitorAllSitesToggle').addEventListener('change', (event) => {
+      this.saveAdvancedConfig(false);
       this.updateSetting('monitorAllSites', event.target.checked);
       this.renderAdvancedStates();
     });
@@ -649,8 +666,8 @@ class SettingsManager {
     if (!node) return;
     const mode = this.settings.redactionMode === 'mask' ? 'Mask' : 'Anonymize';
     const modeBehavior = mode === 'Mask'
-      ? 'Output format: [TYPE REDACTED].'
-      : 'Output format: API anonymized values (fallback: <TYPE_N>).';
+      ? 'Replaces your data with [TYPE REDACTED] tags — private, no setup needed.'
+      : 'Swaps your data for realistic fakes (e.g. Pranav → Jack) so prompts stay coherent. Requires a Maya API key.';
 
     const sensitivityMap = {
       low: 'Low = strict precision mode (fewer detections).',
@@ -1526,6 +1543,15 @@ class SettingsManager {
     chrome.storage.local.set({ [key]: value }, () => this.setMessage('Saved'));
   }
 
+  escHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   parseLines(text) {
     return text
       .split(/\n|,/)
@@ -1667,10 +1693,10 @@ class SettingsManager {
     <span class="pattern-toggle-pill"></span>
   </label>
   <div class="pattern-card-body">
-    <span class="pattern-card-name">${displayName}</span>
-    <code class="pattern-card-preview">${preview}</code>
+    <span class="pattern-card-name">${this.escHtml(displayName)}</span>
+    <code class="pattern-card-preview">${this.escHtml(preview)}</code>
   </div>
-  <span class="pattern-card-badge">${labelBadge}</span>
+  <span class="pattern-card-badge">${this.escHtml(labelBadge)}</span>
   ${!isDefault ? `<button class="pattern-card-del ghost compact" data-index="${index}" aria-label="Remove pattern" title="Remove">&#x2715;</button>` : ''}
 </div>`;
     }).join('');
@@ -1730,18 +1756,22 @@ class SettingsManager {
       return;
     }
 
-    list.innerHTML = types.map((t, index) => `<div class="pattern-card${t.enabled ? '' : ' pattern-card--off'}">
+    list.innerHTML = types.map((t, index) => {
+      const name = this.escHtml(t.name);
+      const desc = this.escHtml(String(t.description || '').slice(0, 48)) + (String(t.description || '').length > 48 ? '…' : '');
+      return `<div class="pattern-card${t.enabled ? '' : ' pattern-card--off'}">
   <label class="pattern-toggle-wrap" title="${t.enabled ? 'Disable' : 'Enable'}">
     <input type="checkbox" class="entity-cb" data-index="${index}"${t.enabled ? ' checked' : ''}>
     <span class="pattern-toggle-pill"></span>
   </label>
   <div class="pattern-card-body">
-    <span class="pattern-card-name">${t.name}</span>
-    <code class="pattern-card-preview">${t.description.slice(0, 48)}${t.description.length > 48 ? '…' : ''}</code>
+    <span class="pattern-card-name">${name}</span>
+    <code class="pattern-card-preview">${desc}</code>
   </div>
   <span class="pattern-card-badge">AI</span>
   <button class="entity-del ghost compact" data-index="${index}" aria-label="Remove" title="Remove">&#x2715;</button>
-</div>`).join('');
+</div>`;
+    }).join('');
 
     list.querySelectorAll('.entity-cb').forEach((cb) => {
       cb.addEventListener('change', () => {
@@ -1824,12 +1854,18 @@ class OnboardingWizard {
     this._checkAndShow();
   }
 
+  _setVisible(visible) {
+    if (!this.overlay) return;
+    this.overlay.hidden = !visible;
+    document.body.classList.toggle('onboarding-open', Boolean(visible));
+  }
+
   async _checkAndShow() {
     const result = await new Promise((resolve) => chrome.storage.local.get(['veilOnboardingDone'], resolve));
     if (result.veilOnboardingDone) return;
     this._populateInstallCmd();
     this._goToStep(0);
-    this.overlay.hidden = false;
+    this._setVisible(true);
   }
 
   _populateInstallCmd() {
@@ -1957,7 +1993,7 @@ class OnboardingWizard {
   _finish() {
     this._stopHostPolling();
     chrome.storage.local.set({ veilOnboardingDone: true });
-    this.overlay.hidden = true;
+    this._setVisible(false);
   }
 }
 

@@ -883,6 +883,10 @@ button.compact.is-copied {
    Onboarding Wizard Overlay
 ══════════════════════════════════ */
 
+body.onboarding-open .shell {
+  min-height: 440px;
+}
+
 .onboarding-overlay {
   position: absolute;
   inset: 0;
@@ -895,6 +899,21 @@ button.compact.is-copied {
   border-radius: 14px;
   padding: 12px;
   animation: onboarding-fade-in 250ms ease;
+}
+
+body:not(.full-page).onboarding-open .shell {
+  overflow: visible;
+}
+
+body:not(.full-page).onboarding-open .shell > :not(#onboardingOverlay) {
+  display: none !important;
+}
+
+body:not(.full-page).onboarding-open .onboarding-overlay {
+  position: relative;
+  inset: auto;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .onboarding-overlay[hidden] {
@@ -916,13 +935,17 @@ button.compact.is-copied {
 .onboarding-card {
   width: 100%;
   max-width: 360px;
-  max-height: calc(100% - 8px);
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
   background: linear-gradient(180deg, #fffefb 0%, #fffbf4 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 18px;
   box-shadow: 0 4px 24px rgba(78, 62, 33, 0.12), 0 1px 0 rgba(24, 24, 27, 0.05);
+}
+
+body:not(.full-page).onboarding-open .onboarding-card {
+  max-height: none;
 }
 
 .onboarding-dots {
@@ -965,6 +988,13 @@ button.compact.is-copied {
 .onboarding-icon svg {
   width: 28px;
   height: 28px;
+}
+
+.onboarding-logo-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: block;
 }
 
 .onboarding-done-icon {
@@ -1636,6 +1666,22 @@ a.maya-link:hover { text-decoration: underline; }
   transition: background 150ms ease;
 }
 .anon-hint-settings-btn:hover { background: #5B4397; }
+
+/* ─── Mask hint card (first-use only) ─── */
+.mask-hint-card {
+  margin: 6px 12px 0;
+  padding: 9px 12px;
+  background: #f4f0fa;
+  border: 1px solid #d0c8e8;
+  border-radius: 10px;
+}
+
+.mask-hint-text {
+  margin: 0;
+  font-size: 11.5px;
+  color: #4a3e72;
+  line-height: 1.5;
+}
 
 /* ─── Redaction Key card ─── */
 .key-card {
