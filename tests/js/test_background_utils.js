@@ -6,6 +6,12 @@
 
 'use strict';
 
+const {
+  cloneDefaultCustomPatterns,
+  normalizeCustomPatterns,
+  PATTERN_NAMES,
+} = require('../../extension/pattern_catalog.js');
+
 let passed = 0;
 let failed = 0;
 
@@ -115,6 +121,40 @@ section('mergeOverlapping — sorts by start position');
   const result = mergeOverlapping(dets);
   assertEqual(result[0].start, 0, 'first result has lower start');
   assertEqual(result[1].start, 10, 'second result has higher start');
+}
+
+section('pattern catalog — expected built-in regex detectors are present');
+{
+  const ids = cloneDefaultCustomPatterns().map((pattern) => pattern.id);
+  assert(ids.includes('openai_key'), 'includes OpenAI key pattern');
+  assert(ids.includes('aws_access_key'), 'includes AWS access key pattern');
+  assert(ids.includes('github_token'), 'includes GitHub token pattern');
+  assert(ids.includes('jwt_token'), 'includes JWT pattern');
+  assert(ids.includes('ipv4'), 'includes IPv4 pattern');
+  assert(ids.includes('ipv6'), 'includes IPv6 pattern');
+  assert(ids.includes('ssn'), 'includes SSN pattern');
+  assert(ids.includes('indian_pan'), 'includes PAN pattern');
+  assert(ids.includes('indian_aadhaar'), 'includes Aadhaar pattern');
+  assert(ids.includes('passport'), 'includes passport pattern');
+  assertEqual(PATTERN_NAMES.openai_key, 'OpenAI API Key', 'exposes display names for built-ins');
+}
+
+section('pattern catalog — legacy OpenAI regex migrates to the canonical matcher');
+{
+  const normalized = normalizeCustomPatterns([
+    {
+      id: 'openai_key',
+      label: 'api_key',
+      pattern: '\\bsk-[A-Za-z0-9]{20,}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[API KEY REDACTED]',
+      enabled: true,
+    },
+  ], cloneDefaultCustomPatterns());
+
+  const openAi = normalized.find((pattern) => pattern.id === 'openai_key');
+  assert(openAi.pattern.includes('sk-proj-'), 'legacy OpenAI pattern is upgraded to the canonical matcher');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

@@ -1,6 +1,11 @@
 // content.js - Grammarly-style PII detection & redaction for input fields only
 // LLM response areas are NEVER scanned or modified.
 
+const {
+  cloneDefaultCustomPatterns,
+  normalizeCustomPatterns
+} = globalThis.VEIL_PATTERN_CATALOG;
+
 const DEFAULT_MONITORED_SELECTORS = [
   'textarea',
   'input[type="text"]',
@@ -57,61 +62,12 @@ const PLATFORM_SELECTORS = {
   ]
 };
 
-const DEFAULT_CUSTOM_PATTERNS = [
-  {
-    id: 'openai_key',
-    label: 'api_key',
-    pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[API KEY REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'aws_access_key',
-    label: 'api_key',
-    pattern: '\\bAKIA[0-9A-Z]{16}\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[AWS KEY REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'jwt_token',
-    label: 'jwt',
-    pattern: '\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b',
-    flags: 'g',
-    score: 0.97,
-    replacement: '[JWT REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'ipv4',
-    label: 'ip_address',
-    pattern: '\\b(?:(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\b',
-    flags: 'g',
-    score: 0.96,
-    replacement: '[IP REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'ssn',
-    label: 'ssn',
-    pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[SSN REDACTED]',
-    enabled: true
-  }
-];
-
 const TYPING_IDLE_DELAY_MS = 1200;
 const PASTE_IDLE_DELAY_MS = 750;
 const BLUR_DELAY_MS = 80;
 const SUPPRESS_INPUT_MS = 300;
 const AUTO_REDACT_DELAY_MS = 1500;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
 const MASK_MODE_HINT_STORAGE_KEY = 'maskModeHintSeen';
 
 // ── Selectors that identify known LLM response / output areas ──
@@ -131,44 +87,6 @@ const RESPONSE_AREA_SELECTORS = [
   '.ai-message',
   '.chat-answer'
 ];
-
-function normalizeCustomPatterns(storedPatterns, defaults) {
-  const defaultList = Array.isArray(defaults) ? defaults : [];
-  if (!Array.isArray(storedPatterns) || storedPatterns.length === 0) {
-    return defaultList.slice();
-  }
-
-  const storedById = new Map();
-  const extras = [];
-
-  storedPatterns.forEach((entry) => {
-    if (!entry || typeof entry !== 'object') return;
-    const id = String(entry.id || '').trim();
-    if (!id) {
-      extras.push(entry);
-      return;
-    }
-    storedById.set(id, entry);
-  });
-
-  const mergedDefaults = defaultList.map((def) => {
-    const id = String(def?.id || '').trim();
-    if (!id || !storedById.has(id)) return def;
-    const stored = storedById.get(id);
-    if (id === 'openai_key' && String(stored.pattern || '') === LEGACY_OPENAI_KEY_PATTERN) {
-      return { ...def, ...stored, pattern: def.pattern };
-    }
-    return { ...def, ...stored };
-  });
-
-  const mergedIds = new Set(mergedDefaults.map((entry) => String(entry?.id || '').trim()).filter(Boolean));
-  const customOnly = storedPatterns.filter((entry) => {
-    const id = String(entry?.id || '').trim();
-    return !id || !mergedIds.has(id);
-  });
-
-  return [...mergedDefaults, ...extras, ...customOnly];
-}
 
 class VeilContentController {
   constructor() {
@@ -299,7 +217,7 @@ class VeilContentController {
           monitoredSelectors: Array.isArray(result.monitoredSelectors) && result.monitoredSelectors.length > 0
             ? result.monitoredSelectors
             : this.getPlatformSelectors(),
-          customPatterns: normalizeCustomPatterns(result.customPatterns, DEFAULT_CUSTOM_PATTERNS),
+          customPatterns: normalizeCustomPatterns(result.customPatterns, cloneDefaultCustomPatterns()),
           customEntityTypes: Array.isArray(result.customEntityTypes) ? result.customEntityTypes : []
         };
         resolve();
@@ -1978,6 +1896,7 @@ class VeilContentController {
     if (!item.redacted) return item.text;
     if (modeOverride === 'anonymize') {
       if (item.anonymizedText) return item.anonymizedText;
+      if (item.replacement) return item.replacement;
       return `<${item.alias}>`;
     }
     if (item.replacement) return item.replacement;
@@ -1997,7 +1916,10 @@ class VeilContentController {
       organization: '[ORG REDACTED]',
       api_key: '[API KEY REDACTED]',
       ip_address: '[IP REDACTED]',
-      jwt: '[JWT REDACTED]'
+      jwt: '[JWT REDACTED]',
+      pan: '[PAN REDACTED]',
+      aadhaar: '[AADHAAR REDACTED]',
+      passport: '[PASSPORT REDACTED]'
     };
     const base = map[label] || `[${String(label || 'PII').toUpperCase()} REDACTED]`;
     // Insert numeric index before REDACTED so tokens are uniquely identifiable:
@@ -2598,7 +2520,10 @@ class VeilContentController {
       organization: '#3949AB',
       api_key: '#6A1B9A',
       ip_address: '#546E7A',
-      jwt: '#8D6E63'
+      jwt: '#8D6E63',
+      pan: '#00897B',
+      aadhaar: '#5E35B1',
+      passport: '#6D4C41'
     };
     return palette[type] || '#546E7A';
   }

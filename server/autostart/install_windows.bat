@@ -33,6 +33,9 @@ if errorlevel 1 (
 echo Scheduled task created: %TASK_NAME%
 echo The Veil GLiNER server will start automatically at next login.
 echo.
-echo To start it now (in a new window):
+echo Manual start from Command Prompt:
 echo   start "" "%VENV_PYTHON%" "%SERVER_SCRIPT%" --host 127.0.0.1 --port 8765
+echo.
+echo Manual start from PowerShell:
+echo   Start-Process "%VENV_PYTHON%" -ArgumentList '"%SERVER_SCRIPT%" --host 127.0.0.1 --port 8765'
 endlocal

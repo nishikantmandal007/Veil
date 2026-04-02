@@ -1,89 +1,11 @@
 // popup.js - Claude-like compact settings UI + server controls
 
-const DEFAULT_CUSTOM_PATTERNS = [
-  {
-    id: 'openai_key',
-    label: 'api_key',
-    pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[API KEY REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'aws_access_key',
-    label: 'api_key',
-    pattern: '\\bAKIA[0-9A-Z]{16}\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[AWS KEY REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'github_token',
-    label: 'api_key',
-    pattern: '\\bgh[pousr]_[A-Za-z0-9]{20,}\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[TOKEN REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'jwt_token',
-    label: 'jwt',
-    pattern: '\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b',
-    flags: 'g',
-    score: 0.97,
-    replacement: '[JWT REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'ipv4',
-    label: 'ip_address',
-    pattern: '\\b(?:(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\b',
-    flags: 'g',
-    score: 0.96,
-    replacement: '[IP REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'ssn',
-    label: 'ssn',
-    pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b',
-    flags: 'g',
-    score: 0.99,
-    replacement: '[SSN REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'indian_pan',
-    label: 'pan',
-    pattern: '\\b[A-Z]{5}[0-9]{4}[A-Z]\\b',
-    flags: 'g',
-    score: 0.98,
-    replacement: '[PAN REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'indian_aadhaar',
-    label: 'aadhaar',
-    pattern: '\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b',
-    flags: 'g',
-    score: 0.95,
-    replacement: '[AADHAAR REDACTED]',
-    enabled: true
-  },
-  {
-    id: 'passport',
-    label: 'passport',
-    pattern: '\\b[A-Z][0-9]{7}\\b',
-    flags: 'g',
-    score: 0.92,
-    replacement: '[PASSPORT REDACTED]',
-    enabled: false
-  }
-];
-const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
+const {
+  DEFAULT_CUSTOM_PATTERNS,
+  PATTERN_NAMES,
+  cloneDefaultCustomPatterns,
+  normalizeCustomPatterns
+} = globalThis.VEIL_PATTERN_CATALOG;
 const DEFAULT_SERVER_MODEL = 'fastino/gliner2-large-v1';
 const MODEL_SELECTION_ALIASES = {
   'fastino/gliner2-base-v1': DEFAULT_SERVER_MODEL
@@ -136,47 +58,9 @@ const DEFAULT_SETTINGS = {
     '[role="textbox"]',
     '.ProseMirror'
   ],
-  customPatterns: DEFAULT_CUSTOM_PATTERNS,
+  customPatterns: cloneDefaultCustomPatterns(),
   customEntityTypes: []
 };
-
-function normalizeCustomPatterns(storedPatterns, defaults) {
-  const defaultList = Array.isArray(defaults) ? defaults : [];
-  if (!Array.isArray(storedPatterns) || storedPatterns.length === 0) {
-    return defaultList.slice();
-  }
-
-  const storedById = new Map();
-  const extras = [];
-
-  storedPatterns.forEach((entry) => {
-    if (!entry || typeof entry !== 'object') return;
-    const id = String(entry.id || '').trim();
-    if (!id) {
-      extras.push(entry);
-      return;
-    }
-    storedById.set(id, entry);
-  });
-
-  const mergedDefaults = defaultList.map((def) => {
-    const id = String(def?.id || '').trim();
-    if (!id || !storedById.has(id)) return def;
-    const stored = storedById.get(id);
-    if (id === 'openai_key' && String(stored.pattern || '') === LEGACY_OPENAI_KEY_PATTERN) {
-      return { ...def, ...stored, pattern: def.pattern };
-    }
-    return { ...def, ...stored };
-  });
-
-  const mergedIds = new Set(mergedDefaults.map((entry) => String(entry?.id || '').trim()).filter(Boolean));
-  const customOnly = storedPatterns.filter((entry) => {
-    const id = String(entry?.id || '').trim();
-    return !id || !mergedIds.has(id);
-  });
-
-  return [...mergedDefaults, ...extras, ...customOnly];
-}
 
 class SettingsManager {
   constructor() {
@@ -243,7 +127,7 @@ class SettingsManager {
           ...DEFAULT_SETTINGS,
           ...result
         };
-        this.settings.customPatterns = normalizeCustomPatterns(this.settings.customPatterns, DEFAULT_CUSTOM_PATTERNS);
+        this.settings.customPatterns = normalizeCustomPatterns(this.settings.customPatterns, cloneDefaultCustomPatterns());
         resolve();
       });
     });
@@ -438,7 +322,7 @@ class SettingsManager {
 
     document.getElementById('saveAdvancedButton').addEventListener('click', () => this.saveAdvancedConfig(true));
     document.getElementById('loadDefaultsButton').addEventListener('click', () => {
-      this.settings.customPatterns = DEFAULT_CUSTOM_PATTERNS.slice();
+      this.settings.customPatterns = cloneDefaultCustomPatterns();
       this.renderPatternCards();
       this.savePatterns();
       this.setMessage('Patterns reset to defaults.');
@@ -547,7 +431,12 @@ class SettingsManager {
 
     window.addEventListener('focus', () => {
       this.loadPageStats().catch(() => { });
-      this.refreshReleaseInfo({ silent: true }).catch(() => { });
+      this.refreshReleaseSurface({ silent: true }).catch(() => { });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      this.refreshReleaseSurface({ silent: true }).catch(() => { });
     });
   }
 
@@ -985,18 +874,49 @@ class SettingsManager {
     const latestTag = this.releaseInfo.latestTag || 'latest';
     const published = this.formatReleaseTimestamp(this.releaseInfo.publishedAt);
     const currentVersion = chrome.runtime.getManifest()?.version || 'unknown';
-    const bundleIsCurrent = Boolean(installedBundleTag) && installedBundleTag === latestTag;
-    const bundleNeedsRefresh = Boolean(latestTag) && installedBundleTag !== latestTag;
+    const bundleKnown = Boolean(installedBundleTag);
+    const bundleIsCurrent = bundleKnown && installedBundleTag === latestTag;
+    const bundleNeedsRefresh = bundleKnown && Boolean(latestTag) && installedBundleTag !== latestTag;
+    const bundleUnknown = !bundleKnown;
+    const extensionComparable = Boolean(this.releaseInfo.comparableToExtension);
+    const extensionUpdateAvailable = extensionComparable && Boolean(this.releaseInfo.extensionUpdateAvailable);
+    const extensionIsCurrent = extensionComparable && !extensionUpdateAvailable;
 
-    if (this.releaseInfo.comparableToExtension && this.releaseInfo.extensionUpdateAvailable) {
+    if (extensionUpdateAvailable && bundleIsCurrent) {
+      setUpdateBlockVisible(false);
+      releaseText.textContent = `Extension update available: ${latestTag} (backend already updated)`;
+      releaseSubtext.textContent = `Published ${published}. Your installed local server bundle already matches ${latestTag}. Reload or reinstall the extension build from v${currentVersion} to finish the upgrade.`;
+      applySidebarState('is-available', 'Update', 'Backend current, extension behind', `The local server bundle is already on ${latestTag}, but the extension UI is still on v${currentVersion}.`);
+      showNotice(
+        'Extension update',
+        'Reload the extension to finish updating Veil',
+        `Your local server bundle already matches ${latestTag}. Reload or reinstall the extension build from v${currentVersion} so the UI and backend are on the same release.`
+      );
+      return;
+    }
+
+    if (extensionUpdateAvailable && bundleNeedsRefresh) {
       setUpdateBlockVisible(true);
-      releaseText.textContent = `Extension update available: ${latestTag} (you have v${currentVersion})`;
-      releaseSubtext.textContent = `Published ${published}. Update or reload the extension build first. Then re-run the local server update command below to refresh the installed backend bundle.`;
-      applySidebarState('is-available', 'Update', 'Extension update available', `A newer Veil release is available. Update the extension first, then refresh the local server bundle if prompted.`);
+      releaseText.textContent = `Veil update available: ${latestTag}`;
+      releaseSubtext.textContent = `Published ${published}. Extension build is v${currentVersion} and the installed local server bundle is ${installedBundleTag}. Update or reload the extension, then run the refresh command below so both parts land on ${latestTag}.`;
+      applySidebarState('is-available', 'Update', 'Extension and server update available', `A newer Veil release is available, and this machine still has the ${installedBundleTag} local server bundle.`);
       showNotice(
         'Update available',
-        'A newer Veil extension release is available',
-        `You’re currently on v${currentVersion}. Update or reload the extension first, then run the refresh local server bundle command below so the backend matches the new release.`
+        'Update the extension, then refresh the local server bundle',
+        `You’re on extension v${currentVersion} with local server bundle ${installedBundleTag}. Reload the extension first, then run the refresh command below so both move to ${latestTag}.`
+      );
+      return;
+    }
+
+    if (extensionUpdateAvailable && bundleUnknown) {
+      setUpdateBlockVisible(true);
+      releaseText.textContent = `Extension update available: ${latestTag} (backend version unknown)`;
+      releaseSubtext.textContent = `Published ${published}. Update or reload the extension build first. Then run the refresh command below once so Veil can stamp and verify the installed local server bundle version.`;
+      applySidebarState('is-available', 'Update', 'Extension update available', `A newer Veil release is available, and this install still needs backend release metadata stamped locally.`);
+      showNotice(
+        'Update available',
+        'Update the extension and refresh local server metadata',
+        `You’re currently on v${currentVersion}. Reload the extension first, then run the refresh command below so Veil can verify which local server bundle is installed.`
       );
       return;
     }
@@ -1017,6 +937,19 @@ class SettingsManager {
       return;
     }
 
+    if (extensionIsCurrent && bundleUnknown) {
+      setUpdateBlockVisible(true);
+      releaseText.textContent = `Extension is up to date: v${currentVersion}`;
+      releaseSubtext.textContent = `Latest GitHub release is ${latestTag}, published ${published}. This install still needs one local server refresh so Veil can verify and stamp the backend bundle version on this machine.`;
+      applySidebarState('is-available', 'Refresh', 'Backend version needs verification', 'The extension is current, but this local server install is missing release metadata until you refresh it once.');
+      showNotice(
+        'Server metadata',
+        'Refresh the local server bundle once',
+        `The extension is already on ${latestTag}. Run the refresh command below once so Veil can stamp and verify the backend bundle version for this install.`
+      );
+      return;
+    }
+
     if (bundleIsCurrent) {
       setUpdateBlockVisible(false);
       releaseText.textContent = `Local server bundle is up to date: ${latestTag}`;
@@ -1025,7 +958,7 @@ class SettingsManager {
       return;
     }
 
-    if (this.releaseInfo.comparableToExtension) {
+    if (extensionComparable) {
       setUpdateBlockVisible(false);
       releaseText.textContent = `Extension is up to date: v${currentVersion}`;
       releaseSubtext.textContent = `Latest GitHub release is ${latestTag}, published ${published}. Refresh the local server bundle below if you want to stamp this install with the latest release metadata or repair it in place.`;
@@ -1405,6 +1338,11 @@ class SettingsManager {
     });
   }
 
+  async refreshReleaseSurface(options = {}) {
+    await this.refreshServerStatus(options);
+    await this.refreshReleaseInfo(options);
+  }
+
   async startServer() {
     if (this.serverBusy) return;
     const hfToken = this.getInputHfToken() || this.localSecrets.hfToken || '';
@@ -1665,18 +1603,6 @@ class SettingsManager {
     }
 
     const defaultIds = new Set(DEFAULT_CUSTOM_PATTERNS.map((p) => p.id));
-
-    const PATTERN_NAMES = {
-      openai_key: 'OpenAI API Key',
-      aws_access_key: 'AWS Access Key',
-      github_token: 'GitHub Token',
-      jwt_token: 'JWT Token',
-      ipv4: 'IPv4 Address',
-      ssn: 'US Social Security Number',
-      indian_pan: 'Indian PAN Number',
-      indian_aadhaar: 'Indian Aadhaar',
-      passport: 'Passport Number'
-    };
 
     list.innerHTML = patterns.map((pattern, index) => {
       const isDefault = defaultIds.has(pattern.id);
@@ -1999,24 +1925,84 @@ class OnboardingWizard {
 
 document.addEventListener('DOMContentLoaded', () => {
   const sm = new SettingsManager();
+  window.__VEIL_SETTINGS_MANAGER__ = sm;
   // eslint-disable-next-line no-new
   new OnboardingWizard(sm);
 
   // Sidebar scroll-spy for options page
   const mainEl = document.getElementById('opt-main');
   if (mainEl) {
-    const navItems = document.querySelectorAll('.opt-nav-item[data-section]');
-    const sections = document.querySelectorAll('.opt-section[id]');
-    const activate = () => {
-      let active = '';
-      sections.forEach((s) => {
-        if (s.getBoundingClientRect().top <= 80) active = s.id.replace('section-', '');
-      });
-      navItems.forEach((a) => {
-        a.classList.toggle('is-active', a.dataset.section === active);
+    const navItems = Array.from(document.querySelectorAll('.opt-nav-item[data-section]'));
+    const sections = Array.from(document.querySelectorAll('.opt-section[id]'));
+    const sectionPrefix = 'section-';
+    const getScrollOffset = () => {
+      const rawOffset = getComputedStyle(document.documentElement).getPropertyValue('--opt-section-scroll-offset');
+      const parsedOffset = Number.parseFloat(rawOffset);
+      return Number.isFinite(parsedOffset) ? parsedOffset : 112;
+    };
+    const getSectionName = (value = '') => value.startsWith(sectionPrefix) ? value.slice(sectionPrefix.length) : value;
+    const setActive = (sectionName) => {
+      navItems.forEach((item) => {
+        item.classList.toggle('is-active', item.dataset.section === sectionName);
       });
     };
+    const getSectionTop = (section) => (
+      mainEl.scrollTop + section.getBoundingClientRect().top - mainEl.getBoundingClientRect().top
+    );
+    const activate = () => {
+      if (!sections.length) return;
+      const maxScrollTop = Math.max(0, mainEl.scrollHeight - mainEl.clientHeight);
+      if (mainEl.scrollTop >= maxScrollTop - 4) {
+        setActive(getSectionName(sections[sections.length - 1].id));
+        return;
+      }
+
+      const threshold = mainEl.scrollTop + getScrollOffset() + 24;
+      let activeSection = sections[0];
+      sections.forEach((section) => {
+        if (getSectionTop(section) <= threshold) {
+          activeSection = section;
+        }
+      });
+      setActive(getSectionName(activeSection.id));
+    };
+    const scrollToSection = (sectionName, updateHash = true) => {
+      const target = document.getElementById(`${sectionPrefix}${sectionName}`);
+      if (!target) return;
+      const nextTop = Math.max(0, getSectionTop(target) - getScrollOffset());
+      mainEl.scrollTo({ top: nextTop, behavior: 'smooth' });
+      setActive(sectionName);
+      if (updateHash) {
+        const nextHash = `#${sectionPrefix}${sectionName}`;
+        if (window.history?.replaceState) {
+          window.history.replaceState(null, '', nextHash);
+        } else {
+          window.location.hash = nextHash;
+        }
+      }
+    };
+
+    navItems.forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.preventDefault();
+        scrollToSection(item.dataset.section);
+      });
+    });
+
+    window.addEventListener('hashchange', () => {
+      const sectionName = getSectionName(window.location.hash.replace(/^#/, ''));
+      if (!sectionName || !navItems.some((item) => item.dataset.section === sectionName)) return;
+      scrollToSection(sectionName, false);
+    });
+
     mainEl.addEventListener('scroll', activate, { passive: true });
-    activate();
+    requestAnimationFrame(() => {
+      const initialSection = getSectionName(window.location.hash.replace(/^#/, ''));
+      if (initialSection && navItems.some((item) => item.dataset.section === initialSection)) {
+        scrollToSection(initialSection, false);
+        return;
+      }
+      activate();
+    });
   }
 });

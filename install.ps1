@@ -73,6 +73,79 @@ function Start-VeilScheduledTask {
     return $true
 }
 
+function Test-VeilServerHealthy {
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:8765/health" -TimeoutSec 2
+        return $response.StatusCode -ge 200 -and $response.StatusCode -lt 300
+    }
+    catch {
+        return $false
+    }
+}
+
+function Test-VeilPortOpen {
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $asyncResult = $client.BeginConnect("127.0.0.1", 8765, $null, $null)
+        if (-not $asyncResult.AsyncWaitHandle.WaitOne(750, $false)) {
+            return $false
+        }
+
+        $client.EndConnect($asyncResult)
+        return $true
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+function Start-VeilServerNow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallDir
+    )
+
+    $venvPython = Join-Path $InstallDir ".venv\Scripts\python.exe"
+    $serverScript = Join-Path $InstallDir "server\gliner2_server.py"
+
+    if (Test-VeilServerHealthy) {
+        Write-Host "Veil server already healthy; skipping immediate start."
+        return $true
+    }
+
+    if (Test-VeilPortOpen) {
+        Write-Host "Warning: port 8765 is already in use by another local process. Skipping immediate Veil start for this session."
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $venvPython) -or -not (Test-Path -LiteralPath $serverScript)) {
+        Write-Host "Warning: Veil installed, but the managed runtime was not found for an immediate start."
+        return $false
+    }
+
+    try {
+        Start-Process -FilePath $venvPython -ArgumentList @($serverScript, "--host", "127.0.0.1", "--port", "8765") -WorkingDirectory $InstallDir -WindowStyle Hidden | Out-Null
+    }
+    catch {
+        Write-Host "Warning: Veil installed successfully, but the server could not be started immediately."
+        return $false
+    }
+
+    for ($attempt = 0; $attempt -lt 20; $attempt += 1) {
+        Start-Sleep -Milliseconds 500
+        if (Test-VeilServerHealthy) {
+            Write-Host "Veil server started for the current session."
+            return $true
+        }
+    }
+
+    Write-Host "Warning: Veil installed successfully, but the server is still starting in the background."
+    return $false
+}
+
 function Stop-VeilWindowsProcesses {
     param(
         [Parameter(Mandatory = $true)]
@@ -352,12 +425,21 @@ function Install-Veil {
         Sync-VeilRuntime -InstallDir $InstallDir -UvExe $uvExe -PythonVersion $pinnedPythonVersion -RecreateVenv:$RecreateVenv
 
         Invoke-VeilCommand -Command @((Join-Path $InstallDir "server\native-host\install_windows.bat"), $ExtensionId) -FailureMessage "Failed to register the Veil native host"
-        Invoke-VeilCommand -Command @((Join-Path $InstallDir "server\autostart\install_windows.bat")) -FailureMessage "Failed to register Veil autostart"
-        foreach ($taskName in Get-VeilScheduledTaskNames) {
-            if (Start-VeilScheduledTask -TaskName $taskName) {
-                break
-            }
+
+        $autostartRegistered = $false
+        try {
+            Invoke-VeilCommand -Command @((Join-Path $InstallDir "server\autostart\install_windows.bat")) -FailureMessage "Failed to register Veil autostart"
+            $autostartRegistered = $true
         }
+        catch {
+            Write-Host $_.Exception.Message
+            Write-Host "Warning: Veil install completed, but autostart could not be registered. You can still start the server from the extension now, or rerun the installer in an Administrator PowerShell later."
+        }
+
+        if ($autostartRegistered) {
+            Write-Host "Veil autostart is configured for the next sign-in."
+        }
+        Start-VeilServerNow -InstallDir $InstallDir | Out-Null
 
         Write-Host ""
         Write-Host "Veil install complete."

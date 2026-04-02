@@ -69,6 +69,7 @@
   /* ── Typography ── */
   --md-font: "Roboto", "Google Sans", system-ui, sans-serif;
   --md-font-mono: "Roboto Mono", "JetBrains Mono", "SF Mono", monospace;
+  --opt-section-scroll-offset: 112px;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -491,6 +492,9 @@ html, body {
   overflow-y: auto;
   background: var(--md-surface-2);
   scroll-behavior: smooth;
+  scroll-padding-top: var(--opt-section-scroll-offset);
+  scroll-padding-bottom: 120px;
+  padding-bottom: 120px;
 }
 .opt-main::-webkit-scrollbar { width: 6px; }
 .opt-main::-webkit-scrollbar-track { background: transparent; }
@@ -549,8 +553,9 @@ html, body {
 /* ── Sections ── */
 .opt-section {
   padding: 36px 40px 0;
+  scroll-margin-top: calc(var(--opt-section-scroll-offset) + 8px);
 }
-.opt-section:last-of-type { padding-bottom: 64px; }
+.opt-section:last-of-type { padding-bottom: 24px; }
 
 .opt-section-header { margin-bottom: 20px; }
 
@@ -857,7 +862,8 @@ html, body {
   padding: 16px 24px 18px;
   background: var(--md-surface-1);
   border-top: 1px solid var(--md-outline-variant);
-  margin-top: 24px;
+  margin: 24px 40px 0;
+  border-radius: var(--md-shape-lg);
 }
 
 .opt-maya-footer .maya-logo {

@@ -17,6 +17,22 @@ const TEST_PAGE_HTML = `<!DOCTYPE html>
 
 const DATA_URL = `data:text/html;charset=utf-8,${encodeURIComponent(TEST_PAGE_HTML)}`;
 
+async function sendDetectRequest(context, extensionId, text, options = {}) {
+    const extensionPage = await context.newPage();
+    await extensionPage.goto(`chrome-extension://${extensionId}/popup.html`);
+    await extensionPage.waitForLoadState('domcontentloaded');
+    const response = await extensionPage.evaluate(
+        ({ payloadText, payloadOptions }) => new Promise((resolve) => chrome.runtime.sendMessage({
+            action: 'detectPII',
+            text: payloadText,
+            options: payloadOptions,
+        }, resolve)),
+        { payloadText: text, payloadOptions: options }
+    );
+    await extensionPage.close();
+    return response;
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 test.describe('Content-Script Detection', () => {
@@ -57,6 +73,62 @@ test.describe('Content-Script Detection', () => {
         await page.close();
     });
 
+    test('regex token detectors stay off while the model is online when the toggle is disabled', async ({ extensionContext }) => {
+        const { context, extensionId } = extensionContext;
+        const response = await sendDetectRequest(
+            context,
+            extensionId,
+            'My name is Jane Doe and my key is sk-abcdefghijklmnopqrst',
+            {
+                enabledTypes: ['person'],
+                includeRegexWhenModelOnline: false,
+                customPatterns: [
+                    {
+                        id: 'openai_key',
+                        label: 'api_key',
+                        pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
+                        flags: 'g',
+                        score: 0.99,
+                        replacement: '[API KEY REDACTED]',
+                        enabled: true,
+                    },
+                ],
+            }
+        );
+
+        expect(response.success).toBeTruthy();
+        expect(response.mode).toBe('gliner2-local');
+        expect(response.detections.map((item) => item.label)).not.toContain('api_key');
+    });
+
+    test('regex token detectors run alongside the model when the toggle is enabled', async ({ extensionContext }) => {
+        const { context, extensionId } = extensionContext;
+        const response = await sendDetectRequest(
+            context,
+            extensionId,
+            'My name is Jane Doe and my key is sk-abcdefghijklmnopqrst',
+            {
+                enabledTypes: ['person'],
+                includeRegexWhenModelOnline: true,
+                customPatterns: [
+                    {
+                        id: 'openai_key',
+                        label: 'api_key',
+                        pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
+                        flags: 'g',
+                        score: 0.99,
+                        replacement: '[API KEY REDACTED]',
+                        enabled: true,
+                    },
+                ],
+            }
+        );
+
+        expect(response.success).toBeTruthy();
+        expect(response.mode).toBe('gliner2-local');
+        expect(response.detections.map((item) => item.label)).toContain('api_key');
+    });
+
     test('LLM response areas (.markdown-body) are never modified', async ({ extensionContext }) => {
         const { context } = extensionContext;
         const page = await context.newPage();
@@ -78,23 +150,32 @@ test.describe('Content-Script Detection', () => {
 });
 
 test.describe('Regex Fallback (no server)', () => {
-    test('extension does not crash when server is offline', async ({ extensionContext }) => {
+    test('regex fallback detects built-in token patterns when server is offline', async ({ extensionContext }) => {
         // No mock server — server is offline; regex fallback should kick in silently
-        const { context } = extensionContext;
-        const page = await context.newPage();
-        await page.goto(DATA_URL);
-        await page.waitForLoadState('domcontentloaded');
+        const { context, extensionId } = extensionContext;
+        const response = await sendDetectRequest(
+            context,
+            extensionId,
+            'Call me at 415-555-1234 or sk-abcdefghijklmnopqrst',
+            {
+                enabledTypes: ['phone'],
+                includeRegexWhenModelOnline: false,
+                customPatterns: [
+                    {
+                        id: 'openai_key',
+                        label: 'api_key',
+                        pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
+                        flags: 'g',
+                        score: 0.99,
+                        replacement: '[API KEY REDACTED]',
+                        enabled: true,
+                    },
+                ],
+            }
+        );
 
-        const textarea = page.locator('#userInput');
-        await textarea.click();
-        await textarea.fill('Call me at 415-555-1234 or sk-abcdefghijklmnopqrst');
-
-        await page.waitForTimeout(2500);
-
-        // Extension process should not have crashed
-        const value = await textarea.inputValue();
-        expect(value.length).toBeGreaterThan(0);
-
-        await page.close();
+        expect(response.success).toBeTruthy();
+        expect(response.mode).toBe('regex-fallback');
+        expect(response.detections.map((item) => item.label).sort()).toEqual(['api_key', 'phone']);
     });
 });

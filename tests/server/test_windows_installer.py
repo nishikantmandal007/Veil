@@ -6,6 +6,7 @@ import re
 
 
 INSTALLER_PATH = Path(__file__).resolve().parents[2] / "install.ps1"
+AUTOSTART_INSTALLER_PATH = Path(__file__).resolve().parents[2] / "server" / "autostart" / "install_windows.bat"
 
 
 def test_uv_bootstrap_output_is_not_returned_from_ensure_veil_uv():
@@ -23,3 +24,18 @@ def test_uv_bootstrap_output_is_not_returned_from_ensure_veil_uv():
         re.MULTILINE,
     )
     assert direct_invoke.search(script) is None
+
+
+def test_install_veil_starts_the_server_now_and_treats_autostart_as_a_warning():
+    script = INSTALLER_PATH.read_text(encoding="utf-8")
+
+    assert "function Start-VeilServerNow" in script
+    assert 'Write-Host "Warning: Veil install completed, but autostart could not be registered.' in script
+    assert "Start-VeilServerNow -InstallDir $InstallDir | Out-Null" in script
+
+
+def test_windows_autostart_script_prints_powershell_safe_manual_start_guidance():
+    script = AUTOSTART_INSTALLER_PATH.read_text(encoding="utf-8")
+
+    assert "Manual start from PowerShell:" in script
+    assert 'Start-Process "%VENV_PYTHON%" -ArgumentList' in script

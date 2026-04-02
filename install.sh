@@ -25,6 +25,17 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+extract_release_field() {
+  local payload="$1"
+  local field="$2"
+  local match=""
+  match="$(printf '%s' "${payload}" | grep -o "\"${field}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -n 1 || true)"
+  if [[ -z "${match}" ]]; then
+    return 0
+  fi
+  printf '%s' "${match}" | sed -E "s/\"${field}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\"/\\1/"
+}
+
 python_version_of() {
   local python_bin="$1"
   if [[ ! -x "${python_bin}" ]]; then
@@ -92,9 +103,9 @@ EOF
   fi
 
   payload="$(tr -d '\n' < "${release_info_path}")"
-  tag="$(printf '%s' "${payload}" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-  published="$(printf '%s' "${payload}" | sed -n 's/.*"published_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-  html_url="$(printf '%s' "${payload}" | sed -n 's/.*"html_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+  tag="$(extract_release_field "${payload}" "tag_name")"
+  published="$(extract_release_field "${payload}" "published_at")"
+  html_url="$(extract_release_field "${payload}" "html_url")"
 
   cat > "${target_path}" <<EOF
 {
