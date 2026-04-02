@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.4] - 2026-04-02
+
+### Update UX and Backend Tracking
+
+- Split extension and backend release state in the popup/settings UI so Veil can clearly show mixed states like “extension behind, backend already updated” instead of masking backend success behind one generic update warning.
+- Refreshed release-state checks whenever the popup or settings view regains focus, reducing the need to close and reopen Veil after refreshing the local server bundle.
+- Surfaced missing backend release metadata as a one-time refresh step instead of incorrectly implying that the installed backend is definitely outdated.
+- Fixed Unix release metadata stamping so the stored backend `html_url` is extracted from the actual GitHub release payload instead of occasionally capturing an unrelated nested URL.
+
+### Settings and Maintenance
+
+- Fixed settings-page sidebar navigation so section headers land fully below the sticky control bar, improved bottom-of-page scroll-spy behavior, and made the `About` section reliably selectable.
+- Moved local server uninstall into Diagnostics so setup, logs, runtime details, and repair actions live in one Local Server workflow.
+- Polished the Local Server maintenance surface with clearer recovery copy and a more explicit uninstall command section for removing the native host, autostart entry, and installed backend bundle.
+
+### Regex Detection
+
+- Unified Veil’s built-in sensitive-token patterns into one shared regex catalog used by the background runtime, popup/options editor, and content-side settings normalization, eliminating drift between UI and detection behavior.
+- Updated the online regex toggle to govern all regex-based detectors while GLiNER is healthy, while keeping regex fallback automatic when the local server is offline.
+- Expanded the built-in regex catalog coverage for GitHub tokens, IPv6, PAN, Aadhaar, and passport patterns, and ensured explicit regex replacements are respected even in anonymize mode for token-style detections.
+
+### Windows Installer
+
+- Changed the Windows PowerShell installer to treat autostart registration as a warning when permissions block scheduled-task creation, allowing the core backend/native-host install to finish cleanly in non-admin sessions.
+- Added a safe immediate-start step after install on Windows so Veil can start the local server for the current session when port `8765` is free, while still warning instead of failing if the server is already running or the port is occupied.
+- Replaced the previous `cmd.exe`-only manual start guidance in the Windows autostart script with both Command Prompt and PowerShell-safe instructions.
+
 ## [1.2.3] - 2026-03-31
 
 ### Runtime and Packaging

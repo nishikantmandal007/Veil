@@ -1,6 +1,6 @@
 [project]
 name = "veil-local-runtime"
-version = "1.2.3"
+version = "1.2.4"
 description = "Local runtime and native-host support for the Veil browser extension."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
