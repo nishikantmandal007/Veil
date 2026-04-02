@@ -1,0 +1,166 @@
+(function initVeilPatternCatalog(root) {
+  const LEGACY_OPENAI_KEY_PATTERN = '\\bsk-[A-Za-z0-9]{20,}\\b';
+
+  const DEFAULT_CUSTOM_PATTERNS = Object.freeze([
+    Object.freeze({
+      id: 'openai_key',
+      label: 'api_key',
+      pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[API KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'aws_access_key',
+      label: 'api_key',
+      pattern: '\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[AWS KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'github_token',
+      label: 'api_key',
+      pattern: '\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[GITHUB TOKEN REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'jwt_token',
+      label: 'jwt',
+      pattern: '\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b',
+      flags: 'g',
+      score: 0.97,
+      replacement: '[JWT REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'ipv4',
+      label: 'ip_address',
+      pattern: '\\b(?:(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\b',
+      flags: 'g',
+      score: 0.96,
+      replacement: '[IP REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'ipv6',
+      label: 'ip_address',
+      pattern: '\\b(?:[A-Fa-f0-9]{1,4}:){2,7}[A-Fa-f0-9]{1,4}\\b',
+      flags: 'g',
+      score: 0.9,
+      replacement: '[IPV6 REDACTED]',
+      enabled: false
+    }),
+    Object.freeze({
+      id: 'ssn',
+      label: 'ssn',
+      pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[SSN REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'indian_pan',
+      label: 'pan',
+      pattern: '\\b[A-Z]{5}[0-9]{4}[A-Z]\\b',
+      flags: 'g',
+      score: 0.98,
+      replacement: '[PAN REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'indian_aadhaar',
+      label: 'aadhaar',
+      pattern: '\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b',
+      flags: 'g',
+      score: 0.95,
+      replacement: '[AADHAAR REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'passport',
+      label: 'passport',
+      pattern: '\\b[A-Z][0-9]{7}\\b',
+      flags: 'g',
+      score: 0.92,
+      replacement: '[PASSPORT REDACTED]',
+      enabled: false
+    })
+  ]);
+
+  const PATTERN_NAMES = Object.freeze({
+    openai_key: 'OpenAI API Key',
+    aws_access_key: 'AWS Access Key',
+    github_token: 'GitHub Token',
+    jwt_token: 'JWT Token',
+    ipv4: 'IPv4 Address',
+    ipv6: 'IPv6 Address',
+    ssn: 'US Social Security Number',
+    indian_pan: 'Indian PAN Number',
+    indian_aadhaar: 'Indian Aadhaar',
+    passport: 'Passport Number'
+  });
+
+  function cloneDefaultCustomPatterns() {
+    return DEFAULT_CUSTOM_PATTERNS.map((pattern) => ({ ...pattern }));
+  }
+
+  function normalizeCustomPatterns(storedPatterns, defaults = cloneDefaultCustomPatterns()) {
+    const defaultList = Array.isArray(defaults) ? defaults.map((entry) => ({ ...entry })) : cloneDefaultCustomPatterns();
+    if (!Array.isArray(storedPatterns) || storedPatterns.length === 0) {
+      return defaultList;
+    }
+
+    const storedById = new Map();
+    const extras = [];
+
+    storedPatterns.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const id = String(entry.id || '').trim();
+      if (!id) {
+        extras.push({ ...entry });
+        return;
+      }
+      storedById.set(id, entry);
+    });
+
+    const mergedDefaults = defaultList.map((def) => {
+      const id = String(def?.id || '').trim();
+      if (!id || !storedById.has(id)) return { ...def };
+      const stored = storedById.get(id);
+      if (id === 'openai_key' && String(stored.pattern || '') === LEGACY_OPENAI_KEY_PATTERN) {
+        return { ...def, ...stored, pattern: def.pattern };
+      }
+      return { ...def, ...stored };
+    });
+
+    const mergedIds = new Set(mergedDefaults.map((entry) => String(entry?.id || '').trim()).filter(Boolean));
+    const customOnly = storedPatterns
+      .filter((entry) => {
+        const id = String(entry?.id || '').trim();
+        return !id || !mergedIds.has(id);
+      })
+      .map((entry) => ({ ...entry }));
+
+    return [...mergedDefaults, ...extras, ...customOnly];
+  }
+
+  const api = {
+    DEFAULT_CUSTOM_PATTERNS,
+    LEGACY_OPENAI_KEY_PATTERN,
+    PATTERN_NAMES,
+    cloneDefaultCustomPatterns,
+    normalizeCustomPatterns
+  };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  }
+  root.VEIL_PATTERN_CATALOG = api;
+}(typeof globalThis !== 'undefined' ? globalThis : this));

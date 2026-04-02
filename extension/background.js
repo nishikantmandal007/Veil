@@ -1,4 +1,10 @@
+import './pattern_catalog.js';
+
 // background.js - Service worker for GLiNER2 management and local PII detection
+
+const {
+  cloneDefaultCustomPatterns,
+} = globalThis.VEIL_PATTERN_CATALOG;
 
 const DEFAULT_LABELS = [
   'person',
@@ -413,71 +419,7 @@ class VeilAnonymizer {
 }
 
 function getDefaultCustomPatterns() {
-  return [
-    {
-      id: 'openai_key',
-      label: 'api_key',
-      pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
-      flags: 'g',
-      score: 0.99,
-      replacement: '[API KEY REDACTED]',
-      enabled: true
-    },
-    {
-      id: 'aws_access_key',
-      label: 'api_key',
-      pattern: '\\bAKIA[0-9A-Z]{16}\\b',
-      flags: 'g',
-      score: 0.99,
-      replacement: '[AWS KEY REDACTED]',
-      enabled: true
-    },
-    {
-      id: 'github_token',
-      label: 'api_key',
-      pattern: '\\bgh[pousr]_[A-Za-z0-9]{20,}\\b',
-      flags: 'g',
-      score: 0.99,
-      replacement: '[TOKEN REDACTED]',
-      enabled: true
-    },
-    {
-      id: 'jwt_token',
-      label: 'jwt',
-      pattern: '\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b',
-      flags: 'g',
-      score: 0.97,
-      replacement: '[JWT REDACTED]',
-      enabled: true
-    },
-    {
-      id: 'ipv4',
-      label: 'ip_address',
-      pattern: '\\b(?:(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\b',
-      flags: 'g',
-      score: 0.96,
-      replacement: '[IP REDACTED]',
-      enabled: true
-    },
-    {
-      id: 'ipv6',
-      label: 'ip_address',
-      pattern: '\\b(?:[A-Fa-f0-9]{1,4}:){2,7}[A-Fa-f0-9]{1,4}\\b',
-      flags: 'g',
-      score: 0.9,
-      replacement: '[IPV6 REDACTED]',
-      enabled: false
-    },
-    {
-      id: 'ssn',
-      label: 'ssn',
-      pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b',
-      flags: 'g',
-      score: 0.99,
-      replacement: '[SSN REDACTED]',
-      enabled: true
-    }
-  ];
+  return cloneDefaultCustomPatterns();
 }
 
 function isNativeHostMissingError(message) {
@@ -623,10 +565,11 @@ class GLiNERDetector {
       }
     }
 
-    if (!modelOnline || includeRegexWhenModelOnline) {
+    const shouldRunRegexDetectors = !modelOnline || includeRegexWhenModelOnline;
+    if (shouldRunRegexDetectors) {
       detections.push(...this.detectWithRegex(text, enabledTypes, threshold));
+      detections.push(...this.detectWithCustomPatterns(text, customPatterns, threshold));
     }
-    detections.push(...this.detectWithCustomPatterns(text, customPatterns, threshold));
 
     return this.mergeAdjacentSameLabel(
       this.mergeOverlapping(this.postProcessDetections(detections, threshold)),

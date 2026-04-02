@@ -227,7 +227,7 @@
             <button id="copyUpdateCommandButton" type="button" class="ghost compact">Copy</button>
           </div>
           <pre class="cmd-box"><code id="serverUpdateCommand"></code></pre>
-          <p class="hint install-note">This command updates the local server bundle only. Extension updates still come from GitHub or your reloaded unpacked build.</p>
+          <p class="hint install-note">This command refreshes only the local server bundle on this machine. Extension updates still come from GitHub or from reloading your unpacked build.</p>
           <p class="hint install-note" id="releaseStatusText">Checking GitHub for the latest release…</p>
           <p class="hint install-note" id="releaseStatusSubtext">Re-run this command after a new release to update the local server bundle while keeping your cache and local config.</p>
           <p class="hint install-note"><a id="releaseLink" href="#" target="_blank" rel="noreferrer">Open latest GitHub release</a></p>
@@ -335,22 +335,15 @@
               </div>
               <pre class="cmd-box"><code id="logCommandText">tail -n 80 .runtime/gliner2_server.log</code></pre>
             </div>
+            <div class="install-block">
+              <div class="install-header">
+                <span class="install-title">Uninstall local server bundle</span>
+                <button id="copyUninstallCommandButton" type="button" class="ghost compact">Copy</button>
+              </div>
+              <pre class="cmd-box"><code id="nativeHostUninstallCommand"></code></pre>
+              <p class="hint install-note">This removes the native bridge, autostart entry, and the installed local server bundle from this machine.</p>
+            </div>
           </section>
-        </div>
-      </section>
-
-      <section class="card server-maintenance-card">
-        <div class="section-title-row">
-          <h2>Maintenance</h2>
-        </div>
-        <p class="hint">Need to remove Veil's local server from this machine? Use the uninstall command below.</p>
-        <div class="install-block">
-          <div class="install-header">
-            <span class="install-title">Uninstall local server</span>
-            <button id="copyUninstallCommandButton" type="button" class="ghost compact">Copy</button>
-          </div>
-          <pre class="cmd-box"><code id="nativeHostUninstallCommand"></code></pre>
-          <p class="hint install-note">This removes the native bridge, autostart entry, and installed local server bundle from this machine.</p>
         </div>
       </section>
 
@@ -365,7 +358,7 @@
           <input type="checkbox" id="monitorAllSitesToggle" checked>
         </label>
         <label class="row">
-          <span>Use Regex Fallback When Model Is Online</span>
+          <span>Run Regex Detectors Alongside AI Detection</span>
           <input type="checkbox" id="includeRegexToggle">
         </label>
       </section>
@@ -445,7 +438,7 @@
               <span class="patterns-section-title">Detection Patterns</span>
               <button id="addPatternButton" type="button" class="ghost compact">+ Add</button>
             </div>
-            <p class="hint" style="margin:0 0 8px">Toggle patterns on or off. Add your own without writing JSON.</p>
+            <p class="hint" style="margin:0 0 8px">Toggle built-in patterns or add your own regex-based detectors. These always run when the server is offline, and they run online when "Run Regex Detectors Alongside AI Detection" is enabled.</p>
             <div id="addPatternForm" class="add-pattern-form" hidden>
               <input id="newPatternName" type="text" class="pattern-form-input" placeholder="Name (e.g. Employee ID)" spellcheck="false" autocomplete="off">
               <input id="newPatternRegex" type="text" class="pattern-form-input" placeholder="Regex: \bEMP-\d{6}\b" spellcheck="false" autocomplete="off">
@@ -483,6 +476,7 @@
     <div id="messageBar" class="message" aria-live="polite"></div>
 
   </div>
+  <script src="pattern_catalog.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

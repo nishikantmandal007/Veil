@@ -190,3 +190,97 @@ test.describe('Settings Persistence', () => {
         expect(await page.locator('#enabledToggle').isChecked()).toBe(false);
     });
 });
+
+test.describe('Release Status UX', () => {
+    test('shows backend already updated even when the extension build is behind', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+
+        await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
+        await page.evaluate(() => {
+            const sm = window.__VEIL_SETTINGS_MANAGER__;
+            sm.refreshReleaseInfo = async () => { };
+            sm.refreshReleaseSurface = async () => { };
+            sm.releaseInfo = {
+                ...sm.getDefaultReleaseInfo(),
+                status: 'ready',
+                latestTag: 'v9.9.9',
+                publishedAt: '2026-04-02T08:00:00Z',
+                htmlUrl: 'https://github.com/Maya-Data-Privacy/Veil/releases/tag/v9.9.9',
+                comparableToExtension: true,
+                extensionUpdateAvailable: true,
+                error: '',
+            };
+            sm.serverMeta = {
+                ...sm.serverMeta,
+                bundleReleaseTag: 'v9.9.9',
+            };
+            sm.renderReleaseInfo();
+        });
+
+        await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Backend current, extension behind');
+        await expect(page.locator('#releaseNoticeTitle')).toHaveText('Reload the extension to finish updating Veil');
+        await expect(page.locator('#serverUpdateBlock')).toBeHidden();
+    });
+
+    test('surfaces missing backend metadata as a refresh step instead of a false outdated warning', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+
+        await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
+        await page.evaluate(() => {
+            const sm = window.__VEIL_SETTINGS_MANAGER__;
+            sm.refreshReleaseInfo = async () => { };
+            sm.refreshReleaseSurface = async () => { };
+            const manifestVersion = chrome.runtime.getManifest().version;
+            sm.releaseInfo = {
+                ...sm.getDefaultReleaseInfo(),
+                status: 'ready',
+                latestTag: `v${manifestVersion}`,
+                publishedAt: '2026-04-02T08:00:00Z',
+                htmlUrl: 'https://github.com/Maya-Data-Privacy/Veil/releases/latest',
+                comparableToExtension: true,
+                extensionUpdateAvailable: false,
+                error: '',
+            };
+            sm.serverMeta = {
+                ...sm.serverMeta,
+                bundleReleaseTag: '',
+            };
+            sm.renderReleaseInfo();
+        });
+
+        await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Backend version needs verification');
+        await expect(page.locator('#releaseStatusSubtext')).toContainText('needs one local server refresh');
+        await expect(page.locator('#serverUpdateBlock')).toBeVisible();
+    });
+});
+
+test.describe('Options Navigation', () => {
+    test('sidebar navigation lands headings below the sticky control bar', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+
+        await page.locator('.opt-nav-item[data-section="protection"]').click();
+        await page.waitForTimeout(500);
+
+        const barBox = await page.locator('.opt-control-bar').boundingBox();
+        const headingBox = await page.locator('#section-protection .opt-section-title').boundingBox();
+
+        expect(barBox).not.toBeNull();
+        expect(headingBox).not.toBeNull();
+        expect(headingBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height - 1);
+    });
+
+    test('about remains clickable and becomes the active section near the bottom', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+
+        await page.locator('.opt-nav-item[data-section="about"]').click();
+        await page.waitForFunction(() => document.querySelector('.opt-nav-item[data-section="about"]').classList.contains('is-active'));
+
+        const barBox = await page.locator('.opt-control-bar').boundingBox();
+        const headingBox = await page.locator('#section-about .opt-section-title').boundingBox();
+
+        expect(barBox).not.toBeNull();
+        expect(headingBox).not.toBeNull();
+        expect(headingBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height - 1);
+        await expect(page.locator('.opt-nav-item[data-section="about"]')).toHaveClass(/is-active/);
+    });
+});
