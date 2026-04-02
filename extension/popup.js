@@ -299,6 +299,7 @@ class SettingsManager {
 
     document.getElementById('includeRegexToggle').addEventListener('change', (event) => {
       this.updateSetting('includeRegexWhenModelOnline', event.target.checked);
+      this.renderRegexRuntimeState();
     });
 
     document.getElementById('redactionModeSelect').addEventListener('change', (event) => {
@@ -467,6 +468,7 @@ class SettingsManager {
     this.renderStats();
     this.renderAdvancedStates();
     this.renderModeSummary();
+    this.renderRegexRuntimeState();
     this.renderServerDiagnostics();
     this.renderTerminalVisibility();
     this.renderServerToolsPanel();
@@ -478,6 +480,8 @@ class SettingsManager {
     const dot = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
     const sub = document.getElementById('statusSubtext');
+
+    this.renderRegexRuntimeState();
 
     dot.classList.remove('active', 'warn');
 
@@ -541,6 +545,35 @@ class SettingsManager {
     sub.textContent = 'Local model is offline. Regex/custom patterns are active.';
   }
 
+  renderRegexRuntimeState() {
+    const node = document.getElementById('regexRuntimeState');
+    if (!node) return;
+
+    if (!this.settings.enabled) {
+      node.textContent = 'Runtime: protection paused.';
+      return;
+    }
+
+    if (
+      this.serverPhase === 'connecting'
+      || this.serverPhase === 'model-loading'
+      || this.serverPhase === 'disconnecting'
+      || !this.serverState.known
+    ) {
+      node.textContent = 'Runtime: checking AI and regex availability…';
+      return;
+    }
+
+    if (this.serverState.installed && this.serverState.running && this.serverState.healthy) {
+      node.textContent = this.settings.includeRegexWhenModelOnline
+        ? 'Runtime: AI + Regex active.'
+        : 'Runtime: AI only. Regex stays ready as fallback.';
+      return;
+    }
+
+    node.textContent = 'Runtime: Regex fallback active.';
+  }
+
   renderStats() {
     document.getElementById('detectionCount').textContent = this.formatNumber(this.stats.detections);
     document.getElementById('redactionCount').textContent = this.formatNumber(this.stats.redactions);
@@ -556,7 +589,7 @@ class SettingsManager {
     const mode = this.settings.redactionMode === 'mask' ? 'Mask' : 'Anonymize';
     const modeBehavior = mode === 'Mask'
       ? 'Replaces your data with [TYPE REDACTED] tags — private, no setup needed.'
-      : 'Swaps your data for realistic fakes (e.g. Pranav → Jack) so prompts stay coherent. Requires a Maya API key.';
+      : 'Swaps supported PII with realistic fakes through Maya so enterprise LLMs receive only anonymized text. Unsupported types stay local and are still redacted.';
 
     const sensitivityMap = {
       low: 'Low = strict precision mode (fewer detections).',
@@ -821,11 +854,13 @@ class SettingsManager {
     const noticeLink = document.getElementById('releaseNoticeLink');
     const installedBundleTag = String(this.serverMeta.bundleReleaseTag || '').trim();
 
+    const resolvedReleaseLink = this.releaseInfo.htmlUrl || this.serverMeta.bundleReleaseUrl || VEIL_RELEASE_PAGE_URL;
+
     if (releaseLink) {
-      releaseLink.href = this.releaseInfo.htmlUrl || VEIL_RELEASE_PAGE_URL;
+      releaseLink.href = resolvedReleaseLink;
     }
     if (noticeLink) {
-      noticeLink.href = this.releaseInfo.htmlUrl || VEIL_RELEASE_PAGE_URL;
+      noticeLink.href = resolvedReleaseLink;
     }
 
     const applySidebarState = (state, pill, title, subtext) => {
@@ -864,10 +899,28 @@ class SettingsManager {
     }
 
     if (this.releaseInfo.status === 'error') {
+      if (installedBundleTag) {
+        setUpdateBlockVisible(true);
+        releaseText.textContent = `Local server verified: ${installedBundleTag}`;
+        releaseSubtext.textContent = `${this.releaseInfo.error || 'GitHub could not be reached right now.'} Veil can confirm the installed local server bundle on this machine, but it cannot check for newer releases at the moment.`;
+        applySidebarState('is-current', 'Verified', 'Local server verified', `Installed local server bundle ${installedBundleTag} is known. Checking GitHub for newer releases is temporarily unavailable.`);
+        showNotice(
+          'Release check delayed',
+          'Installed local server bundle is verified',
+          `Veil can confirm that this machine is running local server bundle ${installedBundleTag}. GitHub could not be reached to check whether anything newer exists right now.`
+        );
+        return;
+      }
+
       setUpdateBlockVisible(true);
-      releaseText.textContent = 'GitHub release check unavailable right now.';
-      releaseSubtext.textContent = this.releaseInfo.error || 'You can still re-run the update command manually any time.';
-      applySidebarState('is-error', 'Unavailable', 'Update check unavailable', this.releaseInfo.error || 'GitHub could not be reached right now.');
+      releaseText.textContent = 'Backend version unknown right now.';
+      releaseSubtext.textContent = `${this.releaseInfo.error || 'GitHub could not be reached right now.'} Refresh the local server bundle below once to stamp this install with local release metadata.`;
+      applySidebarState('is-available', 'Refresh', 'Backend version unknown', 'GitHub could not be reached, and this install does not yet have local bundle metadata.');
+      showNotice(
+        'Server metadata',
+        'Refresh the local server bundle once',
+        'This install is missing local backend release metadata. Refresh the local server bundle below once, and future update checks will stay valid even if GitHub is temporarily unavailable.'
+      );
       return;
     }
 

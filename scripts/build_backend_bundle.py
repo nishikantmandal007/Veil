@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import io
+import json
+import os
 import shutil
 import tarfile
 import zipfile
@@ -13,6 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 UNIX_ARCHIVE = DIST / "veil-backend-unix.tar.gz"
 WINDOWS_ARCHIVE = DIST / "veil-backend-windows.zip"
+REPO_SLUG = "Maya-Data-Privacy/Veil"
+BUNDLE_RELEASE_ARCNAME = ".runtime/bundle_release.json"
 INSTALLER_FILES = [
     ROOT / "install.sh",
     ROOT / "install.ps1",
@@ -28,6 +33,33 @@ INCLUDE_PATHS = [
 ]
 SKIP_DIRS = {"__pycache__", ".pytest_cache"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".DS_Store"}
+
+
+def load_package_version() -> str:
+    package_json = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    return str(package_json["version"]).strip()
+
+
+def build_release_metadata() -> dict[str, str]:
+    tag = str(os.environ.get("VEIL_RELEASE_TAG") or "").strip()
+    if not tag:
+        tag = f"v{load_package_version()}"
+
+    html_url = str(os.environ.get("VEIL_RELEASE_HTML_URL") or "").strip()
+    if not html_url:
+        html_url = f"https://github.com/{REPO_SLUG}/releases/tag/{tag}"
+
+    return {
+        "tag": tag,
+        "published_at": str(os.environ.get("VEIL_RELEASE_PUBLISHED_AT") or "").strip(),
+        "html_url": html_url,
+        "repository": REPO_SLUG,
+    }
+
+
+def serialize_release_metadata() -> bytes:
+    payload = json.dumps(build_release_metadata(), indent=2)
+    return f"{payload}\n".encode("utf-8")
 
 
 def iter_files(base: Path):
@@ -46,17 +78,23 @@ def iter_files(base: Path):
 
 
 def build_unix_archive() -> None:
+    metadata_bytes = serialize_release_metadata()
     with tarfile.open(UNIX_ARCHIVE, "w:gz") as archive:
         for base in INCLUDE_PATHS:
             for path in iter_files(base):
                 archive.add(path, arcname=path.relative_to(ROOT))
+        tar_info = tarfile.TarInfo(BUNDLE_RELEASE_ARCNAME)
+        tar_info.size = len(metadata_bytes)
+        archive.addfile(tar_info, io.BytesIO(metadata_bytes))
 
 
 def build_windows_archive() -> None:
+    metadata_bytes = serialize_release_metadata()
     with zipfile.ZipFile(WINDOWS_ARCHIVE, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for base in INCLUDE_PATHS:
             for path in iter_files(base):
                 archive.write(path, arcname=path.relative_to(ROOT))
+        archive.writestr(BUNDLE_RELEASE_ARCNAME, metadata_bytes)
 
 
 def main() -> None:

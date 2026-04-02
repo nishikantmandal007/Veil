@@ -249,10 +249,10 @@
                 </div>
                 <div class="maya-api-guidance-body" id="mayaApiGuidanceBody">
                   <p class="maya-api-guidance-title">What is Anonymize mode?</p>
-                  <p class="maya-api-guidance-desc">Instead of blocking text with placeholders, Anonymize replaces sensitive information with realistic fake equivalents — so your prompts stay readable while your real data stays private.</p>
-                  <p class="maya-api-guidance-desc" style="margin-top:2px">Veil anonymizes: <strong>Names · Emails · Phone numbers · Addresses · Locations · Organizations · Dates of birth · SSNs · Credit card numbers</strong></p>
+                  <p class="maya-api-guidance-desc">Instead of blocking text with placeholders, Anonymize replaces supported sensitive information with realistic fake equivalents through Maya — so enterprise LLMs see safe text while your real data stays out of their prompts.</p>
+                  <p class="maya-api-guidance-desc" style="margin-top:2px">Veil anonymizes through Maya: <strong>Names · Emails · Phone numbers · Addresses · Locations · Organizations · Dates of birth · SSNs · Credit card numbers</strong></p>
                   <p class="maya-api-guidance-example">e.g. <span class="anon-ex-real">Priya Sharma</span> → <span class="anon-ex-fake">Claire Bennett</span> &nbsp;&nbsp; <span class="anon-ex-real">priya@acme.com</span> → <span class="anon-ex-fake">claire.b@mailhub.io</span></p>
-                  <p class="maya-api-guidance-desc" style="margin-top:4px">If a type can't be anonymized (e.g. API unreachable for that request), Veil automatically falls back to masking it — so nothing ever leaks.</p>
+                  <p class="maya-api-guidance-desc" style="margin-top:4px">Unsupported detections stay local and remain redacted. If Maya is unavailable for a supported type, Veil falls back to safe masking before the prompt leaves your browser.</p>
                   <p class="maya-api-guidance-desc" style="margin-top:6px">A <strong>Maya API Key</strong> is required. Sign up free at <a href="https://app.mayadataprivacy.eu" target="_blank" rel="noreferrer" class="maya-api-link">app.mayadataprivacy.eu</a>, then copy your key from the <strong>Profile</strong> section and paste it below.</p>
                   <a href="https://app.mayadataprivacy.eu" target="_blank" rel="noreferrer" class="maya-api-get-key-btn">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -303,6 +303,7 @@
           <div id="diagnosticsPanel" class="tool-panel" hidden>
             <section class="server-tool-panel">
               <p class="panel-title">Diagnostics</p>
+              <p class="hint" style="margin-top:4px">Diagnostics are local-only troubleshooting data from this device. They help you inspect Veil&apos;s runtime and do not change what gets sent to enterprise LLMs.</p>
               <label class="field field-tight" style="margin-bottom:8px">
                 <span style="font-size:11px;font-weight:600;color:var(--ink)">GLiNER2 Model</span>
                 <select id="modelSelect">
@@ -378,6 +379,7 @@
             <span>Run Regex Detectors Alongside AI Detection <span class="opt-row-hint">Keep built-in and custom regex detectors active even while GLiNER is online</span></span>
             <input type="checkbox" id="includeRegexToggle">
           </label>
+          <p class="opt-row-hint regex-runtime-note" id="regexRuntimeState">Checking regex runtime…</p>
         </div>
       </section>
 

@@ -21,7 +21,6 @@ const DEFAULT_MONITORED_SELECTORS = [
 const PLATFORM_SELECTORS = {
   chatgpt: [
     'textarea[data-id]',
-    'div[data-message-author-role="user"]',
     'button[data-testid="send-button"] + div',
     '.flex.flex-1 textarea',
     'form button[type="submit"] + div textarea',
@@ -70,10 +69,10 @@ const AUTO_REDACT_DELAY_MS = 1500;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MASK_MODE_HINT_STORAGE_KEY = 'maskModeHintSeen';
 
-// ── Selectors that identify known LLM response / output areas ──
-const RESPONSE_AREA_SELECTORS = [
+// ── Selectors that identify known LLM assistant / thread areas so Veil never
+// scans or mutates provider-owned conversation history. ─────────────────────
+const ASSISTANT_RESPONSE_SELECTORS = [
   '[data-message-author-role="assistant"]',
-  '[data-message-author-role="user"]',
   '[data-is-streaming]',
   '.assistant-message',
   '.markdown-body',
@@ -86,6 +85,18 @@ const RESPONSE_AREA_SELECTORS = [
   '.bot-message',
   '.ai-message',
   '.chat-answer'
+];
+
+const USER_THREAD_MESSAGE_SELECTORS = [
+  '[data-message-author-role="user"]',
+  '.message--user',
+  '.user-message',
+  '.human-message'
+];
+
+const RESPONSE_AREA_SELECTORS = [
+  ...ASSISTANT_RESPONSE_SELECTORS,
+  ...USER_THREAD_MESSAGE_SELECTORS
 ];
 
 class VeilContentController {
@@ -107,7 +118,7 @@ class VeilContentController {
     this.suppressedInput = new WeakSet();
     this.tokenTrays = new Map();
     this.scanningPills = new Map();
-    this.actionBars = new WeakMap();
+    this.actionBars = new Map();
     this.autoRedactTimers = new Map();
     this.dismissedDetections = new WeakMap(); // element → Set of "start:end:label"
     this.maskModeHintChecked = false;
@@ -124,24 +135,22 @@ class VeilContentController {
     this.activePopover = null;
     this.activePopoverHideTimer = null;
     this.activeRevealOverlay = null;
-    this.isApplyingDecode = false; // guard: true while response decoder is mutating text nodes
-    // Session-level decode map: token → original, persists after clearElementState clears
-    // this.redactions (which happens 180ms post-send, before the AI response arrives).
-    this.sessionDecodeMap = new Map();
-
+    this.activeRevealState = null;
+    this.revealOpenTimer = 0;
+    this.revealCloseTimer = 0;
     // Overlay highlights — fixed-position divs in document.body that visually
     // decorate text inside rich-editor contenteditables without touching their DOM.
-    this._ceOverlayHighlights = new Map(); // element → hl[] array
+    this._ceOverlayHighlights = new Map(); // element → { root, highlights: Map<key, HTMLElement> }
     this._ceOverlayTimers = new Map();     // element → setTimeout id
+    this.anchoredUiRefreshRaf = 0;
+    this.resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => this.scheduleAnchoredUiRefresh('resize-observer'))
+      : null;
 
     this.domObserver = null;
     this.stateReconcileTimer = null;
     this._pollingInterval = null;
-    this.handleViewportChange = () => {
-      this.repositionTokenTrays();
-      this.repositionScanningPills();
-      this._refreshAllOverlays();
-    };
+    this.handleViewportChange = () => this.scheduleAnchoredUiRefresh('viewport');
     this.handleRuntimeMessage = this.handleRuntimeMessage.bind(this);
     chrome.runtime.onMessage.addListener(this.handleRuntimeMessage);
 
@@ -319,14 +328,12 @@ class VeilContentController {
       }
       // Debounce finding new elements to batch rapid mutations
       this.debouncedFindInputElements();
+      this.scheduleAnchoredUiRefresh('dom-mutation');
     });
     this.domObserver.observe(document.body, { childList: true, subtree: true });
 
     window.addEventListener('scroll', this.handleViewportChange, true);
     window.addEventListener('resize', this.handleViewportChange);
-
-    this.initResponseDecoder();
-    this._loadSessionDecodeMap();
 
     // Hide scanning pills when the tab goes to the background so they don't
     // linger and appear stale when switching back.
@@ -369,6 +376,90 @@ class VeilContentController {
     this._findInputElementsTimer = setTimeout(() => {
       this.findInputElements();
     }, 300);
+  }
+
+  scheduleAnchoredUiRefresh(_reason = 'unknown') {
+    if (this.anchoredUiRefreshRaf) return;
+    this.anchoredUiRefreshRaf = requestAnimationFrame(() => {
+      this.anchoredUiRefreshRaf = 0;
+      this.refreshAnchoredUi();
+    });
+  }
+
+  refreshAnchoredUi() {
+    this.repositionActionBars();
+    this.repositionTokenTrays();
+    this.repositionScanningPills();
+    this._refreshAllOverlays();
+    this.refreshRevealOverlayPosition();
+    this.cleanupOrphanedUIElements();
+  }
+
+  getAnchoredUiScrollRoots(element) {
+    const roots = [];
+    if (!element || !(element instanceof HTMLElement)) return roots;
+
+    const maybePush = (node) => {
+      if (!node || roots.includes(node)) return;
+      roots.push(node);
+    };
+
+    const isScrollable = (node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(node);
+      const overflow = `${style.overflow} ${style.overflowX} ${style.overflowY}`;
+      if (!/(auto|scroll|overlay)/.test(overflow)) return false;
+      return (node.scrollHeight - node.clientHeight > 1) || (node.scrollWidth - node.clientWidth > 1);
+    };
+
+    if (isScrollable(element)) maybePush(element);
+
+    let current = element.parentElement;
+    while (current) {
+      if (isScrollable(current)) maybePush(current);
+      current = current.parentElement;
+    }
+
+    return roots;
+  }
+
+  getOverlayClipRect(element) {
+    const clipRect = {
+      left: 0,
+      top: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight,
+    };
+
+    this.getAnchoredUiScrollRoots(element).forEach((root) => {
+      const rect = root.getBoundingClientRect();
+      clipRect.left = Math.max(clipRect.left, rect.left);
+      clipRect.top = Math.max(clipRect.top, rect.top);
+      clipRect.right = Math.min(clipRect.right, rect.right);
+      clipRect.bottom = Math.min(clipRect.bottom, rect.bottom);
+    });
+
+    if (clipRect.right <= clipRect.left || clipRect.bottom <= clipRect.top) {
+      return null;
+    }
+    return clipRect;
+  }
+
+  intersectClientRect(rect, clipRect) {
+    if (!rect || !clipRect) return null;
+    const left = Math.max(rect.left, clipRect.left);
+    const top = Math.max(rect.top, clipRect.top);
+    const right = Math.min(rect.right, clipRect.right);
+    const bottom = Math.min(rect.bottom, clipRect.bottom);
+    if (right <= left || bottom <= top) return null;
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: right - left,
+      height: bottom - top,
+    };
   }
 
   // Enhanced MutationObserver with explicit new element detection
@@ -493,9 +584,9 @@ class VeilContentController {
     });
     // Remove fixed-position overlay highlights whose source element is gone.
     // These are not tracked by data-element-id so must be swept via the Map.
-    this._ceOverlayHighlights.forEach((highlights, element) => {
+    this._ceOverlayHighlights.forEach((layer, element) => {
       if (!element?.isConnected) {
-        highlights.forEach((hl) => hl.remove());
+        layer?.root?.remove?.();
         this._ceOverlayHighlights.delete(element);
       }
     });
@@ -514,6 +605,13 @@ class VeilContentController {
       if (listeners.form && listeners.handleSubmit) {
         listeners.form.removeEventListener('submit', listeners.handleSubmit);
       }
+      if (listeners.handleAnchoredScroll) {
+        listeners.scrollRoots?.forEach((root) => {
+          root.removeEventListener('scroll', listeners.handleAnchoredScroll);
+          this.resizeObserver?.unobserve(root);
+        });
+      }
+      this.resizeObserver?.unobserve(element);
       this.clearElementState(element);
       this.monitoredElements.delete(element);
       this.inputRevisions.delete(element);
@@ -644,6 +742,14 @@ class VeilContentController {
       form.addEventListener('submit', handleSubmit);
     }
 
+    const handleAnchoredScroll = () => this.scheduleAnchoredUiRefresh('editor-scroll');
+    const scrollRoots = this.getAnchoredUiScrollRoots(element);
+    scrollRoots.forEach((root) => {
+      root.addEventListener('scroll', handleAnchoredScroll, { passive: true });
+      this.resizeObserver?.observe(root);
+    });
+    this.resizeObserver?.observe(element);
+
     this.monitoredElements.set(element, {
       handleInput,
       handlePaste,
@@ -652,7 +758,9 @@ class VeilContentController {
       handleCompositionStart,
       handleCompositionEnd,
       form,
-      handleSubmit
+      handleSubmit,
+      handleAnchoredScroll,
+      scrollRoots
     });
   }
 
@@ -1267,7 +1375,7 @@ class VeilContentController {
     }
 
     // Allocate a stable numeric index per label type for numbered mask tokens,
-    // e.g. [NAME_1 REDACTED], [NAME_2 REDACTED] — enables response de-anonymization.
+    // e.g. [NAME_1 REDACTED], [NAME_2 REDACTED] — keeps repeated entities distinct.
     if (!ledger.maskCounters) ledger.maskCounters = new Map();
     const maskKey = String(detection.label || 'pii').toUpperCase().replace(/[^A-Z0-9]+/g, '_') || 'PII';
     const maskIndex = (ledger.maskCounters.get(maskKey) || 0) + 1;
@@ -1338,31 +1446,6 @@ class VeilContentController {
     });
 
     if (changed) {
-      // Snapshot committed redactions into session map so response decoder survives
-      // clearElementState (which fires at 180ms post-send, before AI responds).
-      state.items.forEach((item) => {
-        if (!item.redacted) return;
-        const original = item.text;
-        if (item.maskIndex != null) this.sessionDecodeMap.set(this.getMaskText(item.label, item.maskIndex), original);
-        this.sessionDecodeMap.set(this.getMaskText(item.label), original);
-        if (item.alias) this.sessionDecodeMap.set(`<${item.alias}>`, original);
-        if (item.anonymizedText) {
-          this.sessionDecodeMap.set(item.anonymizedText, original);
-          // Also persist sub-word mappings so individual words used by the AI
-          // (e.g. "Angela" from "Angela Antonio Arthur") are decoded after
-          // clearElementState wipes the active redaction state.
-          const fakeWords = item.anonymizedText.trim().split(/\s+/);
-          const realWords = original.trim().split(/\s+/);
-          if (fakeWords.length > 1 && fakeWords.length === realWords.length) {
-            fakeWords.forEach((word, idx) => {
-              if (word && !this.sessionDecodeMap.has(word)) {
-                this.sessionDecodeMap.set(word, realWords[idx]);
-              }
-            });
-          }
-        }
-      });
-      this._persistSessionDecodeMap();
       this.renderElement(element);
       this.persistCache(element);
       this.showNotification(`${count} item${count === 1 ? '' : 's'} protected`, 'info');
@@ -1372,8 +1455,6 @@ class VeilContentController {
         }, 1100);
       }
       this.updateStats(0, count);
-      // Decode any matching tokens in AI response areas now that new redactions exist
-      this.scanExistingResponseAreas();
       // Track per-site manual redact count — after 3 times offer always-auto-redact
       this.siteRedactCount += 1;
       chrome.storage.local.set({ [this.getSiteRedactCountKey()]: this.siteRedactCount });
@@ -1807,7 +1888,12 @@ class VeilContentController {
         const currentState = this.redactions.get(element);
         const current = currentState?.items?.[index];
         if (current?.redacted) {
-          this.showRevealOverlay(current.text, anchorRect, span);
+          this.beginRevealHover({
+            element,
+            itemIndex: index,
+            anchorRect,
+            typographySource: span,
+          });
         }
       }
     });
@@ -1817,7 +1903,9 @@ class VeilContentController {
       if (!span || !element.contains(span)) return;
       // Skip if the pointer is still within the same span (moving between child nodes)
       if (span.contains(event.relatedTarget)) return;
-      this.hideRevealOverlay();
+      const index = parseInt(span.getAttribute('data-index'), 10);
+      if (this.shouldKeepRevealOpen(event.relatedTarget, element, Number.isNaN(index) ? null : index)) return;
+      this.scheduleRevealHide();
     });
   }
 
@@ -1897,7 +1985,7 @@ class VeilContentController {
     if (modeOverride === 'anonymize') {
       if (item.anonymizedText) return item.anonymizedText;
       if (item.replacement) return item.replacement;
-      return `<${item.alias}>`;
+      return this.getMaskText(item.label, item.maskIndex ?? null);
     }
     if (item.replacement) return item.replacement;
     return this.getMaskText(item.label, item.maskIndex ?? null);
@@ -1919,11 +2007,19 @@ class VeilContentController {
       jwt: '[JWT REDACTED]',
       pan: '[PAN REDACTED]',
       aadhaar: '[AADHAAR REDACTED]',
-      passport: '[PASSPORT REDACTED]'
+      passport: '[PASSPORT REDACTED]',
+      ifsc: '[IFSC REDACTED]',
+      driver_license: '[DL REDACTED]',
+      bank_account: '[BANK ACCOUNT REDACTED]',
+      oauth_token: '[OAUTH TOKEN REDACTED]',
+      mac_address: '[MAC REDACTED]',
+      employee_id: '[EMPLOYEE ID REDACTED]',
+      device_id: '[DEVICE ID REDACTED]',
+      session_id: '[SESSION ID REDACTED]'
     };
     const base = map[label] || `[${String(label || 'PII').toUpperCase()} REDACTED]`;
     // Insert numeric index before REDACTED so tokens are uniquely identifiable:
-    // [NAME REDACTED] → [NAME_1 REDACTED]. This enables response de-anonymization.
+    // [NAME REDACTED] → [NAME_1 REDACTED] for repeated entities in the same prompt.
     if (maskIndex != null) return base.replace(/ REDACTED]$/, `_${maskIndex} REDACTED]`);
     return base;
   }
@@ -1955,48 +2051,177 @@ class VeilContentController {
   // rich-editor DOM reconciliation (ProseMirror, Lexical, etc.).
 
   showRevealOverlay(originalText, anchorRect, refSpan) {
-    this.hideRevealOverlay();
     if (!anchorRect || anchorRect.width === 0) return;
 
-    const overlay = document.createElement('div');
-    overlay.className = 'ps-reveal-overlay';
+    let overlay = this.activeRevealOverlay;
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'ps-reveal-overlay';
+      overlay.addEventListener('mouseenter', () => {
+        this.cancelRevealClose();
+      });
+      overlay.addEventListener('mouseleave', (event) => {
+        if (this.shouldKeepRevealOpen(event.relatedTarget, this.activeRevealState?.element, this.activeRevealState?.itemIndex)) {
+          return;
+        }
+        this.scheduleRevealHide();
+      });
+      document.body.appendChild(overlay);
+      this.activeRevealOverlay = overlay;
+    } else if (!overlay.isConnected) {
+      document.body.appendChild(overlay);
+    }
 
-    // Inherit typographic properties from the span so text aligns naturally.
     const cs = window.getComputedStyle(refSpan);
-    overlay.style.cssText = [
-      `position:fixed`,
-      `top:${anchorRect.top}px`,
-      // Centre the overlay horizontally over the span; width is auto so longer
-      // original text doesn't get clipped.
-      `left:${anchorRect.left + anchorRect.width / 2}px`,
-      `transform:translateX(-50%)`,
-      `height:${anchorRect.height}px`,
-      `display:flex`,
-      `align-items:center`,
-      `justify-content:center`,
-      `white-space:nowrap`,
-      `pointer-events:none`,
-      `z-index:2147483100`,
-      `font-size:${cs.fontSize}`,
-      `font-family:${cs.fontFamily}`,
-      `font-weight:${cs.fontWeight}`,
-      `line-height:${cs.lineHeight}`,
-      `letter-spacing:${cs.letterSpacing}`,
-      `padding:1px 4px`,
-      `border-radius:3px`,
-    ].join(';');
-
-    // Safe — this element lives in document.body, not in the contenteditable.
     overlay.textContent = originalText;
-    document.body.appendChild(overlay);
-    this.activeRevealOverlay = overlay;
+    overlay.style.visibility = 'hidden';
+    overlay.style.fontSize = cs.fontSize;
+    overlay.style.fontFamily = cs.fontFamily;
+    overlay.style.fontWeight = cs.fontWeight;
+    overlay.style.lineHeight = cs.lineHeight;
+    overlay.style.letterSpacing = cs.letterSpacing;
+    this.positionRevealOverlay(anchorRect);
+    overlay.style.visibility = '';
   }
 
   hideRevealOverlay() {
+    this.cancelRevealOpen();
+    this.cancelRevealClose();
     if (this.activeRevealOverlay) {
       this.activeRevealOverlay.remove();
       this.activeRevealOverlay = null;
     }
+    this.activeRevealState = null;
+  }
+
+  cancelRevealOpen() {
+    if (this.revealOpenTimer) {
+      clearTimeout(this.revealOpenTimer);
+      this.revealOpenTimer = 0;
+    }
+  }
+
+  cancelRevealClose() {
+    if (this.revealCloseTimer) {
+      clearTimeout(this.revealCloseTimer);
+      this.revealCloseTimer = 0;
+    }
+  }
+
+  beginRevealHover({ element, itemIndex, anchorRect, typographySource, anchorKey = null }) {
+    const item = this.redactions.get(element)?.items?.[itemIndex];
+    if (!item?.redacted) return;
+
+    this.cancelRevealClose();
+    this.cancelRevealOpen();
+
+    const show = () => {
+      const current = this.redactions.get(element)?.items?.[itemIndex];
+      if (!current?.redacted) {
+        this.hideRevealOverlay();
+        return;
+      }
+      this.activeRevealState = { element, itemIndex, anchorKey };
+      this.showRevealOverlay(current.text, anchorRect, typographySource || element);
+    };
+
+    if (this.activeRevealState?.element === element && this.activeRevealState?.itemIndex === itemIndex) {
+      show();
+      return;
+    }
+
+    this.revealOpenTimer = setTimeout(() => {
+      this.revealOpenTimer = 0;
+      show();
+    }, 70);
+  }
+
+  scheduleRevealHide(delay = 120) {
+    this.cancelRevealOpen();
+    this.cancelRevealClose();
+    this.revealCloseTimer = setTimeout(() => {
+      this.revealCloseTimer = 0;
+      this.hideRevealOverlay();
+    }, delay);
+  }
+
+  shouldKeepRevealOpen(target, element, itemIndex) {
+    if (!target || itemIndex == null) return false;
+    if (this.activeRevealOverlay?.contains?.(target)) return true;
+    if (!(target instanceof Element)) return false;
+
+    const overlayMatch = target.closest(`.ps-overlay-hl[data-item-index="${itemIndex}"]`);
+    if (overlayMatch) return true;
+
+    if (element?.contains?.(target)) {
+      const spanMatch = target.closest(`.ps-redaction[data-index="${itemIndex}"], .ps-pii-underline[data-index="${itemIndex}"]`);
+      if (spanMatch) return true;
+    }
+    return false;
+  }
+
+  positionRevealOverlay(anchorRect) {
+    const overlay = this.activeRevealOverlay;
+    if (!overlay || !anchorRect) return;
+
+    const margin = 12;
+    const spacing = 10;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const overlayWidth = overlay.offsetWidth || 1;
+    const overlayHeight = overlay.offsetHeight || 1;
+
+    let left = anchorRect.left + (anchorRect.width / 2) - (overlayWidth / 2);
+    left = Math.max(margin, Math.min(left, viewportWidth - overlayWidth - margin));
+
+    let top = anchorRect.top - overlayHeight - spacing;
+    if (top < margin) {
+      top = anchorRect.bottom + spacing;
+    }
+    top = Math.max(margin, Math.min(top, viewportHeight - overlayHeight - margin));
+
+    overlay.style.left = `${Math.round(left)}px`;
+    overlay.style.top = `${Math.round(top)}px`;
+  }
+
+  getRevealAnchorRect(element, itemIndex, anchorKey = null) {
+    const layer = this._ceOverlayHighlights.get(element);
+    if (layer?.highlights instanceof Map) {
+      if (anchorKey && layer.highlights.has(anchorKey)) {
+        return layer.highlights.get(anchorKey).getBoundingClientRect();
+      }
+      for (const node of layer.highlights.values()) {
+        if (String(node.dataset.itemIndex) === String(itemIndex)) {
+          return node.getBoundingClientRect();
+        }
+      }
+    }
+
+    const span = element?.querySelector?.(`.ps-redaction[data-index="${itemIndex}"], .ps-pii-underline[data-index="${itemIndex}"]`);
+    if (!span) return null;
+
+    const rects = span.getClientRects();
+    return rects[0] || span.getBoundingClientRect();
+  }
+
+  refreshRevealOverlayPosition() {
+    const reveal = this.activeRevealState;
+    if (!reveal || !this.activeRevealOverlay) return;
+
+    const item = this.redactions.get(reveal.element)?.items?.[reveal.itemIndex];
+    if (!item?.redacted) {
+      this.hideRevealOverlay();
+      return;
+    }
+
+    const anchorRect = this.getRevealAnchorRect(reveal.element, reveal.itemIndex, reveal.anchorKey);
+    if (!anchorRect || anchorRect.width === 0 || anchorRect.height === 0) {
+      this.hideRevealOverlay();
+      return;
+    }
+
+    this.activeRevealOverlay.textContent = item.text;
+    this.positionRevealOverlay(anchorRect);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -2012,17 +2237,28 @@ class VeilContentController {
   }
 
   _updateElementOverlay(element) {
-    this._clearElementOverlay(element);
-
     const state = this.redactions.get(element);
-    if (!state || !element.isConnected || !state.items.length) return;
+    if (!state || !element.isConnected || !state.items.length) {
+      this._clearElementOverlay(element);
+      return;
+    }
 
     // If our spans survived innerHTML injection (regular site), the existing span
     // delegation handles everything — no overlay needed.
-    if (element.querySelector('.ps-redaction, .ps-pii-underline')) return;
+    if (element.querySelector('.ps-redaction, .ps-pii-underline')) {
+      this._clearElementOverlay(element);
+      return;
+    }
 
     // Spans were stripped by the editor. Draw external fixed-position highlights.
-    const highlights = [];
+    const clipRect = this.getOverlayClipRect(element);
+    if (!clipRect) {
+      this._clearElementOverlay(element);
+      return;
+    }
+
+    const layer = this._getOrCreateOverlayLayer(element);
+    const seenKeys = new Set();
 
     state.items.forEach((item, index) => {
       const range = item.redacted
@@ -2033,65 +2269,139 @@ class VeilContentController {
       // Use getClientRects() instead of getBoundingClientRect() so that tokens
       // wrapping across multiple visual lines get one hl div per line segment,
       // not a single giant bounding-box rectangle.
-      const lineRects = [...range.getClientRects()].filter(r => r.width > 0);
+      const lineRects = [...range.getClientRects()]
+        .map((rect) => this.intersectClientRect(rect, clipRect))
+        .filter((rect) => rect && rect.width > 0 && rect.height > 0);
       if (!lineRects.length) return;
 
       const color = this.getTypeColor(item.label);
-      lineRects.forEach(rect => {
-        const hl = document.createElement('div');
-        hl.className = `ps-overlay-hl ${item.redacted ? 'ps-overlay-hl-redacted' : 'ps-overlay-hl-underline'}`;
-        hl.setAttribute('data-index', String(index));
-        hl.style.cssText = [
-          'position:fixed',
-          `left:${Math.round(rect.left)}px`,
-          `top:${Math.round(rect.top)}px`,
-          `width:${Math.round(rect.width)}px`,
-          `height:${Math.round(rect.height)}px`,
-          `--hl-color:${color}`,
-        ].join(';');
+      lineRects.forEach((rect, rectIndex) => {
+        const overlayKey = `${index}:${rectIndex}`;
+        seenKeys.add(overlayKey);
+        let hl = layer.highlights.get(overlayKey);
+        if (!hl) {
+          hl = this._createOverlayHighlightNode(element, index);
+          layer.root.appendChild(hl);
+          layer.highlights.set(overlayKey, hl);
+        }
 
-        hl.addEventListener('mouseenter', () => {
-          const hlRect = hl.getBoundingClientRect();
-          if (item.redacted) this.showRevealOverlay(item.text, hlRect, hl);
-        });
-        hl.addEventListener('mouseleave', () => {
-          this.hideRevealOverlay();
-        });
-        hl.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          this.hideRevealOverlay();
-          if (item.redacted) {
-            this.toggleRedaction(element, index);
-          } else {
-            this.redactSingle(element, index);
-          }
-        });
-
-        document.body.appendChild(hl);
-        highlights.push(hl);
+        hl.dataset.itemIndex = String(index);
+        hl.dataset.overlayKey = overlayKey;
+        hl.classList.toggle('ps-overlay-hl-redacted', Boolean(item.redacted));
+        hl.classList.toggle('ps-overlay-hl-underline', !item.redacted);
+        hl.style.left = `${Math.round(rect.left)}px`;
+        hl.style.top = `${Math.round(rect.top)}px`;
+        hl.style.width = `${Math.round(rect.width)}px`;
+        hl.style.height = `${Math.round(rect.height)}px`;
+        hl.style.setProperty('--hl-color', color);
       });
     });
 
-    if (highlights.length) {
-      this._ceOverlayHighlights.set(element, highlights);
+    layer.highlights.forEach((hl, key) => {
+      if (seenKeys.has(key)) return;
+      hl.remove();
+      layer.highlights.delete(key);
+    });
+
+    if (layer.highlights.size === 0) {
+      this._clearElementOverlay(element);
+    } else if (this.activeRevealState?.element === element) {
+      this.refreshRevealOverlayPosition();
     }
   }
 
   _clearElementOverlay(element) {
-    const highlights = this._ceOverlayHighlights.get(element);
-    if (highlights) {
-      highlights.forEach((hl) => hl.remove());
+    const layer = this._ceOverlayHighlights.get(element);
+    if (layer) {
+      layer.highlights?.forEach((hl) => hl.remove());
+      layer.root?.remove?.();
       this._ceOverlayHighlights.delete(element);
+      if (this.activeRevealState?.element === element) {
+        this.hideRevealOverlay();
+      }
     }
     clearTimeout(this._ceOverlayTimers.get(element));
     this._ceOverlayTimers.delete(element);
   }
 
   _refreshAllOverlays() {
-    this._ceOverlayHighlights.forEach((_, element) => {
-      this._scheduleOverlayUpdate(element);
+    this.redactions.forEach((state, element) => {
+      if (!element?.isConnected || !this.isContentEditableElement(element)) {
+        this._clearElementOverlay(element);
+        return;
+      }
+      if (!state?.items?.length) {
+        this._clearElementOverlay(element);
+        return;
+      }
+      this._updateElementOverlay(element);
     });
+  }
+
+  _getOrCreateOverlayLayer(element) {
+    let layer = this._ceOverlayHighlights.get(element);
+    if (layer?.root?.isConnected && layer.highlights instanceof Map) {
+      return layer;
+    }
+
+    const root = document.createElement('div');
+    root.className = 'ps-overlay-hl-layer';
+    root.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'pointer-events:none',
+      'z-index:2147483090',
+    ].join(';');
+    document.body.appendChild(root);
+
+    layer = {
+      root,
+      highlights: new Map(),
+    };
+    this._ceOverlayHighlights.set(element, layer);
+    return layer;
+  }
+
+  _createOverlayHighlightNode(element, itemIndex) {
+    const hl = document.createElement('div');
+    hl.className = 'ps-overlay-hl';
+    hl.dataset.itemIndex = String(itemIndex);
+    hl.style.pointerEvents = 'auto';
+    hl.style.position = 'absolute';
+
+    hl.addEventListener('mouseenter', () => {
+      const index = Number(hl.dataset.itemIndex);
+      if (!Number.isInteger(index)) return;
+      this.beginRevealHover({
+        element,
+        itemIndex: index,
+        anchorRect: hl.getBoundingClientRect(),
+        typographySource: element,
+        anchorKey: hl.dataset.overlayKey || null,
+      });
+    });
+    hl.addEventListener('mouseleave', (event) => {
+      const index = Number(hl.dataset.itemIndex);
+      if (this.shouldKeepRevealOpen(event.relatedTarget, element, Number.isInteger(index) ? index : null)) {
+        return;
+      }
+      this.scheduleRevealHide();
+    });
+    hl.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const index = Number(hl.dataset.itemIndex);
+      if (!Number.isInteger(index)) return;
+      this.hideRevealOverlay();
+      const item = this.redactions.get(element)?.items?.[index];
+      if (item?.redacted) {
+        this.toggleRedaction(element, index);
+      } else {
+        this.redactSingle(element, index);
+      }
+    });
+
+    return hl;
   }
 
   // Walk text nodes in element to build a Range for character offsets [start, end].
@@ -2201,15 +2511,9 @@ class VeilContentController {
 
     document.body.appendChild(bar);
     this.actionBars.set(element, bar);
-
-    // Position below the element, clamped to viewport right edge
-    const rect = element.getBoundingClientRect();
-    bar.style.top = `${window.scrollY + rect.bottom + 6}px`;
-    bar.style.left = `${window.scrollX + rect.left}px`;
-
+    this.positionActionBar(element, bar);
     requestAnimationFrame(() => {
-      const maxLeft = window.scrollX + window.innerWidth - bar.offsetWidth - 8;
-      if (parseFloat(bar.style.left) > maxLeft) bar.style.left = `${Math.max(8, maxLeft)}px`;
+      this.positionActionBar(element, bar);
       bar.classList.add('ps-action-bar-visible');
     });
   }
@@ -2219,6 +2523,33 @@ class VeilContentController {
     if (!bar) return;
     bar.remove();
     this.actionBars.delete(element);
+  }
+
+  positionActionBar(element, bar) {
+    if (!element?.isConnected || !bar?.isConnected) return;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 48 || rect.height < 18) {
+      bar.remove();
+      this.actionBars.delete(element);
+      return;
+    }
+    bar.style.top = `${window.scrollY + rect.bottom + 6}px`;
+    bar.style.left = `${window.scrollX + rect.left}px`;
+    const maxLeft = window.scrollX + window.innerWidth - bar.offsetWidth - 8;
+    if (parseFloat(bar.style.left) > maxLeft) {
+      bar.style.left = `${Math.max(8, maxLeft)}px`;
+    }
+  }
+
+  repositionActionBars() {
+    this.actionBars.forEach((bar, element) => {
+      if (!element?.isConnected || !bar?.isConnected) {
+        bar?.remove?.();
+        this.actionBars.delete(element);
+        return;
+      }
+      this.positionActionBar(element, bar);
+    });
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -2462,6 +2793,9 @@ class VeilContentController {
   clearElementState(element) {
     this.clearHighlights(element);
     this._clearElementOverlay(element);
+    if (this.activeRevealState?.element === element) {
+      this.hideRevealOverlay();
+    }
     this.redactions.delete(element);
     this.lastDetectionSignature.delete(element);
     this.lastAnalyzedSnapshot.delete(element);
@@ -2523,7 +2857,15 @@ class VeilContentController {
       jwt: '#8D6E63',
       pan: '#00897B',
       aadhaar: '#5E35B1',
-      passport: '#6D4C41'
+      passport: '#6D4C41',
+      ifsc: '#455A64',
+      driver_license: '#AD1457',
+      bank_account: '#33691E',
+      oauth_token: '#7B1FA2',
+      mac_address: '#1565C0',
+      employee_id: '#6A1B1A',
+      device_id: '#2E7D32',
+      session_id: '#5D4037'
     };
     return palette[type] || '#546E7A';
   }
@@ -2566,9 +2908,9 @@ class VeilContentController {
 
     if (request?.action !== 'getPageStats') return false;
     if (window !== window.top) return false;
-    const reverseMap = this.buildGlobalReverseMap();
-    const redactionKey = reverseMap.size
-      ? Object.fromEntries([...reverseMap])
+    const redactionKeyMap = this.buildRedactionKey();
+    const redactionKey = redactionKeyMap.size
+      ? Object.fromEntries([...redactionKeyMap])
       : null;
     sendResponse({
       success: true,
@@ -2627,6 +2969,13 @@ class VeilContentController {
       if (listeners.form && listeners.handleSubmit) {
         listeners.form.removeEventListener('submit', listeners.handleSubmit);
       }
+      if (listeners.handleAnchoredScroll) {
+        listeners.scrollRoots?.forEach((root) => {
+          root.removeEventListener('scroll', listeners.handleAnchoredScroll);
+          this.resizeObserver?.unobserve(root);
+        });
+      }
+      this.resizeObserver?.unobserve(element);
       this.clearElementState(element);
     });
 
@@ -2653,6 +3002,7 @@ class VeilContentController {
     this.scanningPills.clear();
 
     this.hidePopover();
+    this.hideRevealOverlay();
 
     if (this.domObserver) {
       this.domObserver.disconnect();
@@ -2670,9 +3020,13 @@ class VeilContentController {
     window.removeEventListener('scroll', this.handleViewportChange, true);
     window.removeEventListener('resize', this.handleViewportChange);
 
-    if (this.responseDecoderObserver) {
-      this.responseDecoderObserver.disconnect();
-      this.responseDecoderObserver = null;
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+
+    if (this.anchoredUiRefreshRaf) {
+      cancelAnimationFrame(this.anchoredUiRefreshRaf);
+      this.anchoredUiRefreshRaf = 0;
     }
   }
 
@@ -2717,187 +3071,21 @@ class VeilContentController {
     }, 1000);
   }
 
-  // Persist sessionDecodeMap to chrome.storage.session so it survives tab reload.
-  // Auto-cleared when the browser closes — PII never written to long-term disk.
-  _persistSessionDecodeMap() {
-    if (!chrome?.storage?.session) return;
-    const key = `veil::decodeMap::${location.hostname}`;
-    chrome.storage.session.set({ [key]: Object.fromEntries(this.sessionDecodeMap) });
-  }
-
-  // Restore sessionDecodeMap from chrome.storage.session on startup.
-  async _loadSessionDecodeMap() {
-    if (!chrome?.storage?.session) return;
-    const key = `veil::decodeMap::${location.hostname}`;
-    try {
-      const data = await new Promise((resolve) => chrome.storage.session.get(key, resolve));
-      if (data[key] && typeof data[key] === 'object') {
-        Object.entries(data[key]).forEach(([token, original]) => {
-          if (!this.sessionDecodeMap.has(token)) {
-            this.sessionDecodeMap.set(token, original);
-          }
-        });
-      }
-    } catch { /* non-fatal — session storage unavailable in older Chrome */ }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // Response De-Anonymization ("Invisible Veil")
-  // ═══════════════════════════════════════════════════════════
-
-  // Build a reverse map from all active redaction states: token → originalText.
-  // Covers mask tokens ([NAME_1 REDACTED]), alias tokens (<PERSON_1>), and
-  // synthetic names (anonymize mode). Memory-only — never persisted.
-  buildGlobalReverseMap() {
-    // Seed from session-level cache so decoder works even after clearElementState
-    // fires at 180ms post-send (before the AI response has been received).
-    const map = new Map(this.sessionDecodeMap);
+  // Build the popup/settings redaction key from currently active Veil states only.
+  // Veil must never rewrite provider-owned thread history with original values.
+  buildRedactionKey() {
+    const map = new Map();
     this.redactions.forEach((state) => {
-      if (!state?.items) return;
+      if (!state?.items?.length) return;
       state.items.forEach((item) => {
-        if (!item.redacted) return;
-        const original = item.text;
-        // Numbered mask token: [NAME_1 REDACTED]
-        if (item.maskIndex != null) map.set(this.getMaskText(item.label, item.maskIndex), original);
-        // Generic mask token (backward compat): [NAME REDACTED]
-        map.set(this.getMaskText(item.label), original);
-        // Alias token: <PERSON_1>
-        if (item.alias) map.set(`<${item.alias}>`, original);
-        // Synthetic name (anonymize mode)
-        if (item.anonymizedText) {
-          map.set(item.anonymizedText, original);
-          // Also map individual words so the LLM using just a first/last name
-          // still gets reverse-decoded (e.g. "Gavin" → "Nishi").
-          const fakeWords = item.anonymizedText.trim().split(/\s+/);
-          const realWords = original.trim().split(/\s+/);
-          if (fakeWords.length > 1 && fakeWords.length === realWords.length) {
-            fakeWords.forEach((word, idx) => {
-              if (word && !map.has(word)) map.set(word, realWords[idx]);
-            });
-          }
-        }
+        if (!item?.redacted) return;
+        const replacement = this.getReplacementText(item, state.mode);
+        const original = String(item.text || '').trim();
+        if (!replacement || !original || replacement === original) return;
+        if (!map.has(replacement)) map.set(replacement, original);
       });
     });
     return map;
-  }
-
-  // Replace tokens in a response-area element tree with original values.
-  // Uses direct text node content mutation — no new DOM nodes, no span wrapping.
-  // This is the least invasive mutation possible and survives React/Preact
-  // reconciliation because completed responses are frozen (no more state updates).
-  processResponseNodeTree(container, reverseMap) {
-    if (!container || !reverseMap.size) return;
-
-    const tokens = [...reverseMap.keys()].sort((a, b) => b.length - a.length);
-    const tokenRegex = new RegExp(
-      tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
-      'g'
-    );
-
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-    const textNodes = [];
-    let node;
-    while ((node = walker.nextNode())) textNodes.push(node);
-
-    textNodes.forEach((textNode) => {
-      if (!textNode.parentNode) return;
-      // Never mutate text inside Veil's own UI elements
-      if (textNode.parentElement?.closest(
-        '.ps-pii-underline, .ps-redaction, .ps-action-bar, .ps-token-tray, .ps-scanning-pill'
-      )) return;
-
-      const text = textNode.textContent;
-      tokenRegex.lastIndex = 0;
-      if (!tokenRegex.test(text)) return;
-      tokenRegex.lastIndex = 0;
-
-      // Pure text replacement — decoded value shown inline, no DOM structure change.
-      textNode.textContent = text.replace(tokenRegex, (match) => reverseMap.get(match) ?? match);
-    });
-  }
-
-  // Scan all current response areas for tokens. Called after new redactions are committed.
-  scanExistingResponseAreas() {
-    const reverseMap = this.buildGlobalReverseMap();
-    if (!reverseMap.size) return;
-    const selector = RESPONSE_AREA_SELECTORS.join(', ');
-
-    // Disconnect during scan so our text mutations don't re-trigger the decoder observer.
-    if (this.responseDecoderObserver) this.responseDecoderObserver.disconnect();
-    this.isApplyingDecode = true;
-    try {
-      document.querySelectorAll(selector).forEach((el) => this.processResponseNodeTree(el, reverseMap));
-    } catch { /* ignore invalid selectors on unusual pages */ }
-    finally {
-      this.isApplyingDecode = false;
-      if (this.responseDecoderObserver) {
-        this.responseDecoderObserver.observe(document.body, {
-          childList: true, subtree: true, characterData: true,
-        });
-      }
-    }
-  }
-
-  // Set up a MutationObserver to decode tokens in response areas after streaming ends.
-  //
-  // Design:
-  //   • watches characterData so we catch streaming text-node updates
-  //   • 500ms per-container debounce — decode fires only after streaming goes quiet
-  //   • disconnect → replace → reconnect prevents our own text mutations from
-  //     looping back into the observer
-  initResponseDecoder() {
-    if (this.responseDecoderObserver) return;
-    const responseSelector = RESPONSE_AREA_SELECTORS.join(', ');
-    const decodeTimers = new Map(); // container → setTimeout id
-
-    const observerOptions = { childList: true, subtree: true, characterData: true };
-
-    this.responseDecoderObserver = new MutationObserver((mutations) => {
-      if (this.isApplyingDecode) return; // our own replacement firing — skip
-      const reverseMap = this.buildGlobalReverseMap();
-      if (!reverseMap.size) return;
-
-      // Identify which response-area containers were touched by this mutation batch.
-      const affected = new Set();
-      for (const mutation of mutations) {
-        const target = mutation.target instanceof Element
-          ? mutation.target
-          : mutation.target.parentElement;
-        if (!target) continue;
-        try {
-          const container = target.matches(responseSelector)
-            ? target
-            : target.closest(responseSelector);
-          if (container) affected.add(container);
-        } catch { /* invalid selector on some page */ }
-      }
-
-      // Debounce per container: reset timer on every streaming chunk,
-      // fire 500ms after the last one (i.e. after streaming completes).
-      affected.forEach((container) => {
-        clearTimeout(decodeTimers.get(container));
-        decodeTimers.set(container, setTimeout(() => {
-          decodeTimers.delete(container);
-          const currentMap = this.buildGlobalReverseMap(); // re-fetch — may have grown
-          if (!currentMap.size) return;
-
-          // Disconnect → mutate text nodes → reconnect.
-          this.responseDecoderObserver.disconnect();
-          this.isApplyingDecode = true;
-          try {
-            this.processResponseNodeTree(container, currentMap);
-          } finally {
-            this.isApplyingDecode = false;
-            this.responseDecoderObserver.observe(document.body, observerOptions);
-          }
-        }, 500));
-      });
-    });
-
-    this.responseDecoderObserver.observe(document.body, observerOptions);
-
-    // Decode any tokens already present on the page (resumed conversation, etc.)
-    this.scanExistingResponseAreas();
   }
 }
 

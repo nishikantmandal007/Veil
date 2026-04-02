@@ -184,7 +184,12 @@ jobs:
         run: bash scripts/build_crx.sh dist/veil-extension.zip
 
       - name: Build backend release bundle
-        run: uv run --no-sync python scripts/build_backend_bundle.py
+        env:
+          VEIL_RELEASE_TAG: ${{ needs.verify-release-version.outputs.tag_name }}
+          VEIL_RELEASE_HTML_URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.verify-release-version.outputs.tag_name }}
+        run: |
+          export VEIL_RELEASE_PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          uv run --no-sync python scripts/build_backend_bundle.py
 
       - name: Rename extension ZIP with version
         run: mv dist/veil-extension.zip "dist/veil-extension-${{ needs.verify-release-version.outputs.release_version }}.zip"

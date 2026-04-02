@@ -719,6 +719,10 @@ html, body {
   letter-spacing: 0.01em;
 }
 
+.regex-runtime-note {
+  margin: 6px 0 0 2px;
+}
+
 /* ── About card ── */
 .opt-about-card { padding: 24px; }
 

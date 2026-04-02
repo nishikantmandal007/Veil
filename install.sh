@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO_SLUG="Maya-Data-Privacy/Veil"
 RELEASE_BASE="https://github.com/${REPO_SLUG}/releases/latest/download"
-RELEASE_API="https://api.github.com/repos/${REPO_SLUG}/releases/latest"
 ASSET_NAME="veil-backend-unix.tar.gz"
 DEFAULT_ANON_ENDPOINT="https://app.mayadataprivacy.in/mdp/engine/anonymization"
 PINNED_UV_VERSION="0.10.7"
@@ -254,10 +253,7 @@ elif ! grep -q '^MDP_ANONYMIZATION_ENDPOINT=' "${ENV_FILE}"; then
 fi
 
 mkdir -p "${INSTALL_DIR}/.runtime"
-RELEASE_INFO_PATH="${TMP_DIR}/release.json"
-if curl -fsSL "${RELEASE_API}" -o "${RELEASE_INFO_PATH}"; then
-  stamp_release_metadata "${RELEASE_INFO_PATH}" "${INSTALL_DIR}/.runtime/bundle_release.json"
-fi
+stamp_release_metadata "${INSTALL_DIR}/.runtime/bundle_release.json" "${INSTALL_DIR}/.runtime/bundle_release.json"
 
 ensure_local_uv
 sync_runtime

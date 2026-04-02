@@ -3,8 +3,24 @@
  */
 const { test, expect } = require('./fixtures');
 const { startMockServer, stopMockServer } = require('./mock_server');
+const { cloneDefaultCustomPatterns } = require('../../extension/pattern_catalog.js');
+const {
+    REGEX_SMOKE_TEXT,
+    REGEX_SMOKE_CUSTOM_PATTERNS,
+    EXPECTED_BUILTIN_REGEX_LABELS,
+    EXPECTED_CUSTOM_REGEX_LABELS,
+} = require('../fixtures/regex_smoke_corpus');
 
-// ─── Minimal HTML test page (data: URL) ──────────────────────────────────────
+const MOCK_SERVER_PORT = 18765;
+const OFFLINE_SERVER_PORT = 18766;
+const MOCK_SERVER_URL = `http://127.0.0.1:${MOCK_SERVER_PORT}`;
+const OFFLINE_SERVER_URL = `http://127.0.0.1:${OFFLINE_SERVER_PORT}`;
+const CONTENT_PAGE_PATH = '/content-fixture';
+const HOSTILE_SCROLL_PAGE_PATH = '/hostile-scroll-fixture';
+const OUTBOUND_PRIVACY_PAGE_PATH = '/outbound-privacy-fixture';
+const CONTENT_PAGE_URL = `${MOCK_SERVER_URL}${CONTENT_PAGE_PATH}`;
+const OFFLINE_HOSTILE_SCROLL_URL = `${OFFLINE_SERVER_URL}${HOSTILE_SCROLL_PAGE_PATH}`;
+const OUTBOUND_PRIVACY_PAGE_URL = `${OFFLINE_SERVER_URL}${OUTBOUND_PRIVACY_PAGE_PATH}`;
 
 const TEST_PAGE_HTML = `<!DOCTYPE html>
 <html>
@@ -15,58 +31,179 @@ const TEST_PAGE_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const DATA_URL = `data:text/html;charset=utf-8,${encodeURIComponent(TEST_PAGE_HTML)}`;
+const OUTBOUND_PRIVACY_PAGE_HTML = `<!DOCTYPE html>
+<html>
+<head><title>Veil outbound privacy fixture</title></head>
+<body>
+  <form id="composerForm">
+    <textarea id="userInput" style="width:400px;height:100px;"></textarea>
+    <button id="sendButton" type="submit">Send</button>
+  </form>
+  <div id="thread">
+    <div data-message-author-role="assistant" id="assistantReply">Assistant keeps only protected thread text.</div>
+  </div>
+  <script>
+    const form = document.getElementById('composerForm');
+    const textarea = document.getElementById('userInput');
+    const thread = document.getElementById('thread');
 
-async function sendDetectRequest(context, extensionId, text, options = {}) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const current = textarea.value;
+      const threadMessages = Array.from(thread.querySelectorAll('[data-message-author-role]')).map((node) => ({
+        role: node.getAttribute('data-message-author-role'),
+        text: node.textContent || '',
+      }));
+
+      await fetch('/provider-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current, thread: threadMessages }),
+      });
+
+      const sent = document.createElement('div');
+      sent.setAttribute('data-message-author-role', 'user');
+      sent.textContent = current;
+      thread.appendChild(sent);
+      textarea.value = '';
+    });
+  </script>
+</body>
+</html>`;
+
+const HOSTILE_SCROLL_HTML = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Veil hostile editor scroll test</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; }
+    #scrollHost {
+      width: 560px;
+      height: 140px;
+      overflow: auto;
+      border: 1px solid #aaa;
+      padding: 12px;
+    }
+    #hostileEditor {
+      min-height: 420px;
+      white-space: pre-wrap;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="scrollHost">
+    <div id="hostileEditor" contenteditable="true" role="textbox"></div>
+  </div>
+  <script>
+    const editor = document.getElementById('hostileEditor');
+    let normalizeScheduled = false;
+
+    const stripInjectedMarkup = () => {
+      normalizeScheduled = false;
+      if (!editor.isConnected) return;
+      if (!editor.querySelector('.ps-redaction, .ps-pii-underline')) return;
+      const plainText = editor.innerText;
+      editor.textContent = plainText;
+    };
+
+    new MutationObserver(() => {
+      if (normalizeScheduled) return;
+      normalizeScheduled = true;
+      requestAnimationFrame(stripInjectedMarkup);
+    }).observe(editor, { childList: true, subtree: true });
+  </script>
+</body>
+</html>`;
+
+const DEFAULT_SMOKE_PATTERNS = Object.freeze([
+    ...cloneDefaultCustomPatterns(),
+    ...REGEX_SMOKE_CUSTOM_PATTERNS.map((pattern) => ({ ...pattern })),
+]);
+const MOCK_MODEL_DETECTIONS = Object.freeze([
+    {
+        text: 'Rohan Sen',
+        label: 'person',
+        start: REGEX_SMOKE_TEXT.indexOf('Rohan Sen'),
+        end: REGEX_SMOKE_TEXT.indexOf('Rohan Sen') + 'Rohan Sen'.length,
+        score: 0.94,
+        source: 'gliner2',
+    },
+]);
+
+async function withExtensionPage(context, extensionId, callback) {
     const extensionPage = await context.newPage();
     await extensionPage.goto(`chrome-extension://${extensionId}/popup.html`);
     await extensionPage.waitForLoadState('domcontentloaded');
-    const response = await extensionPage.evaluate(
+    try {
+        return await callback(extensionPage);
+    } finally {
+        await extensionPage.close();
+    }
+}
+
+async function setLocalServerOverride(context, extensionId, url) {
+    await withExtensionPage(context, extensionId, (page) => page.evaluate(
+        (localServerUrl) => new Promise((resolve) => chrome.storage.local.set({
+            veilLocalServerUrlOverride: localServerUrl,
+        }, resolve)),
+        url,
+    ));
+}
+
+async function sendDetectRequest(context, extensionId, text, options = {}) {
+    return withExtensionPage(context, extensionId, (page) => page.evaluate(
         ({ payloadText, payloadOptions }) => new Promise((resolve) => chrome.runtime.sendMessage({
             action: 'detectPII',
             text: payloadText,
             options: payloadOptions,
         }, resolve)),
-        { payloadText: text, payloadOptions: options }
-    );
-    await extensionPage.close();
-    return response;
+        { payloadText: text, payloadOptions: options },
+    ));
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
+async function readCapturedProviderPayload(page) {
+    return page.evaluate(async () => {
+        const response = await fetch('/provider-capture-last');
+        return response.json();
+    });
+}
 
 test.describe('Content-Script Detection', () => {
     let mockServer;
 
     test.beforeEach(async () => {
         mockServer = await startMockServer({
-            port: 8765,
+            port: MOCK_SERVER_PORT,
             healthy: true,
             loaded: true,
-            detections: [
-                { text: 'Jane Doe', label: 'person', start: 12, end: 20, score: 0.92, source: 'gliner2' },
-            ],
+            detections: MOCK_MODEL_DETECTIONS,
+            pages: {
+                [CONTENT_PAGE_PATH]: TEST_PAGE_HTML,
+                [HOSTILE_SCROLL_PAGE_PATH]: HOSTILE_SCROLL_HTML,
+            },
         });
     });
 
     test.afterEach(async () => {
         if (mockServer) await stopMockServer(mockServer);
+        mockServer = null;
     });
 
     test('content script attaches and textarea retains value after detection', async ({ extensionContext }) => {
-        const { context } = extensionContext;
+        const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, MOCK_SERVER_URL);
+
         const page = await context.newPage();
-        await page.goto(DATA_URL);
+        await page.goto(CONTENT_PAGE_URL);
         await page.waitForLoadState('domcontentloaded');
 
         const textarea = page.locator('#userInput');
         await textarea.click();
         await textarea.fill('My name is Jane Doe and my email is jane@example.com');
 
-        // Wait for Veil debounce + detection (up to 4s)
         await page.waitForTimeout(3000);
 
-        // Extension should be alive and textarea should still have its value
         const value = await textarea.inputValue();
         expect(value.length).toBeGreaterThan(0);
 
@@ -75,107 +212,262 @@ test.describe('Content-Script Detection', () => {
 
     test('regex token detectors stay off while the model is online when the toggle is disabled', async ({ extensionContext }) => {
         const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, MOCK_SERVER_URL);
+
         const response = await sendDetectRequest(
             context,
             extensionId,
-            'My name is Jane Doe and my key is sk-abcdefghijklmnopqrst',
+            REGEX_SMOKE_TEXT,
             {
-                enabledTypes: ['person'],
+                enabledTypes: ['person', 'email', 'phone', 'address', 'ssn', 'credit_card', 'date_of_birth'],
                 includeRegexWhenModelOnline: false,
-                customPatterns: [
-                    {
-                        id: 'openai_key',
-                        label: 'api_key',
-                        pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
-                        flags: 'g',
-                        score: 0.99,
-                        replacement: '[API KEY REDACTED]',
-                        enabled: true,
-                    },
-                ],
-            }
+                customPatterns: DEFAULT_SMOKE_PATTERNS,
+            },
         );
 
         expect(response.success).toBeTruthy();
         expect(response.mode).toBe('gliner2-local');
-        expect(response.detections.map((item) => item.label)).not.toContain('api_key');
+        expect(response.detections.map((item) => item.label)).toEqual(['person']);
     });
 
     test('regex token detectors run alongside the model when the toggle is enabled', async ({ extensionContext }) => {
         const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, MOCK_SERVER_URL);
+
         const response = await sendDetectRequest(
             context,
             extensionId,
-            'My name is Jane Doe and my key is sk-abcdefghijklmnopqrst',
+            REGEX_SMOKE_TEXT,
             {
-                enabledTypes: ['person'],
+                enabledTypes: ['person', 'email', 'phone', 'address', 'ssn', 'credit_card', 'date_of_birth'],
                 includeRegexWhenModelOnline: true,
-                customPatterns: [
-                    {
-                        id: 'openai_key',
-                        label: 'api_key',
-                        pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
-                        flags: 'g',
-                        score: 0.99,
-                        replacement: '[API KEY REDACTED]',
-                        enabled: true,
-                    },
-                ],
-            }
+                customPatterns: DEFAULT_SMOKE_PATTERNS,
+            },
         );
 
         expect(response.success).toBeTruthy();
         expect(response.mode).toBe('gliner2-local');
-        expect(response.detections.map((item) => item.label)).toContain('api_key');
+
+        const labels = new Set(response.detections.map((item) => item.label));
+        expect(labels.has('person')).toBeTruthy();
+        EXPECTED_BUILTIN_REGEX_LABELS.forEach((label) => expect(labels.has(label), label).toBeTruthy());
+        EXPECTED_CUSTOM_REGEX_LABELS.forEach((label) => expect(labels.has(label), label).toBeTruthy());
     });
 
     test('LLM response areas (.markdown-body) are never modified', async ({ extensionContext }) => {
-        const { context } = extensionContext;
+        const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, MOCK_SERVER_URL);
+
         const page = await context.newPage();
-        await page.goto(DATA_URL);
+        await page.goto(CONTENT_PAGE_URL);
         await page.waitForLoadState('domcontentloaded');
 
         await page.waitForTimeout(2000);
 
-        // No ps-* spans injected into the response area
         const injectedCount = await page.locator('#responseArea .ps-redaction, #responseArea .ps-pii-underline').count();
         expect(injectedCount).toBe(0);
 
-        // Original text intact
         const text = await page.locator('#responseArea').textContent();
         expect(text).toContain('John Smith');
 
         await page.close();
     });
+
 });
 
 test.describe('Regex Fallback (no server)', () => {
-    test('regex fallback detects built-in token patterns when server is offline', async ({ extensionContext }) => {
-        // No mock server — server is offline; regex fallback should kick in silently
+    let offlineServer;
+
+    test.beforeEach(async () => {
+        offlineServer = await startMockServer({
+            port: OFFLINE_SERVER_PORT,
+            healthy: false,
+            loaded: false,
+            detections: [],
+            pages: {
+                [HOSTILE_SCROLL_PAGE_PATH]: HOSTILE_SCROLL_HTML,
+                [OUTBOUND_PRIVACY_PAGE_PATH]: OUTBOUND_PRIVACY_PAGE_HTML,
+            },
+            handlers: {
+                'POST /provider-capture': ({ body, state }) => {
+                    try {
+                        state.lastProviderPayload = JSON.parse(body || '{}');
+                    } catch {
+                        state.lastProviderPayload = { parseError: true, raw: body };
+                    }
+                    return { body: { ok: true } };
+                },
+                'GET /provider-capture-last': ({ state }) => ({
+                    body: state.lastProviderPayload || { ok: false, empty: true },
+                }),
+            },
+        });
+    });
+
+    test.afterEach(async () => {
+        if (offlineServer) await stopMockServer(offlineServer);
+        offlineServer = null;
+    });
+
+    test('regex fallback detects built-in and custom smoke-corpus patterns when server is offline', async ({ extensionContext }) => {
         const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, OFFLINE_SERVER_URL);
+
         const response = await sendDetectRequest(
             context,
             extensionId,
-            'Call me at 415-555-1234 or sk-abcdefghijklmnopqrst',
+            REGEX_SMOKE_TEXT,
             {
-                enabledTypes: ['phone'],
+                enabledTypes: ['email', 'phone', 'address', 'ssn', 'credit_card', 'date_of_birth'],
                 includeRegexWhenModelOnline: false,
-                customPatterns: [
-                    {
-                        id: 'openai_key',
-                        label: 'api_key',
-                        pattern: '\\b(?:sk-[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{20,})\\b',
-                        flags: 'g',
-                        score: 0.99,
-                        replacement: '[API KEY REDACTED]',
-                        enabled: true,
-                    },
-                ],
-            }
+                customPatterns: DEFAULT_SMOKE_PATTERNS,
+            },
         );
 
         expect(response.success).toBeTruthy();
         expect(response.mode).toBe('regex-fallback');
-        expect(response.detections.map((item) => item.label).sort()).toEqual(['api_key', 'phone']);
+
+        const labels = new Set(response.detections.map((item) => item.label));
+        EXPECTED_BUILTIN_REGEX_LABELS.forEach((label) => expect(labels.has(label), label).toBeTruthy());
+        EXPECTED_CUSTOM_REGEX_LABELS.forEach((label) => expect(labels.has(label), label).toBeTruthy());
+    });
+
+    test('follow-up sends never include original PII in provider-bound thread context', async ({ extensionContext }) => {
+        const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, OFFLINE_SERVER_URL);
+
+        const page = await context.newPage();
+        await page.goto(OUTBOUND_PRIVACY_PAGE_URL);
+        await page.waitForLoadState('domcontentloaded');
+
+        const textarea = page.locator('#userInput');
+        await textarea.click();
+        await textarea.fill('Email jane@example.com about the launch.');
+        await expect(textarea).toHaveValue(/EMAIL.*REDACTED/, { timeout: 8000 });
+        await page.locator('#sendButton').click();
+
+        await expect.poll(async () => (await readCapturedProviderPayload(page)).current || '', { timeout: 5000 })
+            .toMatch(/EMAIL.*REDACTED/);
+        const firstPayload = await readCapturedProviderPayload(page);
+        expect(firstPayload.current).toMatch(/EMAIL.*REDACTED/);
+        expect(firstPayload.current).not.toContain('jane@example.com');
+
+        await textarea.fill('Write a follow-up for Sanket.');
+        await page.locator('#sendButton').click();
+
+        await expect.poll(async () => (await readCapturedProviderPayload(page)).thread?.length || 0, { timeout: 5000 })
+            .toBeGreaterThan(1);
+        const secondPayload = await readCapturedProviderPayload(page);
+        expect(secondPayload.current).toContain('Sanket');
+        expect(secondPayload.current).not.toContain('jane@example.com');
+        expect(secondPayload.thread.map((entry) => entry.text).join('\n')).not.toContain('jane@example.com');
+        expect(secondPayload.thread.map((entry) => entry.text).join('\n')).toMatch(/EMAIL.*REDACTED/);
+
+        await page.close();
+    });
+});
+
+test.describe('Anchored Overlay Scroll Refresh', () => {
+    let offlineServer;
+
+    test.beforeEach(async () => {
+        offlineServer = await startMockServer({
+            port: OFFLINE_SERVER_PORT,
+            healthy: false,
+            loaded: false,
+            detections: [],
+            pages: {
+                [HOSTILE_SCROLL_PAGE_PATH]: HOSTILE_SCROLL_HTML,
+            },
+        });
+    });
+
+    test.afterEach(async () => {
+        if (offlineServer) await stopMockServer(offlineServer);
+        offlineServer = null;
+    });
+
+    test('external overlay highlights move with hostile editor internal scroll', async ({ extensionContext }) => {
+        const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, OFFLINE_SERVER_URL);
+
+        const page = await context.newPage();
+        await page.goto(OFFLINE_HOSTILE_SCROLL_URL);
+        await page.waitForLoadState('domcontentloaded');
+
+        const editor = page.locator('#hostileEditor');
+        await editor.click();
+        await page.keyboard.insertText(Array.from({ length: 28 }, (_, index) => `Line ${index + 1}: jane@example.com`).join('\n'));
+
+        const overlay = page.locator('.ps-overlay-hl').first();
+        await expect(overlay).toBeVisible({ timeout: 8000 });
+        const hostBounds = await page.locator('#scrollHost').boundingBox();
+        const beforeTops = await page.locator('.ps-overlay-hl').evaluateAll((nodes) => (
+            nodes.map((node) => Math.round(node.getBoundingClientRect().top))
+        ));
+
+        await page.locator('#scrollHost').evaluate((node) => {
+            node.scrollTop = 72;
+            node.dispatchEvent(new Event('scroll', { bubbles: true }));
+        });
+        await page.waitForTimeout(350);
+
+        const afterRects = await page.locator('.ps-overlay-hl').evaluateAll((nodes) => (
+            nodes.map((node) => {
+                const rect = node.getBoundingClientRect();
+                return {
+                    top: Math.round(rect.top),
+                    bottom: Math.round(rect.bottom),
+                    left: Math.round(rect.left),
+                    right: Math.round(rect.right),
+                };
+            })
+        ));
+
+        expect(hostBounds).not.toBeNull();
+        expect(beforeTops.length).toBeGreaterThan(0);
+        expect(afterRects.length).toBeGreaterThan(0);
+        expect(afterRects.map((rect) => rect.top)).not.toEqual(beforeTops);
+        afterRects.forEach((rect) => {
+            expect(rect.top).toBeGreaterThanOrEqual(Math.floor(hostBounds.y) - 2);
+            expect(rect.bottom).toBeLessThanOrEqual(Math.ceil(hostBounds.y + hostBounds.height) + 2);
+            expect(rect.left).toBeGreaterThanOrEqual(Math.floor(hostBounds.x) - 2);
+            expect(rect.right).toBeLessThanOrEqual(Math.ceil(hostBounds.x + hostBounds.width) + 2);
+        });
+
+        await page.close();
+    });
+
+    test('hostile-editor redactions keep the reveal card visible while moving from token to card', async ({ extensionContext }) => {
+        const { context, extensionId } = extensionContext;
+        await setLocalServerOverride(context, extensionId, OFFLINE_SERVER_URL);
+
+        const page = await context.newPage();
+        await page.goto(OFFLINE_HOSTILE_SCROLL_URL);
+        await page.waitForLoadState('domcontentloaded');
+
+        const editor = page.locator('#hostileEditor');
+        await editor.click();
+        await page.keyboard.insertText('Email: jane@example.com');
+
+        const overlay = page.locator('.ps-overlay-hl.ps-overlay-hl-redacted').first();
+        await expect(overlay).toBeVisible({ timeout: 8000 });
+        await overlay.hover();
+
+        const reveal = page.locator('.ps-reveal-overlay');
+        await expect(reveal).toBeVisible();
+        await expect(reveal).toContainText('jane@example.com');
+
+        const revealBox = await reveal.boundingBox();
+        expect(revealBox).not.toBeNull();
+        await page.mouse.move(revealBox.x + revealBox.width / 2, revealBox.y + revealBox.height / 2);
+        await page.waitForTimeout(180);
+        await expect(reveal).toBeVisible();
+
+        await page.mouse.move(10, 10);
+        await page.waitForTimeout(220);
+        await expect(reveal).toBeHidden();
+
+        await page.close();
     });
 });

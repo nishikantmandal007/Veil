@@ -245,30 +245,37 @@
 
 /* ─── Reveal overlay (outside editor DOM, Grammarly-style) ─── */
 .ps-reveal-overlay {
-  /* Warm card — readable on any background thanks to the drop-shadow */
+  position: fixed;
+  z-index: 2147483110;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 8px 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  user-select: text;
   background: linear-gradient(135deg, #fffefb, #fdfaf4);
   color: var(--veil-ink, #23201b);
   border: 1px solid #e7dece;
-  border-radius: 5px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22), 0 1px 0 rgba(255,255,255,0.9) inset;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24), 0 1px 0 rgba(255,255,255,0.9) inset;
   font-family: var(--veil-font);
   font-weight: 600;
-  animation: ps-reveal-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  line-height: 1.35;
+  animation: ps-reveal-in 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes ps-reveal-in {
-  from { opacity: 0; transform: translateX(-50%) scale(0.93); }
-  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ─── External overlay highlights (AI sites) ─── */
 .ps-overlay-hl {
   pointer-events: all;
   cursor: pointer;
-  z-index: 2147483100;
   box-sizing: border-box;
   border-radius: 3px;
-  animation: ps-overlay-hl-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: background 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
 .ps-overlay-hl-redacted {
@@ -293,11 +300,6 @@
 }
 .ps-overlay-hl-underline:hover {
   background-color: color-mix(in srgb, var(--hl-color, #b45309) 10%, transparent);
-}
-
-@keyframes ps-overlay-hl-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
 }
 
 /* ─── Undo ripple ─── */

@@ -4,6 +4,9 @@
 const { test, expect } = require('./fixtures');
 const { startMockServer, stopMockServer } = require('./mock_server');
 
+const MOCK_SERVER_PORT = 18775;
+const MOCK_SERVER_URL = `http://127.0.0.1:${MOCK_SERVER_PORT}`;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function clearOnboarding(page) {
@@ -12,6 +15,19 @@ async function clearOnboarding(page) {
 
 async function markOnboardingDone(page) {
     await page.evaluate(() => new Promise((resolve) => chrome.storage.local.set({ veilOnboardingDone: true }, resolve)));
+}
+
+async function setLocalServerOverride(page, url) {
+    await page.evaluate(
+        (localServerUrl) => new Promise((resolve) => chrome.storage.local.set({
+            veilLocalServerUrlOverride: localServerUrl,
+        }, resolve)),
+        url,
+    );
+}
+
+async function clearLocalServerOverride(page) {
+    await page.evaluate(() => new Promise((resolve) => chrome.storage.local.remove('veilLocalServerUrlOverride', resolve)));
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -136,21 +152,56 @@ test.describe('Server Status (with mock server)', () => {
     let mockServer;
 
     test.beforeEach(async () => {
-        mockServer = await startMockServer({ port: 8765, healthy: true, loaded: true });
+        mockServer = await startMockServer({ port: MOCK_SERVER_PORT, healthy: true, loaded: true });
     });
 
-    test.afterEach(async () => {
+    test.afterEach(async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+        await clearLocalServerOverride(page);
         if (mockServer) await stopMockServer(mockServer); // stopMockServer handles null safely
     });
 
     test('status dot gets active class when server is healthy', async ({ extensionOptions }) => {
         const { page } = extensionOptions;
-        // Allow polling cycle to detect the mock server (up to 5s)
+        await setLocalServerOverride(page, MOCK_SERVER_URL);
         await page.waitForTimeout(4000);
         const dot = page.locator('#statusDot');
         const hasActive = await dot.evaluate((el) => el.classList.contains('active'));
         const hasWarn = await dot.evaluate((el) => el.classList.contains('warn'));
         expect(hasActive || hasWarn).toBe(true);
+    });
+
+    test('regex runtime note reflects AI-only vs AI-plus-regex states', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+        await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
+        await page.evaluate(() => {
+            const sm = window.__VEIL_SETTINGS_MANAGER__;
+            if (sm.serverPollTimer) {
+                clearInterval(sm.serverPollTimer);
+                sm.serverPollTimer = null;
+            }
+            sm.refreshServerStatus = async () => { };
+            sm.serverPhase = 'ready';
+            sm.serverState = {
+                ...sm.serverState,
+                known: true,
+                installed: true,
+                running: true,
+                healthy: true,
+            };
+            sm.settings.enabled = true;
+            sm.settings.includeRegexWhenModelOnline = false;
+            sm.renderRegexRuntimeState();
+        });
+
+        await expect(page.locator('#regexRuntimeState')).toContainText('AI only');
+
+        await page.evaluate(() => {
+            const sm = window.__VEIL_SETTINGS_MANAGER__;
+            sm.settings.includeRegexWhenModelOnline = true;
+            sm.renderRegexRuntimeState();
+        });
+        await expect(page.locator('#regexRuntimeState')).toContainText('AI + Regex active');
     });
 });
 
@@ -250,6 +301,58 @@ test.describe('Release Status UX', () => {
 
         await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Backend version needs verification');
         await expect(page.locator('#releaseStatusSubtext')).toContainText('needs one local server refresh');
+        await expect(page.locator('#serverUpdateBlock')).toBeVisible();
+    });
+
+    test('keeps the local server verified when GitHub release lookup fails but bundled metadata is known', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+
+        await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
+        await page.evaluate(() => {
+            const sm = window.__VEIL_SETTINGS_MANAGER__;
+            sm.refreshReleaseInfo = async () => { };
+            sm.refreshReleaseSurface = async () => { };
+            sm.releaseInfo = {
+                ...sm.getDefaultReleaseInfo(),
+                status: 'error',
+                error: 'GitHub release check failed (403).',
+            };
+            sm.serverMeta = {
+                ...sm.serverMeta,
+                bundleReleaseTag: 'v1.2.5',
+                bundleReleaseUrl: 'https://github.com/Maya-Data-Privacy/Veil/releases/tag/v1.2.5',
+            };
+            sm.renderReleaseInfo();
+        });
+
+        await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Local server verified');
+        await expect(page.locator('#releaseStatusText')).toContainText('Local server verified: v1.2.5');
+        await expect(page.locator('#releaseStatusSubtext')).toContainText('cannot check for newer releases');
+    });
+
+    test('shows backend version unknown instead of a generic update failure when both GitHub and local metadata are unavailable', async ({ extensionOptions }) => {
+        const { page } = extensionOptions;
+
+        await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
+        await page.evaluate(() => {
+            const sm = window.__VEIL_SETTINGS_MANAGER__;
+            sm.refreshReleaseInfo = async () => { };
+            sm.refreshReleaseSurface = async () => { };
+            sm.releaseInfo = {
+                ...sm.getDefaultReleaseInfo(),
+                status: 'error',
+                error: 'GitHub release check failed (403).',
+            };
+            sm.serverMeta = {
+                ...sm.serverMeta,
+                bundleReleaseTag: '',
+                bundleReleaseUrl: '',
+            };
+            sm.renderReleaseInfo();
+        });
+
+        await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Backend version unknown');
+        await expect(page.locator('#releaseStatusText')).toContainText('Backend version unknown right now');
         await expect(page.locator('#serverUpdateBlock')).toBeVisible();
     });
 });

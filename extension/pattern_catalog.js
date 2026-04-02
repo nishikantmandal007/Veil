@@ -54,7 +54,7 @@
       flags: 'g',
       score: 0.9,
       replacement: '[IPV6 REDACTED]',
-      enabled: false
+      enabled: true
     }),
     Object.freeze({
       id: 'ssn',
@@ -77,7 +77,7 @@
     Object.freeze({
       id: 'indian_aadhaar',
       label: 'aadhaar',
-      pattern: '\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b',
+      pattern: '\\b[2-9]\\d{3}[\\s-]\\d{4}[\\s-]\\d{4}\\b(?![\\s-]\\d{4})',
       flags: 'g',
       score: 0.95,
       replacement: '[AADHAAR REDACTED]',
@@ -90,7 +90,25 @@
       flags: 'g',
       score: 0.92,
       replacement: '[PASSPORT REDACTED]',
-      enabled: false
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'ifsc_code',
+      label: 'ifsc',
+      pattern: '\\b[A-Z]{4}0[A-Z0-9]{6}\\b',
+      flags: 'g',
+      score: 0.97,
+      replacement: '[IFSC REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'indian_driver_license',
+      label: 'driver_license',
+      pattern: '\\b[A-Z]{2}[0-9]{2}[-\\s]?[0-9]{11}\\b',
+      flags: 'g',
+      score: 0.95,
+      replacement: '[DL REDACTED]',
+      enabled: true
     })
   ]);
 
@@ -104,7 +122,9 @@
     ssn: 'US Social Security Number',
     indian_pan: 'Indian PAN Number',
     indian_aadhaar: 'Indian Aadhaar',
-    passport: 'Passport Number'
+    passport: 'Passport Number',
+    ifsc_code: 'IFSC Code',
+    indian_driver_license: 'Indian Driver License'
   });
 
   function cloneDefaultCustomPatterns() {

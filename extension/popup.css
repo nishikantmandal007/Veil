@@ -7,6 +7,12 @@
   --muted: #6f6659;
   --ink: #23201b;
   --ink-soft: #f0e8db;
+  --accent: #6a553a;
+  --accent-strong: #2d251c;
+  --accent-soft: #efe2ce;
+  --accent-soft-2: #f6ecdc;
+  --accent-border: #d7c7ad;
+  --accent-tint: #fcf5e7;
   --ok: #15803d;
   --warn: #9a3412;
   --error: #991b1b;
@@ -110,6 +116,12 @@ body {
   margin: 0 0 8px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.regex-runtime-note {
+  margin-top: 6px;
+  padding-left: 2px;
+  color: #5f5548;
 }
 
 .status-row {
@@ -885,6 +897,12 @@ button.compact.is-copied {
 
 body.onboarding-open .shell {
   min-height: 440px;
+  background:
+    radial-gradient(115% 90% at 12% 8%, #fffdf8 0%, #f7f0e4 50%, #f0e5d2 100%);
+  border-color: #dfd1bb;
+  box-shadow:
+    0 1px 2px rgba(36, 28, 20, 0.08),
+    0 12px 28px rgba(96, 74, 44, 0.14);
 }
 
 .onboarding-overlay {
@@ -894,7 +912,8 @@ body.onboarding-open .shell {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(244, 239, 230, 0.97);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.97) 0%, rgba(242, 233, 218, 0.95) 100%);
   backdrop-filter: blur(3px);
   border-radius: 14px;
   padding: 12px;
@@ -937,11 +956,14 @@ body:not(.full-page).onboarding-open .onboarding-overlay {
   max-width: 360px;
   max-height: none;
   overflow-y: visible;
-  background: linear-gradient(180deg, #fffefb 0%, #fffbf4 100%);
-  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, #fffdf8 0%, #fbf3e6 100%);
+  border: 1px solid #e0d3c0;
   border-radius: var(--radius-lg);
   padding: 18px;
-  box-shadow: 0 4px 24px rgba(78, 62, 33, 0.12), 0 1px 0 rgba(24, 24, 27, 0.05);
+  box-shadow:
+    0 18px 40px rgba(90, 66, 35, 0.16),
+    0 1px 0 rgba(24, 24, 27, 0.05);
 }
 
 body:not(.full-page).onboarding-open .onboarding-card {
@@ -964,7 +986,7 @@ body:not(.full-page).onboarding-open .onboarding-card {
 }
 
 .onboarding-dot.is-active {
-  background: #2d251c;
+  background: var(--accent-strong);
   transform: scale(1.25);
 }
 
@@ -976,13 +998,13 @@ body:not(.full-page).onboarding-open .onboarding-card {
   width: 52px;
   height: 52px;
   margin: 0 auto 14px;
-  background: linear-gradient(145deg, #2d251c, #3a3127);
+  background: linear-gradient(145deg, #5a4328, #2d251c);
   border-radius: 14px;
-  border: 1px solid #4a3d2e;
+  border: 1px solid #755b3a;
   display: grid;
   place-items: center;
-  color: #f4e8d0;
-  box-shadow: 0 2px 8px rgba(45, 37, 28, 0.25);
+  color: #fff5de;
+  box-shadow: 0 8px 18px rgba(79, 58, 28, 0.24);
 }
 
 .onboarding-icon svg {
@@ -1017,9 +1039,9 @@ body:not(.full-page).onboarding-open .onboarding-card {
   align-items: center;
   font-size: 11px;
   font-weight: 650;
-  color: #7c5c38;
-  background: #f0e4cf;
-  border: 1px solid #e0cdb0;
+  color: #815f34;
+  background: #f4e6ce;
+  border: 1px solid #e4cfad;
   border-radius: 999px;
   padding: 2px 9px;
   margin-bottom: 10px;
@@ -1057,17 +1079,17 @@ body:not(.full-page).onboarding-open .onboarding-card {
 .onboarding-bullets li {
   font-size: 12px;
   color: #433b2e;
-  background: #f8f3ea;
-  border: 1px solid #e9dece;
+  background: #faf4e8;
+  border: 1px solid #e6d9c4;
   border-radius: 8px;
   padding: 5px 8px;
   line-height: 1.4;
 }
 
 .onboarding-cmd-block {
-  border: 1px solid var(--border);
+  border: 1px solid #dfd1bb;
   border-radius: var(--radius-sm);
-  background: #f7f2e8;
+  background: #f8f1e4;
   overflow: hidden;
   margin-bottom: 8px;
 }
@@ -1077,9 +1099,9 @@ body:not(.full-page).onboarding-open .onboarding-card {
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #dfd1bb;
   font-size: 11px;
-  color: var(--muted);
+  color: #695843;
   font-weight: 600;
 }
 
@@ -1096,9 +1118,9 @@ body:not(.full-page).onboarding-open .onboarding-card {
   font-size: 11px;
   padding: 2px 8px;
   min-height: 22px;
-  background: #ede4d4;
-  border-color: #d5c9b2;
-  color: #3c3123;
+  background: var(--accent-soft-2);
+  border-color: var(--accent-border);
+  color: #4a3b29;
 }
 
 .onboarding-status-note {
@@ -1131,9 +1153,9 @@ body:not(.full-page).onboarding-open .onboarding-card {
   font-size: 13.5px;
   font-weight: 650;
   letter-spacing: 0.01em;
-  background: #2d251c;
-  border-color: #3a3024;
-  color: #faf8f3;
+  background: linear-gradient(180deg, #584225 0%, #2d251c 100%);
+  border-color: #513e28;
+  color: #fff7eb;
   border-radius: var(--radius-sm);
 }
 
@@ -1142,10 +1164,41 @@ body:not(.full-page).onboarding-open .onboarding-card {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
-  background: #efe2ce;
-  border-color: #d3c4ab;
-  color: #3c3123;
+  background: linear-gradient(180deg, #f3e7d3 0%, #e7d6bb 100%);
+  border-color: #cfbf9f;
+  color: #453624;
   border-radius: var(--radius-sm);
+}
+
+.onboarding-copy-btn:hover:not(:disabled),
+.onboarding-copy-btn:focus-visible {
+  background: #eadcc6;
+  border-color: #cdb890;
+  color: #3f3020;
+}
+
+.onboarding-primary-btn:hover:not(:disabled),
+.onboarding-primary-btn:focus-visible {
+  background: linear-gradient(180deg, #685032 0%, #3a2f22 100%);
+  border-color: #5c472d;
+  color: #fff7eb;
+}
+
+.onboarding-primary-btn:active:not(:disabled) {
+  background: linear-gradient(180deg, #44331f 0%, #241d16 100%);
+  color: #fff7eb;
+}
+
+.onboarding-secondary-btn:hover:not(:disabled),
+.onboarding-secondary-btn:focus-visible {
+  background: linear-gradient(180deg, #f7eddc 0%, #eadabf 100%);
+  border-color: #cab692;
+  color: #3b2d1d;
+}
+
+.onboarding-secondary-btn:active:not(:disabled) {
+  background: #dfceb0;
+  color: #342718;
 }
 
 .onboarding-skip-btn {
@@ -1163,7 +1216,7 @@ body:not(.full-page).onboarding-open .onboarding-card {
 }
 
 .onboarding-skip-btn:hover {
-  color: var(--ink);
+  color: var(--accent-strong);
   background: transparent;
 }
 /* ─── Redaction Key ─── */

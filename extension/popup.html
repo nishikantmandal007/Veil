@@ -135,7 +135,7 @@
       </div>
       <div class="anon-hint-body">
         <p class="anon-hint-title">Anonymize replaces your real data with realistic fakes</p>
-        <p class="anon-hint-sub" style="margin-bottom:4px">Covers names, emails, phones, addresses, locations, organizations, dates of birth, SSNs, and credit card numbers — keeping prompts coherent while your real data stays private.</p>
+        <p class="anon-hint-sub" style="margin-bottom:4px">Supported PII goes through Maya anonymization so enterprise LLMs only see realistic safe replacements. Unsupported detections stay local and remain redacted.</p>
         <p class="anon-hint-example">e.g. <span class="anon-ex-real">Priya Sharma</span> → <span class="anon-ex-fake">Claire Bennett</span> &nbsp; <span class="anon-ex-real">priya@acme.com</span> → <span class="anon-ex-fake">claire.b@mailhub.io</span></p>
         <p class="anon-hint-sub">Requires a <strong>Maya API Key</strong>. Sign up free at <a href="https://app.mayadataprivacy.eu" target="_blank" rel="noreferrer" class="anon-hint-link">app.mayadataprivacy.eu</a> and copy your key from the <strong>Profile</strong> section.</p>
         <button type="button" class="anon-hint-settings-btn" id="anonymizeHintSettingsBtn">
@@ -261,7 +261,7 @@
         <div id="apiKeyPanel" class="tool-panel" hidden>
           <section class="server-tool-panel token-tools">
             <p class="panel-title">Anonymization API Key</p>
-            <p class="hint" style="margin-top:4px">Required for Anonymize mode. Stored locally — never sent except to your local proxy.</p>
+            <p class="hint" style="margin-top:4px">Required for Anonymize mode. Stored locally and used only for Maya anonymization through Veil&apos;s local proxy. Enterprise LLMs receive only the resulting safe text.</p>
             <div id="apiKeySavedState" hidden>
               <div class="api-key-saved-card">
                 <div class="api-key-saved-info">
@@ -296,6 +296,7 @@
         <div id="diagnosticsPanel" class="tool-panel" hidden>
           <section class="server-tool-panel">
             <p class="panel-title">Diagnostics</p>
+            <p class="hint" style="margin-top:4px">Diagnostics are local-only troubleshooting data from this device. They help you inspect Veil&apos;s local runtime and do not change what gets sent to enterprise LLMs.</p>
             <label class="field field-tight" style="margin-bottom:8px">
               <span style="font-size:11px;font-weight:600;color:var(--ink)">GLiNER2 Model</span>
               <select id="modelSelect">
@@ -361,6 +362,7 @@
           <span>Run Regex Detectors Alongside AI Detection</span>
           <input type="checkbox" id="includeRegexToggle">
         </label>
+        <p class="hint regex-runtime-note" id="regexRuntimeState">Checking regex runtime…</p>
       </section>
 
       <section class="card">

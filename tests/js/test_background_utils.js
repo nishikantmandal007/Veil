@@ -11,6 +11,11 @@ const {
   normalizeCustomPatterns,
   PATTERN_NAMES,
 } = require('../../extension/pattern_catalog.js');
+const {
+  REGEX_SMOKE_TEXT,
+  REGEX_SMOKE_CUSTOM_PATTERNS,
+  EXPECTED_CUSTOM_REGEX_LABELS,
+} = require('../fixtures/regex_smoke_corpus.js');
 
 let passed = 0;
 let failed = 0;
@@ -136,6 +141,8 @@ section('pattern catalog — expected built-in regex detectors are present');
   assert(ids.includes('indian_pan'), 'includes PAN pattern');
   assert(ids.includes('indian_aadhaar'), 'includes Aadhaar pattern');
   assert(ids.includes('passport'), 'includes passport pattern');
+  assert(ids.includes('ifsc_code'), 'includes IFSC pattern');
+  assert(ids.includes('indian_driver_license'), 'includes Indian driver license pattern');
   assertEqual(PATTERN_NAMES.openai_key, 'OpenAI API Key', 'exposes display names for built-ins');
 }
 
@@ -155,6 +162,39 @@ section('pattern catalog — legacy OpenAI regex migrates to the canonical match
 
   const openAi = normalized.find((pattern) => pattern.id === 'openai_key');
   assert(openAi.pattern.includes('sk-proj-'), 'legacy OpenAI pattern is upgraded to the canonical matcher');
+}
+
+section('pattern catalog — built-in smoke corpus patterns match the shared regex fixture');
+{
+  const defaults = cloneDefaultCustomPatterns();
+  const defaultLabels = new Set(
+    defaults
+      .filter((pattern) => {
+        const regex = new RegExp(pattern.pattern, pattern.flags || 'g');
+        return regex.test(REGEX_SMOKE_TEXT);
+      })
+      .map((pattern) => pattern.label)
+  );
+
+  ['aadhaar', 'api_key', 'driver_license', 'ifsc', 'ip_address', 'jwt', 'pan', 'passport', 'ssn'].forEach((label) => {
+    assert(defaultLabels.has(label), `shared smoke corpus hits built-in label "${label}"`);
+  });
+}
+
+section('pattern catalog — custom smoke corpus patterns match the shared regex fixture');
+{
+  const customLabels = new Set(
+    REGEX_SMOKE_CUSTOM_PATTERNS
+      .filter((pattern) => {
+        const regex = new RegExp(pattern.pattern, pattern.flags || 'g');
+        return regex.test(REGEX_SMOKE_TEXT);
+      })
+      .map((pattern) => pattern.label)
+  );
+
+  EXPECTED_CUSTOM_REGEX_LABELS.forEach((label) => {
+    assert(customLabels.has(label), `shared smoke corpus hits custom label "${label}"`);
+  });
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

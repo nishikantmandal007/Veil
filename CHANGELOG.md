@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed release-state checks whenever the popup or settings view regains focus, reducing the need to close and reopen Veil after refreshing the local server bundle.
 - Surfaced missing backend release metadata as a one-time refresh step instead of incorrectly implying that the installed backend is definitely outdated.
 - Fixed Unix release metadata stamping so the stored backend `html_url` is extracted from the actual GitHub release payload instead of occasionally capturing an unrelated nested URL.
+- Embedded canonical release metadata directly into the backend bundles so local installs can verify the installed server version even when `api.github.com` is temporarily rate-limited or unavailable.
+- Updated the Unix and Windows installers to stamp `.runtime/bundle_release.json` from the bundled metadata and add `installed_at` locally instead of depending on a live GitHub API call during install.
+- Changed the settings popup/update surface to treat GitHub latest-release lookups as best-effort only: Veil now shows a verified local bundle state when installed metadata is known, and falls back to “backend version unknown” when both GitHub and local metadata are unavailable.
 
 ### Settings and Maintenance
 
@@ -26,7 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unified Veil’s built-in sensitive-token patterns into one shared regex catalog used by the background runtime, popup/options editor, and content-side settings normalization, eliminating drift between UI and detection behavior.
 - Updated the online regex toggle to govern all regex-based detectors while GLiNER is healthy, while keeping regex fallback automatic when the local server is offline.
-- Expanded the built-in regex catalog coverage for GitHub tokens, IPv6, PAN, Aadhaar, and passport patterns, and ensured explicit regex replacements are respected even in anonymize mode for token-style detections.
+- Expanded the built-in regex catalog coverage for GitHub tokens, IPv6, PAN, Aadhaar, passport, IFSC, and Indian driver-license patterns, and ensured explicit regex replacements are respected even in anonymize mode for token-style detections.
+- Added a shared regex smoke corpus and hostile-editor E2E fixtures so built-in and custom regex detectors are verified in online, offline, and internal-scroll scenarios without depending on a live local server.
+
+### Overlay and Onboarding Polish
+
+- Reworked hostile-editor overlay refresh so external highlight boxes are rebuilt from tracked state, clipped to the visible editor scroll bounds, and refreshed through one anchored UI scheduler instead of lingering as stray floating boxes during Gemini-style internal scrolling.
+- Stabilized hostile-editor overlay highlights by updating them in place instead of destroying and recreating them on every layout pass, reducing visible flicker in Gemini/Claude-style editors.
+- Added a stable hover-intent reveal card for redacted hostile-editor overlays so original text stays readable while moving the pointer from the token to the reveal card.
+- Added clearer live regex-runtime status notes to popup and settings so users can tell whether Veil is currently running in `AI only`, `AI + Regex`, or `Regex fallback` mode.
+- Updated the setup flow styling to keep button text readable on hover and align the onboarding surface with Veil’s dashboard color language.
+
+### Privacy Hardening
+
+- Removed inline response de-anonymization from provider-owned chat threads so Veil no longer writes original PII back into ChatGPT/Gemini/Claude-style message history.
+- Tightened ChatGPT input monitoring so historical user turns are never mistaken for live composer surfaces.
+- Standardized anonymize-mode fallback so supported entities fall back to safe masking instead of alias placeholders when Maya anonymization is unavailable.
+- Clarified popup/settings copy that Maya anonymization is the trusted remote path for supported labels, unsupported detections stay local, and Diagnostics are local-only troubleshooting data.
 
 ### Windows Installer
 

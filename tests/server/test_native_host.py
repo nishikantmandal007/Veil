@@ -50,6 +50,33 @@ def test_read_process_state_reads_existing_json(runtime_paths):
     assert native_host.read_process_state() == {"pid": 5678, "session_id": "abc"}
 
 
+def test_read_bundle_release_info_reads_installed_bundle_metadata(runtime_paths):
+    native_host.ensure_runtime_dirs()
+    native_host.RELEASE_INFO_FILE.write_text(
+        '{"tag":"v1.2.5","published_at":"2026-04-02T12:34:56Z","html_url":"https://github.com/Maya-Data-Privacy/Veil/releases/tag/v1.2.5","installed_at":"2026-04-02T12:40:00Z"}',
+        encoding="utf-8",
+    )
+
+    assert native_host.read_bundle_release_info() == {
+        "bundleReleaseTag": "v1.2.5",
+        "bundleReleasePublishedAt": "2026-04-02T12:34:56Z",
+        "bundleReleaseUrl": "https://github.com/Maya-Data-Privacy/Veil/releases/tag/v1.2.5",
+        "bundleReleaseInstalledAt": "2026-04-02T12:40:00Z",
+    }
+
+
+def test_read_bundle_release_info_falls_back_to_unknown_for_invalid_json(runtime_paths):
+    native_host.ensure_runtime_dirs()
+    native_host.RELEASE_INFO_FILE.write_text("{invalid", encoding="utf-8")
+
+    assert native_host.read_bundle_release_info() == {
+        "bundleReleaseTag": None,
+        "bundleReleasePublishedAt": None,
+        "bundleReleaseUrl": None,
+        "bundleReleaseInstalledAt": None,
+    }
+
+
 def test_start_server_reports_port_conflict_for_non_veil_process(monkeypatch, runtime_paths):
     monkeypatch.setattr(native_host, "is_server_healthy", lambda: False)
     monkeypatch.setattr(native_host, "is_port_open", lambda host="127.0.0.1", port=8765: True)

@@ -74,6 +74,8 @@ const DEFAULT_MONITORED_SELECTORS = [
 const NATIVE_HOST_NAMES = ['com.veil.gliner.server', 'com.privacyshield.gliner2'];
 const MDP_SEED_STORAGE_KEY = 'veilAnonymizationSeed';
 const MDP_SEED_PREFIX = 'veil_';
+const DEFAULT_LOCAL_SERVER_URL = 'http://127.0.0.1:8765';
+const LOCAL_SERVER_URL_OVERRIDE_KEY = 'veilLocalServerUrlOverride';
 
 const MDP_LABEL_CONFIG = Object.freeze({
   person: Object.freeze({
@@ -123,10 +125,37 @@ const MDP_LABEL_CONFIG = Object.freeze({
   })
 });
 
+function normalizeLocalServerUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return DEFAULT_LOCAL_SERVER_URL;
+
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return DEFAULT_LOCAL_SERVER_URL;
+    }
+    return url.origin;
+  } catch {
+    return DEFAULT_LOCAL_SERVER_URL;
+  }
+}
+
+function readConfiguredLocalServerUrl() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([LOCAL_SERVER_URL_OVERRIDE_KEY], (result) => {
+      resolve(normalizeLocalServerUrl(result?.[LOCAL_SERVER_URL_OVERRIDE_KEY]));
+    });
+  });
+}
+
 class VeilAnonymizer {
   constructor() {
     this.timeoutMs = 6000;
-    this.localServerUrl = 'http://127.0.0.1:8765';
+    this.localServerUrl = DEFAULT_LOCAL_SERVER_URL;
+  }
+
+  setLocalServerUrl(url) {
+    this.localServerUrl = normalizeLocalServerUrl(url);
   }
 
   async enrichDetections(detections, options = {}) {
@@ -475,10 +504,14 @@ class GLiNERDetector {
     this.isLoading = false;
     this.isReady = false;
     this.mode = 'regex-fallback';
-    this.localServerUrl = 'http://127.0.0.1:8765';
+    this.localServerUrl = DEFAULT_LOCAL_SERVER_URL;
     this.lastServerCheckTs = 0;
     this.serverCheckCooldownMs = 2500;
     this.labels = DEFAULT_LABELS;
+  }
+
+  setLocalServerUrl(url) {
+    this.localServerUrl = normalizeLocalServerUrl(url);
   }
 
   async initialize(force = false) {
@@ -492,6 +525,7 @@ class GLiNERDetector {
 
     this.isLoading = true;
     try {
+      this.setLocalServerUrl(await readConfiguredLocalServerUrl());
       await this.refreshMode();
       this.isReady = true;
     } finally {
@@ -771,7 +805,7 @@ class GLiNERDetector {
     }
 
     if (enabledTypes.includes('phone')) {
-      const regex = /(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
+      const regex = /(?<![A-Za-z0-9])(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;
       let match;
       while ((match = regex.exec(text)) !== null) push(match, 'phone', 0.9);
     }
@@ -936,6 +970,13 @@ class GLiNERDetector {
 const detector = new GLiNERDetector();
 const anonymizer = new VeilAnonymizer();
 
+async function syncConfiguredLocalServerUrl() {
+  const url = await readConfiguredLocalServerUrl();
+  detector.setLocalServerUrl(url);
+  anonymizer.setLocalServerUrl(url);
+  return url;
+}
+
 // Per-tab AbortControllers — cancels any stale in-flight detection when the same
 // tab fires a new detectPII request (e.g. fast typing across multiple tabs).
 const activeDetectionControllers = new Map(); // tabId → AbortController
@@ -956,7 +997,8 @@ async function broadcastToTabs(message) {
 async function checkServerHealthAndNotify() {
   let isHealthy = false;
   try {
-    const response = await fetch('http://127.0.0.1:8765/health', { method: 'GET', signal: AbortSignal.timeout(2000) });
+    const localServerUrl = await syncConfiguredLocalServerUrl();
+    const response = await fetch(`${localServerUrl}/health`, { method: 'GET', signal: AbortSignal.timeout(2000) });
     if (response.ok) {
       const data = await response.json();
       isHealthy = Boolean(data?.ok);
@@ -978,6 +1020,17 @@ async function checkServerHealthAndNotify() {
 
 // Poll every 5 seconds to detect crashes between popup refreshes
 setInterval(checkServerHealthAndNotify, 5000);
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local') return;
+  if (!changes[LOCAL_SERVER_URL_OVERRIDE_KEY]) return;
+  const nextValue = changes[LOCAL_SERVER_URL_OVERRIDE_KEY]?.newValue;
+  detector.setLocalServerUrl(nextValue);
+  anonymizer.setLocalServerUrl(nextValue);
+  detector.isReady = false;
+  detector.mode = 'regex-fallback';
+  detector.lastServerCheckTs = 0;
+});
 
 
 async function handleServerControl(command, options = {}) {

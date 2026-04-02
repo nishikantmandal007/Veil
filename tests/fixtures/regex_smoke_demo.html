@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veil Regex Smoke Corpus</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px;
+      background: #f7f1e6;
+      color: #2d251c;
+      font: 16px/1.55 "Avenir Next", "Manrope", "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      background: #fffdf8;
+      border: 1px solid #e7dece;
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 18px 40px rgba(45, 37, 28, 0.08);
+    }
+    h1, h2 {
+      margin: 0 0 12px;
+      font-family: "Iowan Old Style", Georgia, serif;
+    }
+    p { margin: 0 0 16px; color: #5f5548; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: #fbf6ed;
+      border: 1px solid #e5d8c4;
+      border-radius: 14px;
+      padding: 16px;
+    }
+    ul {
+      margin: 10px 0 0;
+      padding-left: 18px;
+    }
+    pre {
+      margin: 0;
+      padding: 18px;
+      border-radius: 14px;
+      background: #f5efe4;
+      border: 1px solid #e3d5be;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 13px/1.6 "JetBrains Mono", "SF Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Veil Regex Smoke Corpus</h1>
+    <p>Use this fixture to manually verify default regex detectors and the custom sample patterns added for the `v1.2.4` follow-up.</p>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Built-in Regex Hits</h2>
+        <ul>
+          <li>OpenAI key, AWS key, GitHub token, JWT</li>
+          <li>IPv4, IPv6, SSN, PAN, Aadhaar, Passport</li>
+          <li>IFSC, Driver License</li>
+          <li>Phone, address, credit card, DOB</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Custom Regex Hits</h2>
+        <ul>
+          <li>Bank account</li>
+          <li>OAuth token</li>
+          <li>MAC address</li>
+          <li>Employee ID</li>
+          <li>Device ID</li>
+          <li>Session ID</li>
+        </ul>
+      </section>
+    </div>
+
+    <pre>Primary Contact: Rohan Sen
+Email: rohan.sen@example.com
+Phone: +1 415-555-1234
+Address: 221 Baker Street
+Date of Birth: 04/18/1992
+SSN: 123-45-6789
+Credit Card: 4111 1111 1111 1111
+
+OpenAI API Key: sk-proj-abcDEF1234567890ghijKLMN_opqrstuVWXYZ
+AWS Access Key: AKIAIOSFODNN7EXAMPLE
+GitHub Token: github_pat_11AABBCCDDEEFF00112233445566778899
+JWT Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature
+IPv4 Address: 192.168.34.21
+IPv6 Address: 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+
+PAN Number: BQKPS4587L
+Aadhaar Number: 4821-7395-1602
+Passport Number: N7392615
+Driver License Number: MP09-20230014567
+IFSC Code: SBIN0004587
+
+Bank Account Number: 348291765432
+OAuth Token: ya29.a0AfH6SMDemoToken98765
+MAC Address: 3C:52:82:AF:91:7B
+Employee ID: TN-EMP-20458
+Device ID: ANDR-98X2-KL45-PL09
+Session ID: SESS-a82f91d7c6b34e2f</pre>
+  </main>
+</body>
+</html>

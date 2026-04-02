@@ -217,7 +217,7 @@ function Remove-VeilInstallContents {
 function Write-VeilReleaseMetadata {
     param(
         [Parameter(Mandatory = $true)]
-        $ReleaseInfo,
+        [string]$SourcePath,
         [Parameter(Mandatory = $true)]
         [string]$TargetPath,
         [Parameter(Mandatory = $true)]
@@ -225,12 +225,28 @@ function Write-VeilReleaseMetadata {
     )
 
     $releaseMeta = @{
-        tag = [string]($ReleaseInfo.tag_name)
-        published_at = [string]($ReleaseInfo.published_at)
-        html_url = [string]($ReleaseInfo.html_url)
+        tag = ""
+        published_at = ""
+        html_url = ""
         repository = $RepoSlug
         installed_at = (Get-Date).ToUniversalTime().ToString("o")
     }
+
+    if (Test-Path -LiteralPath $SourcePath) {
+        try {
+            $sourceMeta = Get-Content -LiteralPath $SourcePath -Raw | ConvertFrom-Json
+            $releaseMeta.tag = [string]($sourceMeta.tag)
+            $releaseMeta.published_at = [string]($sourceMeta.published_at)
+            $releaseMeta.html_url = [string]($sourceMeta.html_url)
+            if (-not [string]::IsNullOrWhiteSpace([string]($sourceMeta.repository))) {
+                $releaseMeta.repository = [string]($sourceMeta.repository)
+            }
+        }
+        catch {
+            # Fall back to an unknown-but-valid payload so local installs remain verifiable.
+        }
+    }
+
     $releaseMeta | ConvertTo-Json | Set-Content -LiteralPath $TargetPath -Encoding UTF8
 }
 
@@ -359,7 +375,6 @@ function Install-Veil {
 
     $repoSlug = "Maya-Data-Privacy/Veil"
     $releaseBase = "https://github.com/$repoSlug/releases/latest/download"
-    $releaseApi = "https://api.github.com/repos/$repoSlug/releases/latest"
     $assetName = "veil-backend-windows.zip"
     $defaultAnonEndpoint = "https://app.mayadataprivacy.in/mdp/engine/anonymization"
     $pinnedUvVersion = "0.10.7"
@@ -413,13 +428,7 @@ function Install-Veil {
 
         $runtimeDir = Join-Path $InstallDir ".runtime"
         New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-        try {
-            $releaseInfo = Invoke-RestMethod -UseBasicParsing -Uri $releaseApi
-            Write-VeilReleaseMetadata -ReleaseInfo $releaseInfo -TargetPath (Join-Path $runtimeDir "bundle_release.json") -RepoSlug $repoSlug
-        }
-        catch {
-            Write-Host "Warning: could not stamp release metadata. Update notices may stay conservative until the next refresh."
-        }
+        Write-VeilReleaseMetadata -SourcePath (Join-Path $runtimeDir "bundle_release.json") -TargetPath (Join-Path $runtimeDir "bundle_release.json") -RepoSlug $repoSlug
 
         $uvExe = Ensure-VeilUv -InstallDir $InstallDir -UvVersion $UvVersion -TempRoot $tempRoot -UvPath $UvPath
         Sync-VeilRuntime -InstallDir $InstallDir -UvExe $uvExe -PythonVersion $pinnedPythonVersion -RecreateVenv:$RecreateVenv

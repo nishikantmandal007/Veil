@@ -34,6 +34,14 @@ def test_install_veil_starts_the_server_now_and_treats_autostart_as_a_warning():
     assert "Start-VeilServerNow -InstallDir $InstallDir | Out-Null" in script
 
 
+def test_install_veil_stamps_release_metadata_from_the_bundled_file_without_api_calls():
+    script = INSTALLER_PATH.read_text(encoding="utf-8")
+
+    assert "[string]$SourcePath" in script
+    assert 'Write-VeilReleaseMetadata -SourcePath (Join-Path $runtimeDir "bundle_release.json")' in script
+    assert 'Invoke-RestMethod -UseBasicParsing -Uri $releaseApi' not in script
+
+
 def test_windows_autostart_script_prints_powershell_safe_manual_start_guidance():
     script = AUTOSTART_INSTALLER_PATH.read_text(encoding="utf-8")
 
