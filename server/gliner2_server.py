@@ -24,6 +24,8 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urlparse
 
+from dotenv import load_dotenv
+
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 os.environ.setdefault("USE_TORCH", "0")
@@ -87,6 +89,8 @@ DEFAULT_ANONYMIZATION_ENDPOINT = "https://app.mayadataprivacy.in/mdp/engine/anon
 ANON_REQUEST_TIMEOUT_SEC = 10.0
 PROCESS_SESSION_ID = uuid.uuid4().hex[:10]
 PROCESS_LOCK_HANDLE = None
+
+load_dotenv(ENV_FILE, override=False)
 
 if os.name == "nt":
     import msvcrt
@@ -980,13 +984,13 @@ def make_handler(service: GLiNERService, max_chars: int):
                     request_id = uuid.uuid4().hex[:10]
                     entries = payload
                     api_key = ""
-                    if isinstance(payload, dict):
-                        entries = payload.get("entries", payload.get("payload", []))
-                        api_key = str(payload.get("jwtToken", "")).strip()
+                    api_key = extract_bearer_token(self.headers.get("Authorization", ""))
                     if not api_key:
                         api_key = str(self.headers.get("X-Api-key", "")).strip()
-                    if not api_key:
-                        api_key = extract_bearer_token(self.headers.get("Authorization", ""))
+                    if isinstance(payload, dict):
+                        entries = payload.get("entries", payload.get("payload", []))
+                        if not api_key:
+                            api_key = str(payload.get("jwtToken", "")).strip()
 
                     input_count = len(entries) if isinstance(entries, list) else None
                     log_anonymization(

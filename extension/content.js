@@ -318,7 +318,35 @@ class VeilContentController {
       const original = String(item.text || '').trim();
       if (!replacement || !original || replacement === original) return;
       this.responseRestoreLedger.set(replacement, original);
+      this.buildResponseRestoreComponents(item, replacement, original).forEach(([partialReplacement, partialOriginal]) => {
+        if (!partialReplacement || !partialOriginal || partialReplacement === partialOriginal) return;
+        if (!this.responseRestoreLedger.has(partialReplacement)) {
+          this.responseRestoreLedger.set(partialReplacement, partialOriginal);
+        }
+      });
     });
+  }
+
+  buildResponseRestoreComponents(item, replacement, original) {
+    const label = String(item?.label || '').toLowerCase();
+    if (label !== 'person') return [];
+
+    const replacementParts = String(replacement || '').trim().split(/\s+/).filter(Boolean);
+    const originalParts = String(original || '').trim().split(/\s+/).filter(Boolean);
+    if (replacementParts.length < 2 || replacementParts.length !== originalParts.length || replacementParts.length > 4) {
+      return [];
+    }
+
+    return replacementParts
+      .map((part, index) => [part, originalParts[index]])
+      .filter(([part, mapped]) => (
+        part &&
+        mapped &&
+        part.length >= 3 &&
+        mapped.length >= 3 &&
+        !/\d/.test(part) &&
+        !/\d/.test(mapped)
+      ));
   }
 
   scheduleAssistantResponseRestore(_reason = 'update') {
