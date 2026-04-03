@@ -106,8 +106,9 @@ async function startMockServer({ port = DEFAULT_PORT, detections = [], loaded = 
                         res.writeHead(status, headers);
                         res.end(responseBody);
                     } catch (error) {
+                        console.error('[mock_server] Handler error:', error);
                         res.writeHead(500, cors);
-                        res.end(JSON.stringify({ ok: false, error: String(error?.message || error) }));
+                        res.end(JSON.stringify({ ok: false, error: 'Internal mock server error' }));
                     }
                 });
                 return;
