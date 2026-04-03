@@ -2004,8 +2004,8 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     const activate = () => {
       if (!sections.length) return;
-      const maxScrollTop = Math.max(0, mainEl.scrollHeight - mainEl.clientHeight);
-      if (mainEl.scrollTop >= maxScrollTop - 4) {
+      const bottomSlack = Math.max(24, getScrollOffset());
+      if (mainEl.scrollTop + mainEl.clientHeight >= mainEl.scrollHeight - bottomSlack) {
         setActive(getSectionName(sections[sections.length - 1].id));
         return;
       }
