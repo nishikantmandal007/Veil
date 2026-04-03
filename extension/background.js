@@ -631,6 +631,30 @@ class GLiNERDetector {
     );
   }
 
+  detectFastLocalProtection(text, options = {}) {
+    const threshold = typeof options.threshold === 'number' ? options.threshold : 0.5;
+    const enabledTypes = Array.isArray(options.enabledTypes) && options.enabledTypes.length > 0
+      ? options.enabledTypes
+      : this.labels;
+    const customPatterns = Array.isArray(options.customPatterns)
+      ? options.customPatterns
+      : getDefaultCustomPatterns();
+
+    if (!text || text.trim().length === 0) {
+      return [];
+    }
+
+    const detections = [
+      ...this.detectWithRegex(text, enabledTypes, threshold),
+      ...this.detectWithCustomPatterns(text, customPatterns, threshold)
+    ];
+
+    return this.mergeAdjacentSameLabel(
+      this.mergeOverlapping(this.postProcessDetections(detections, threshold)),
+      text
+    );
+  }
+
   postProcessDetections(detections, threshold) {
     const baseThreshold = typeof threshold === 'number' ? threshold : 0.5;
     const minByLabel = {
@@ -1128,6 +1152,21 @@ async function handleServerControl(command, options = {}) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'detectPIIFast') {
+    try {
+      const detections = detector.detectFastLocalProtection(request.text, request.options);
+      sendResponse({
+        success: true,
+        detections,
+        mode: detector.mode
+      });
+    } catch (error) {
+      console.error('Fast detection error:', error);
+      sendResponse({ success: false, error: error.message || String(error) });
+    }
+    return false;
+  }
+
   if (request.action === 'detectPII') {
     const tabId = sender?.tab?.id;
     // Cancel any stale in-flight request from this tab before issuing a new one
@@ -1206,7 +1245,7 @@ chrome.runtime.onInstalled.addListener(() => {
     autoRedact: true,
     redactionMode: 'mask',
     sensitivity: 'medium',
-    includeRegexWhenModelOnline: false,
+    includeRegexWhenModelOnline: true,
     monitorAllSites: true,
     enabledTypes: DEFAULT_LABELS,
     customPatterns: getDefaultCustomPatterns(),

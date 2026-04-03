@@ -29,7 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unified Veil’s built-in sensitive-token patterns into one shared regex catalog used by the background runtime, popup/options editor, and content-side settings normalization, eliminating drift between UI and detection behavior.
 - Updated the online regex toggle to govern all regex-based detectors while GLiNER is healthy, while keeping regex fallback automatic when the local server is offline.
+- Switched new installs and unset profiles to default to `AI + Regex` so structured secrets are protected alongside GLiNER from the first run.
 - Expanded the built-in regex catalog coverage for GitHub tokens, IPv6, PAN, Aadhaar, passport, IFSC, and Indian driver-license patterns, and ensured explicit regex replacements are respected even in anonymize mode for token-style detections.
+- Added a dedicated built-in MAC-address detector so colon-delimited MAC values no longer get mislabeled as IPv6 placeholders during regex protection.
 - Added a shared regex smoke corpus and hostile-editor E2E fixtures so built-in and custom regex detectors are verified in online, offline, and internal-scroll scenarios without depending on a live local server.
 
 ### Overlay and Onboarding Polish
@@ -45,7 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed inline response de-anonymization from provider-owned chat threads so Veil no longer writes original PII back into ChatGPT/Gemini/Claude-style message history.
 - Tightened ChatGPT input monitoring so historical user turns are never mistaken for live composer surfaces.
 - Standardized anonymize-mode fallback so supported entities fall back to safe masking instead of alias placeholders when Maya anonymization is unavailable.
+- Restored original PII only in assistant responses on the user’s device while keeping user-thread prompts permanently protected in provider-owned history.
+- Improved staged refinement so Maya-supported labels like emails inherit their anonymized replacements after the fast local regex pass instead of remaining stuck in temporary mask placeholders.
 - Clarified popup/settings copy that Maya anonymization is the trusted remote path for supported labels, unsupported detections stay local, and Diagnostics are local-only troubleshooting data.
+
+### Performance and Composer Protection
+
+- Added a staged long-paste protection flow that applies fast local regex/custom masking first, then refines the same canonical source text with GLiNER and Maya anonymization in the background.
+- Tightened send guards so Veil blocks submission while protection is still pending, preventing large pasted prompts from slipping through before refinement completes.
+- Switched popup protection counts to compute from the live redaction state so the UI reflects the actual number of protected items on the page during staged refinement.
 
 ### Windows Installer
 

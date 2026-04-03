@@ -142,6 +142,38 @@ function mergeWithExistingDetections(existingItems, newDetections) {
   });
 }
 
+function mergeExistingItemsWithDetections(existingItems, newDetections) {
+  const existing = Array.isArray(existingItems) ? existingItems : [];
+  const incoming = Array.isArray(newDetections) ? newDetections : [];
+  if (existing.length === 0 || incoming.length === 0) return existing;
+
+  return existing.map((item) => {
+    const itemTextLower = String(item?.text || '').toLowerCase();
+    const itemLabelLower = String(item?.label || '').toLowerCase();
+    const match = incoming.find((detection) => {
+      const detectionTextLower = String(detection?.text || '').toLowerCase();
+      const detectionLabelLower = String(detection?.label || '').toLowerCase();
+      return (
+        detectionTextLower === itemTextLower &&
+        detectionLabelLower === itemLabelLower &&
+        detection.start < item.end &&
+        detection.end > item.start
+      );
+    });
+
+    if (!match) return item;
+
+    return {
+      ...item,
+      score: typeof match.score === 'number' ? match.score : item.score,
+      source: match.source || item.source,
+      tier: match.tier || item.tier,
+      replacement: match.replacement ? String(match.replacement) : item.replacement,
+      anonymizedText: match.anonymizedText ? String(match.anonymizedText) : item.anonymizedText
+    };
+  });
+}
+
 function organizationLooksValid(text) {
   const value = String(text || '');
   if (value.length < 3) return false;
@@ -262,6 +294,7 @@ section('pattern catalog — expected built-in regex detectors are present');
   assert(ids.includes('passport'), 'includes passport pattern');
   assert(ids.includes('ifsc_code'), 'includes IFSC pattern');
   assert(ids.includes('indian_driver_license'), 'includes Indian driver license pattern');
+  assert(ids.includes('mac_address'), 'includes MAC address pattern');
   assertEqual(PATTERN_NAMES.openai_key, 'OpenAI API Key', 'exposes display names for built-ins');
 }
 
@@ -345,6 +378,34 @@ section('content reconciliation — duplicate text in new detections is not over
   const merged = mergeWithExistingDetections(existing, incoming);
   assertEqual(merged.length, 1, 'only the overlapping carried-forward occurrence is suppressed');
   assertEqual(merged[0].start, 16, 'a second identical name remains detectable');
+}
+
+section('content reconciliation — staged supported detections inherit anonymized replacements');
+{
+  const existing = [
+    {
+      text: 'aisha.thomas@acmeresearch.com',
+      label: 'email',
+      start: 14,
+      end: 42,
+      redacted: true,
+      anonymizedText: null,
+      replacement: null
+    }
+  ];
+  const incoming = [
+    {
+      text: 'aisha.thomas@acmeresearch.com',
+      label: 'email',
+      start: 14,
+      end: 42,
+      source: 'gliner2',
+      tier: 'high',
+      anonymizedText: 'nishi@gmail.com'
+    }
+  ];
+  const merged = mergeExistingItemsWithDetections(existing, incoming);
+  assertEqual(merged[0].anonymizedText, 'nishi@gmail.com', 'provisional email masking is upgraded with Maya anonymization');
 }
 
 section('organization validation — single-word title-case names are rejected as orgs');

@@ -62,12 +62,13 @@ const PLATFORM_SELECTORS = {
 };
 
 const TYPING_IDLE_DELAY_MS = 1200;
-const PASTE_IDLE_DELAY_MS = 750;
+const PASTE_IDLE_DELAY_MS = 120;
 const BLUR_DELAY_MS = 80;
 const SUPPRESS_INPUT_MS = 300;
 const AUTO_REDACT_DELAY_MS = 1500;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MASK_MODE_HINT_STORAGE_KEY = 'maskModeHintSeen';
+const FAST_PROTECTION_MIN_CHARS = 480;
 
 // ── Selectors that identify known LLM assistant / thread areas so Veil never
 // scans or mutates provider-owned conversation history. ─────────────────────
@@ -222,7 +223,7 @@ class VeilContentController {
           autoRedact: result.autoRedact ?? true,
           redactionMode: result.redactionMode ?? 'mask',
           sensitivity: result.sensitivity ?? 'medium',
-          includeRegexWhenModelOnline: result.includeRegexWhenModelOnline ?? false,
+          includeRegexWhenModelOnline: result.includeRegexWhenModelOnline ?? true,
           enabledTypes: result.enabledTypes ?? ['person', 'email', 'phone', 'address', 'ssn', 'credit_card'],
           monitorAllSites: result.monitorAllSites ?? true,
           monitoredSites: result.monitoredSites ?? ['claude.ai', 'gemini.google.com', 'chatgpt.com'],
@@ -815,6 +816,10 @@ class VeilContentController {
         this.clearHighlights(element);
         this._clearElementOverlay(element);
       }
+      if (event.key === 'Enter' && !event.shiftKey && this.hasPendingProtection(element)) {
+        event.preventDefault();
+        this.showNotification('Veil is still protecting this message. Please wait a moment.', 'warning');
+      }
       if (event.key === 'Enter' && !event.shiftKey && this.hasUnreviewedRedactions(element)) {
         event.preventDefault();
         this.showNotification('Review pending redactions before sending.', 'warning');
@@ -842,6 +847,10 @@ class VeilContentController {
     let handleSubmit = null;
     if (form) {
       handleSubmit = (event) => {
+        if (this.hasPendingProtection(element)) {
+          event.preventDefault();
+          this.showNotification('Veil is still protecting this message. Please wait a moment.', 'warning');
+        }
         if (this.hasUnreviewedRedactions(element)) {
           event.preventDefault();
           this.showNotification('Review pending redactions before sending.', 'warning');
@@ -932,7 +941,7 @@ class VeilContentController {
       const currentRevision = this.getInputRevision(element);
       if (currentRevision !== targetRevision) return;
       element.classList.remove('ps-awaiting-idle');
-      this.detectAndHighlight(element, currentRevision);
+      this.detectAndHighlight(element, currentRevision, reason);
     }, delay);
 
     this.debounceTimers.set(element, timer);
@@ -1036,7 +1045,71 @@ class VeilContentController {
   // Detection & Highlight (core pipeline)
   // ═══════════════════════════════════════════════════════════
 
-  async detectAndHighlight(element, expectedRevision = null) {
+  shouldUseFastProtection(reason, sourceText) {
+    return reason === 'paste' && String(sourceText || '').trim().length >= FAST_PROTECTION_MIN_CHARS;
+  }
+
+  hasPendingProtection(element) {
+    if (!element) return false;
+    if (element.classList?.contains('ps-awaiting-idle')) return true;
+    if (element.classList?.contains('ps-analyzing')) return true;
+    const state = this.redactions.get(element);
+    if (!state) return false;
+    if (state.pendingRefinement) return true;
+    return state.items.some((item) => !item.redacted && !item.userRestored);
+  }
+
+  protectItemsImmediately(items) {
+    if (!Array.isArray(items)) return items;
+    items.forEach((item) => {
+      item.redacted = true;
+      item.reviewed = true;
+    });
+    return items;
+  }
+
+  async applyFastLocalProtection(element, sourceText, currentRevision) {
+    const response = await chrome.runtime.sendMessage({
+      action: 'detectPIIFast',
+      text: sourceText,
+      options: {
+        threshold: this.getSensitivityThreshold(),
+        enabledTypes: this.settings.enabledTypes,
+        customPatterns: this.settings.customPatterns
+      }
+    });
+
+    if (!response?.success || !Array.isArray(response.detections) || response.detections.length === 0) {
+      return false;
+    }
+
+    if (currentRevision !== this.getInputRevision(element)) {
+      return false;
+    }
+
+    const detections = response.detections.filter((item) => !this.isSyntheticReplacementToken(item.text));
+    if (detections.length === 0) return false;
+
+    const ledger = this.getAliasLedger(element);
+    const items = detections.map((detection) => this.createRedactionItem(detection, ledger, null));
+    this.protectItemsImmediately(items);
+
+    const state = {
+      sourceText,
+      sourceHtml: this.isContentEditableElement(element)
+        ? this.captureContentEditableHtml(element)
+        : null,
+      mode: this.settings.redactionMode,
+      pendingRefinement: true,
+      items
+    };
+
+    this.redactions.set(element, state);
+    this.renderElement(element);
+    return true;
+  }
+
+  async detectAndHighlight(element, expectedRevision = null, reason = 'typing') {
     const currentRevision = this.getInputRevision(element);
     if (expectedRevision !== null && expectedRevision !== currentRevision) return;
 
@@ -1072,8 +1145,10 @@ class VeilContentController {
 
     this.setAnalyzingState(element, true);
     this.showScanningPill(element);
+    const useFastProtection = this.shouldUseFastProtection(reason, sourceText);
+    let fastProtectionApplied = false;
 
-    if (sourceText.length >= 20) {
+    if (sourceText.length >= 20 && sourceText.length < FAST_PROTECTION_MIN_CHARS) {
       chrome.runtime.sendMessage({ action: 'classifyPII', text: sourceText }, (res) => {
         if (chrome.runtime.lastError) return;
         if (res?.success && res.result) this.updateScanningPillWithSensitivity(element, res.result);
@@ -1081,6 +1156,10 @@ class VeilContentController {
     }
 
     try {
+      if (useFastProtection) {
+        fastProtectionApplied = await this.applyFastLocalProtection(element, sourceText, currentRevision);
+      }
+
       const response = await chrome.runtime.sendMessage({
         action: 'detectPII',
         text: sourceText,
@@ -1095,6 +1174,14 @@ class VeilContentController {
       });
 
       if (!response?.success || !Array.isArray(response.detections) || response.detections.length === 0) {
+        const staged = this.redactions.get(element);
+        if (staged?.pendingRefinement) {
+          staged.pendingRefinement = false;
+          this.redactions.set(element, staged);
+          this.renderElement(element);
+          this.lastAnalyzedSnapshot.set(element, snapshotKey);
+          return;
+        }
         const prevState = this.redactions.get(element);
         if (!prevState?.items?.some((item) => item.redacted)) {
           this.clearElementState(element);
@@ -1141,18 +1228,22 @@ class VeilContentController {
 
         // ── Overlap guard: reject detections whose character range ──
         // overlaps with ANY already-tracked item (redacted or not).
-        // This is the strongest protection against re-anonymising regions
-        // that have already been processed.
-        detections = detections.filter((d) => {
-          return !currentState.items.some((ex) =>
-            d.start < ex.end && d.end > ex.start
-          );
-        });
+        // During staged fast protection we intentionally keep overlapping
+        // refined detections so provisional regex masks can be upgraded with
+        // anonymized replacements from the AI/anonymization pipeline.
+        if (!currentState.pendingRefinement) {
+          detections = detections.filter((d) => {
+            return !currentState.items.some((ex) =>
+              d.start < ex.end && d.end > ex.start
+            );
+          });
+        }
       }
 
-      const existingState = currentState;
+      const existingState = this.redactions.get(element) || currentState;
       const existingItems = existingState ? existingState.items : [];
-      const updatedExistingItems = this.reconcileExistingItems(sourceText, existingItems);
+      let updatedExistingItems = this.reconcileExistingItems(sourceText, existingItems);
+      updatedExistingItems = this.mergeExistingItemsWithDetections(updatedExistingItems, detections);
       let newDetections = detections;
       if (updatedExistingItems.length > 0) {
         newDetections = this.mergeWithExistingDetections(updatedExistingItems, detections);
@@ -1161,6 +1252,9 @@ class VeilContentController {
       const ledger = this.getAliasLedger(element);
       const newItems = newDetections
         .map((detection) => this.createRedactionItem(detection, ledger, null));
+      if (useFastProtection || existingState?.pendingRefinement || fastProtectionApplied) {
+        this.protectItemsImmediately(newItems);
+      }
 
       const allItems = [...updatedExistingItems, ...newItems]
         .slice()
@@ -1190,6 +1284,7 @@ class VeilContentController {
           ? this.captureContentEditableHtml(element)
           : null,
         mode: this.settings.redactionMode,
+        pendingRefinement: false,
         items: allItems
       };
 
@@ -1208,6 +1303,12 @@ class VeilContentController {
       this.lastAnalyzedSnapshot.set(element, snapshotKey);
     } catch (error) {
       console.error('[Veil] detection error:', error);
+      const staged = this.redactions.get(element);
+      if (staged?.pendingRefinement) {
+        staged.pendingRefinement = false;
+        this.redactions.set(element, staged);
+        this.renderElement(element);
+      }
       this.lastAnalyzedSnapshot.set(element, snapshotKey);
       // Surface model-offline state as a non-blocking notification so users know
       // regex fallback is active rather than silently getting degraded detection.
@@ -1238,6 +1339,38 @@ class VeilContentController {
           nd.end > ex.start
         );
       });
+    });
+  }
+
+  mergeExistingItemsWithDetections(existingItems, newDetections) {
+    const existing = Array.isArray(existingItems) ? existingItems : [];
+    const incoming = Array.isArray(newDetections) ? newDetections : [];
+    if (existing.length === 0 || incoming.length === 0) return existing;
+
+    return existing.map((item) => {
+      const itemTextLower = String(item?.text || '').toLowerCase();
+      const itemLabelLower = String(item?.label || '').toLowerCase();
+      const match = incoming.find((detection) => {
+        const detectionTextLower = String(detection?.text || '').toLowerCase();
+        const detectionLabelLower = String(detection?.label || '').toLowerCase();
+        return (
+          detectionTextLower === itemTextLower &&
+          detectionLabelLower === itemLabelLower &&
+          detection.start < item.end &&
+          detection.end > item.start
+        );
+      });
+
+      if (!match) return item;
+
+      return {
+        ...item,
+        score: typeof match.score === 'number' ? match.score : item.score,
+        source: match.source || item.source,
+        tier: match.tier || item.tier,
+        replacement: match.replacement ? String(match.replacement) : item.replacement,
+        anonymizedText: match.anonymizedText ? String(match.anonymizedText) : item.anonymizedText
+      };
     });
   }
 
@@ -3056,6 +3189,25 @@ class VeilContentController {
     };
   }
 
+  computeLiveStats() {
+    let detections = 0;
+    let redactions = 0;
+
+    this.redactions.forEach((state) => {
+      if (!state || !Array.isArray(state.items)) return;
+      state.items.forEach((item) => {
+        if (!item) return;
+        if (item.redacted) {
+          redactions += 1;
+        } else {
+          detections += 1;
+        }
+      });
+    });
+
+    return { detections, redactions };
+  }
+
   handleRuntimeMessage(request, _sender, sendResponse) {
     if (request?.action === 'serverCrashed') {
       this.showNotification('⚠ GLiNER2 server offline — using regex fallback.', 'warning');
@@ -3076,9 +3228,10 @@ class VeilContentController {
     const redactionKey = redactionKeyMap.size
       ? Object.fromEntries([...redactionKeyMap])
       : null;
+    const liveStats = this.computeLiveStats();
     sendResponse({
       success: true,
-      stats: { ...this.pageStats },
+      stats: liveStats,
       redactionKey
     });
     return false;

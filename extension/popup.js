@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS = {
   redactionMode: 'mask',
   maskModeHintSeen: false,
   sensitivity: 'medium',
-  includeRegexWhenModelOnline: false,
+  includeRegexWhenModelOnline: true,
   monitorAllSites: true,
   enabledTypes: [
     'person',

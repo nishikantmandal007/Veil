@@ -57,6 +57,15 @@
       enabled: true
     }),
     Object.freeze({
+      id: 'mac_address',
+      label: 'mac_address',
+      pattern: '\\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\\b',
+      flags: 'g',
+      score: 0.96,
+      replacement: '[MAC REDACTED]',
+      enabled: false
+    }),
+    Object.freeze({
       id: 'ssn',
       label: 'ssn',
       pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b',
@@ -119,6 +128,7 @@
     jwt_token: 'JWT Token',
     ipv4: 'IPv4 Address',
     ipv6: 'IPv6 Address',
+    mac_address: 'MAC Address',
     ssn: 'US Social Security Number',
     indian_pan: 'Indian PAN Number',
     indian_aadhaar: 'Indian Aadhaar',
