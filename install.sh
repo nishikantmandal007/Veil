@@ -262,6 +262,12 @@ ensure_local_uv
 sync_runtime
 
 cd "${INSTALL_DIR}"
+
+# Pre-download model BEFORE starting autostart service (which would hold the process lock)
+echo
+echo "Pre-downloading GLiNER2 model (this may take a few minutes on first install)..."
+"${INSTALL_DIR}/.venv/bin/python" "${INSTALL_DIR}/server/gliner2_server.py" --download-only || echo "Warning: model pre-download failed. It will download on first use."
+
 if [[ "${PLATFORM}" == "linux" ]]; then
   bash server/native-host/install_linux.sh "${EXTENSION_ID}"
   bash server/autostart/install_linux.sh
@@ -269,10 +275,6 @@ else
   bash server/native-host/install_mac.sh "${EXTENSION_ID}"
   bash server/autostart/install_mac.sh
 fi
-
-echo
-echo "Pre-downloading GLiNER2 model (this may take a few minutes on first install)..."
-"${INSTALL_DIR}/.venv/bin/python" "${INSTALL_DIR}/server/gliner2_server.py" --download-only || echo "Warning: model pre-download failed. It will download on first use."
 
 echo
 echo "Veil install complete."
