@@ -545,7 +545,17 @@ def deduplicate_detections(detections: List[Dict[str, Any]]) -> List[Dict[str, A
     cur = detections[0]
     for nxt in detections[1:]:
         if nxt["start"] < cur["end"]:  # overlap — keep higher score
-            if nxt["score"] > cur["score"]:
+            cur_label = str(cur.get("label", "")).strip().lower()
+            nxt_label = str(nxt.get("label", "")).strip().lower()
+            cur_text = str(cur.get("text", "")).strip().lower()
+            nxt_text = str(nxt.get("text", "")).strip().lower()
+            same_span = cur["start"] == nxt["start"] and cur["end"] == nxt["end"]
+            same_text = bool(cur_text) and cur_text == nxt_text
+            labels = {cur_label, nxt_label}
+            if (same_span or same_text) and labels == {"person", "organization"}:
+                if nxt_label == "person":
+                    cur = nxt
+            elif nxt["score"] > cur["score"]:
                 cur = nxt
         else:
             merged.append(cur)

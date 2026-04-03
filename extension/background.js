@@ -40,6 +40,26 @@ function scoreTier(score) {
   return 'low';
 }
 
+function compareDetectionPreference(current, next) {
+  const currentLabel = String(current?.label || '').toLowerCase();
+  const nextLabel = String(next?.label || '').toLowerCase();
+  const sameSpan = current?.start === next?.start && current?.end === next?.end;
+  const currentText = String(current?.text || '').trim().toLowerCase();
+  const nextText = String(next?.text || '').trim().toLowerCase();
+  const sameText = Boolean(currentText) && currentText === nextText;
+
+  const labels = new Set([currentLabel, nextLabel]);
+  if ((sameSpan || sameText) && labels.has('person') && labels.has('organization')) {
+    return currentLabel === 'person' ? current : next;
+  }
+
+  const currentLength = (current?.end || 0) - (current?.start || 0);
+  const nextLength = (next?.end || 0) - (next?.start || 0);
+  if (next?.score > current?.score) return next;
+  if (next?.score === current?.score && nextLength > currentLength) return next;
+  return current;
+}
+
 function buildEntityThresholds(enabledTypes, sensitivity = 'medium') {
   const base = {
     ssn:           { low: 0.38, medium: 0.35, high: 0.30 },
@@ -48,7 +68,7 @@ function buildEntityThresholds(enabledTypes, sensitivity = 'medium') {
     phone:         { low: 0.55, medium: 0.45, high: 0.40 },
     date_of_birth: { low: 0.55, medium: 0.48, high: 0.42 },
     address:       { low: 0.60, medium: 0.52, high: 0.46 },
-    organization:  { low: 0.65, medium: 0.55, high: 0.48 },
+    organization:  { low: 0.72, medium: 0.62, high: 0.55 },
     person:        { low: 0.72, medium: 0.60, high: 0.50 },
     location:      { low: 0.70, medium: 0.58, high: 0.50 },
   };
@@ -615,11 +635,12 @@ class GLiNERDetector {
     const baseThreshold = typeof threshold === 'number' ? threshold : 0.5;
     const minByLabel = {
       person: Math.max(baseThreshold, 0.72),
-      organization: Math.max(baseThreshold, 0.67),
+      organization: Math.max(baseThreshold, 0.74),
       location: Math.max(baseThreshold, 0.66),
       address: Math.max(baseThreshold, 0.64),
       date_of_birth: Math.max(baseThreshold, 0.6)
     };
+    const organizationKeywordPattern = /\b(inc|inc\.|llc|ltd|ltd\.|corp|corp\.|corporation|company|co\.|university|college|bank|labs?|group|systems?|studio|technologies?|tech|solutions?|partners?|foundation|agency|associates?|ventures?|industries?|institute|ministry|department|hospital|school)\b/i;
     const personStopwords = new Set([
       'you',
       'your',
@@ -678,7 +699,14 @@ class GLiNERDetector {
       if (label === 'organization') {
         if (text.length < 3) return false;
         const lower = text.toLowerCase();
-        if (/^[a-z\s]+$/.test(text) && !/\b(inc|llc|corp|company|university|bank|labs?|group|systems?)\b/.test(lower)) {
+        const words = text.trim().split(/\s+/).filter(Boolean);
+        const hasKeyword = organizationKeywordPattern.test(lower);
+        const isAcronymLike = /^[A-Z0-9&.-]{2,10}$/.test(text.trim());
+        if (/^[a-z\s]+$/.test(text) && !hasKeyword) {
+          return false;
+        }
+        if (words.length === 1 && !hasKeyword && !isAcronymLike) return false;
+        if (words.length <= 2 && words.every((word) => /^[A-Z][A-Za-z'`.-]*$/.test(word)) && !hasKeyword && !isAcronymLike) {
           return false;
         }
       }
@@ -956,11 +984,7 @@ class GLiNERDetector {
         current = next;
         continue;
       }
-
-      const currentLength = current.end - current.start;
-      const nextLength = next.end - next.start;
-      const nextWins = next.score > current.score || (next.score === current.score && nextLength > currentLength);
-      if (nextWins) current = next;
+      current = compareDetectionPreference(current, next);
     }
     merged.push(current);
     return merged;

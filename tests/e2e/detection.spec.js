@@ -131,6 +131,30 @@ const MOCK_MODEL_DETECTIONS = Object.freeze([
     },
 ]);
 
+function buildMockDetectionsForText(text) {
+    const source = String(text || '');
+    const detections = [];
+
+    const add = (token, label = 'person', score = 0.94) => {
+        const start = source.indexOf(token);
+        if (start === -1) return;
+        detections.push({
+            text: token,
+            label,
+            start,
+            end: start + token.length,
+            score,
+            source: 'gliner2',
+        });
+    };
+
+    add('Rohan Sen');
+    add('Rohan Sharma');
+    add('Pranav');
+    add('Jane Doe');
+    return detections;
+}
+
 async function withExtensionPage(context, extensionId, callback) {
     const extensionPage = await context.newPage();
     await extensionPage.goto(`chrome-extension://${extensionId}/popup.html`);
@@ -181,6 +205,24 @@ test.describe('Content-Script Detection', () => {
             pages: {
                 [CONTENT_PAGE_PATH]: TEST_PAGE_HTML,
                 [HOSTILE_SCROLL_PAGE_PATH]: HOSTILE_SCROLL_HTML,
+            },
+            handlers: {
+                'POST /detect': ({ body, cors }) => {
+                    let payload = {};
+                    try {
+                        payload = JSON.parse(body || '{}');
+                    } catch {
+                        payload = {};
+                    }
+                    const text = String(payload.text || '');
+                    return {
+                        headers: cors,
+                        body: {
+                            ok: true,
+                            detections: buildMockDetectionsForText(text),
+                        },
+                    };
+                },
             },
         });
     });
@@ -254,7 +296,7 @@ test.describe('Content-Script Detection', () => {
         EXPECTED_CUSTOM_REGEX_LABELS.forEach((label) => expect(labels.has(label), label).toBeTruthy());
     });
 
-    test('LLM response areas (.markdown-body) are never modified', async ({ extensionContext }) => {
+    test('assistant responses restore originals locally while user thread prompts stay protected', async ({ extensionContext }) => {
         const { context, extensionId } = extensionContext;
         await setLocalServerOverride(context, extensionId, MOCK_SERVER_URL);
 
@@ -262,13 +304,31 @@ test.describe('Content-Script Detection', () => {
         await page.goto(CONTENT_PAGE_URL);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.waitForTimeout(2000);
+        const textarea = page.locator('#userInput');
+        await textarea.click();
+        await textarea.fill('My name is Rohan Sen.');
+        await expect(textarea).toHaveValue(/NAME.*REDACTED/, { timeout: 8000 });
+
+        const redactedPrompt = await textarea.inputValue();
+        const maskedName = redactedPrompt.match(/\[NAME(?:_\d+)? REDACTED\]/)?.[0];
+        expect(maskedName).toBeTruthy();
+
+        await page.evaluate((token) => {
+            document.getElementById('responseArea').textContent = `Hello ${token}, welcome back.`;
+            const threadUser = document.createElement('div');
+            threadUser.id = 'threadUser';
+            threadUser.setAttribute('data-message-author-role', 'user');
+            threadUser.textContent = `User thread keeps ${token} protected.`;
+            document.body.appendChild(threadUser);
+        }, maskedName);
 
         const injectedCount = await page.locator('#responseArea .ps-redaction, #responseArea .ps-pii-underline').count();
         expect(injectedCount).toBe(0);
 
-        const text = await page.locator('#responseArea').textContent();
-        expect(text).toContain('John Smith');
+        await expect(page.locator('#responseArea')).toContainText('Rohan Sen');
+        await expect(page.locator('#responseArea')).not.toContainText(maskedName);
+        await expect(page.locator('#threadUser')).toContainText(maskedName);
+        await expect(page.locator('#threadUser')).not.toContainText('Rohan Sen');
 
         await page.close();
     });

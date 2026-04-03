@@ -127,6 +127,8 @@ class VeilContentController {
     // on the same site. Loaded from chrome.storage on init, 30-day TTL.
     this.siteAliasCache = { aliases: {}, counters: {}, maskCounters: {} };
     this.siteAliasPersistTimer = null;
+    this.responseRestoreLedger = new Map();
+    this.responseRestoreTimer = 0;
 
     // Per-site redact-all counter — used to offer "always auto-redact here?" after
     // the user has manually clicked Redact All multiple times.
@@ -197,6 +199,7 @@ class VeilContentController {
 
     // Rehydrate cached redactions
     this.rehydrateCachedRedactions();
+    this.scheduleAssistantResponseRestore('init');
   }
 
   async loadSettings() {
@@ -297,6 +300,91 @@ class VeilContentController {
     return false;
   }
 
+  isAssistantResponseElement(element) {
+    if (!element || !(element instanceof Element)) return false;
+    for (const selector of ASSISTANT_RESPONSE_SELECTORS) {
+      try {
+        if (element.matches(selector)) return true;
+      } catch { /* ignore invalid selectors on host pages */ }
+    }
+    return false;
+  }
+
+  rememberResponseRestoreMappings(state) {
+    if (!state?.items?.length) return;
+    state.items.forEach((item) => {
+      if (!item?.redacted) return;
+      const replacement = this.getReplacementText(item, state.mode);
+      const original = String(item.text || '').trim();
+      if (!replacement || !original || replacement === original) return;
+      this.responseRestoreLedger.set(replacement, original);
+    });
+  }
+
+  scheduleAssistantResponseRestore(_reason = 'update') {
+    clearTimeout(this.responseRestoreTimer);
+    this.responseRestoreTimer = setTimeout(() => {
+      this.responseRestoreTimer = 0;
+      this.restoreAssistantResponses();
+    }, 80);
+  }
+
+  restoreAssistantResponses(root = document.body) {
+    const redactionKeyMap = this.buildRedactionKey();
+    if (!redactionKeyMap.size) return;
+
+    const replacements = [...redactionKeyMap.entries()]
+      .filter(([replacement, original]) => replacement && original && replacement !== original)
+      .sort((left, right) => right[0].length - left[0].length);
+    if (replacements.length === 0) return;
+
+    const roots = new Set();
+    if (root instanceof Element && this.isAssistantResponseElement(root)) {
+      roots.add(root);
+    }
+    if (root?.querySelectorAll) {
+      ASSISTANT_RESPONSE_SELECTORS.forEach((selector) => {
+        try {
+          root.querySelectorAll(selector).forEach((node) => roots.add(node));
+        } catch { /* ignore invalid selectors on host pages */ }
+      });
+    }
+
+    roots.forEach((node) => this.restoreAssistantResponseNode(node, replacements));
+  }
+
+  restoreAssistantResponseNode(root, replacements) {
+    if (!root || this.isEditableInputSurface(root)) return;
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        if (parent.closest('script, style, textarea, input, [contenteditable="true"], [role="textbox"]')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (!node.nodeValue || !node.nodeValue.trim()) {
+          return NodeFilter.FILTER_SKIP;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    let textNode = walker.nextNode();
+    while (textNode) {
+      const originalValue = textNode.nodeValue || '';
+      let nextValue = originalValue;
+      replacements.forEach(([replacement, original]) => {
+        if (!nextValue.includes(replacement)) return;
+        nextValue = nextValue.split(replacement).join(original);
+      });
+      if (nextValue !== originalValue) {
+        textNode.nodeValue = nextValue;
+      }
+      textNode = walker.nextNode();
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════
   // Element Monitoring
   // ═══════════════════════════════════════════════════════════
@@ -329,6 +417,7 @@ class VeilContentController {
       // Debounce finding new elements to batch rapid mutations
       this.debouncedFindInputElements();
       this.scheduleAnchoredUiRefresh('dom-mutation');
+      this.scheduleAssistantResponseRestore('dom-mutation');
     });
     this.domObserver.observe(document.body, { childList: true, subtree: true });
 
@@ -1485,6 +1574,7 @@ class VeilContentController {
     });
 
     if (changed) {
+      this.rememberResponseRestoreMappings(state);
       this.renderElement(element);
       this.persistCache(element);
       this.showNotification(`${count} item${count === 1 ? '' : 's'} protected`, 'info');
@@ -1562,6 +1652,7 @@ class VeilContentController {
       // strips our injected spans during its reconciliation cycle, we draw external
       // fixed-position highlights instead so visuals survive without touching the editor DOM.
       this._scheduleOverlayUpdate(element);
+      this.scheduleAssistantResponseRestore('render');
       return;
     }
 
@@ -1584,6 +1675,7 @@ class VeilContentController {
       this.playCommitAnimation(element);
     }
     this.renderTokenTray(element, state);
+    this.scheduleAssistantResponseRestore('render');
   }
 
   isContentEditableElement(element) {
@@ -2603,6 +2695,7 @@ class VeilContentController {
     state.items[index].reviewed = true;
     state.items[index].userRestored = false;  // User chose to re-redact
 
+    this.rememberResponseRestoreMappings(state);
     this.renderElement(element, index);
     this.persistCache(element);
     if (state.mode === 'mask') {
@@ -2659,6 +2752,8 @@ class VeilContentController {
 
     if (wasRedacted) {
       this.cancelAutoRedact(element);
+    } else {
+      this.rememberResponseRestoreMappings(state);
     }
 
     this.renderElement(element, index);
@@ -2830,6 +2925,8 @@ class VeilContentController {
   }
 
   clearElementState(element) {
+    const priorState = this.redactions.get(element);
+    this.rememberResponseRestoreMappings(priorState);
     this.clearHighlights(element);
     this._clearElementOverlay(element);
     if (this.activeRevealState?.element === element) {
@@ -3055,6 +3152,10 @@ class VeilContentController {
       clearInterval(this._pollingInterval);
       this._pollingInterval = null;
     }
+    if (this.responseRestoreTimer) {
+      clearTimeout(this.responseRestoreTimer);
+      this.responseRestoreTimer = 0;
+    }
 
     window.removeEventListener('scroll', this.handleViewportChange, true);
     window.removeEventListener('resize', this.handleViewportChange);
@@ -3113,7 +3214,7 @@ class VeilContentController {
   // Build the popup/settings redaction key from currently active Veil states only.
   // Veil must never rewrite provider-owned thread history with original values.
   buildRedactionKey() {
-    const map = new Map();
+    const map = new Map(this.responseRestoreLedger);
     this.redactions.forEach((state) => {
       if (!state?.items?.length) return;
       state.items.forEach((item) => {

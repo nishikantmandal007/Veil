@@ -48,6 +48,15 @@ function mergeOverlapping(detections) {
   for (let i = 1; i < detections.length; i++) {
     const next = detections[i];
     if (next.start < current.end) {
+      const sameSpan = current.start === next.start && current.end === next.end;
+      const currentText = String(current.text || '').trim().toLowerCase();
+      const nextText = String(next.text || '').trim().toLowerCase();
+      const sameText = Boolean(currentText) && currentText === nextText;
+      const labels = new Set([String(current.label || '').toLowerCase(), String(next.label || '').toLowerCase()]);
+      if ((sameSpan || sameText) && labels.has('person') && labels.has('organization')) {
+        current = String(current.label || '').toLowerCase() === 'person' ? current : next;
+        continue;
+      }
       if (next.score > current.score || (next.score === current.score && (next.end - next.start) > (current.end - current.start))) {
         current = next;
       }
@@ -133,6 +142,19 @@ function mergeWithExistingDetections(existingItems, newDetections) {
   });
 }
 
+function organizationLooksValid(text) {
+  const value = String(text || '');
+  if (value.length < 3) return false;
+  const lower = value.toLowerCase();
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  const hasKeyword = /\b(inc|inc\.|llc|ltd|ltd\.|corp|corp\.|corporation|company|co\.|university|college|bank|labs?|group|systems?|studio|technologies?|tech|solutions?|partners?|foundation|agency|associates?|ventures?|industries?|institute|ministry|department|hospital|school)\b/i.test(lower);
+  const isAcronymLike = /^[A-Z0-9&.-]{2,10}$/.test(value.trim());
+  if (/^[a-z\s]+$/.test(value) && !hasKeyword) return false;
+  if (words.length === 1 && !hasKeyword && !isAcronymLike) return false;
+  if (words.length <= 2 && words.every((word) => /^[A-Z][A-Za-z'`.-]*$/.test(word)) && !hasKeyword && !isAcronymLike) return false;
+  return true;
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 section('mergeOverlapping — no overlaps');
@@ -166,6 +188,17 @@ section('mergeOverlapping — partial overlap, keeps higher score');
   const result = mergeOverlapping(dets);
   assertEqual(result.length, 1, 'overlapping merged to one');
   assertEqual(result[0].score, 0.85, 'kept the higher-scored one');
+}
+
+section('mergeOverlapping — person wins over organization on the same span');
+{
+  const dets = [
+    { text: 'Pranav', label: 'organization', start: 0, end: 6, score: 0.91 },
+    { text: 'Pranav', label: 'person', start: 0, end: 6, score: 0.82 },
+  ];
+  const result = mergeOverlapping(dets);
+  assertEqual(result.length, 1, 'same-span person/org conflict merges to one detection');
+  assertEqual(result[0].label, 'person', 'person is preferred over organization for ambiguous proper names');
 }
 
 section('mergeOverlapping — adjacent spans, both kept');
@@ -293,6 +326,13 @@ section('content reconciliation — duplicate text in new detections is not over
   const merged = mergeWithExistingDetections(existing, incoming);
   assertEqual(merged.length, 1, 'only the overlapping carried-forward occurrence is suppressed');
   assertEqual(merged[0].start, 16, 'a second identical name remains detectable');
+}
+
+section('organization validation — single-word title-case names are rejected as orgs');
+{
+  assertEqual(organizationLooksValid('Pranav'), false, 'single-word proper names do not qualify as organizations');
+  assertEqual(organizationLooksValid('IBM'), true, 'all-caps acronym organizations can still pass');
+  assertEqual(organizationLooksValid('Maya Data Privacy'), true, 'multi-word organization names remain valid');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
