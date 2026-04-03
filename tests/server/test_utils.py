@@ -89,6 +89,15 @@ class TestDeduplicateDetections:
         assert len(result) == 1
         assert result[0]["score"] == 0.85
 
+    def test_same_span_prefers_person_over_organization(self):
+        dets = [
+            {"text": "Pranav", "label": "organization", "start": 0, "end": 6, "score": 0.93},
+            {"text": "Pranav", "label": "person", "start": 0, "end": 6, "score": 0.81},
+        ]
+        result = deduplicate_detections(dets)
+        assert len(result) == 1
+        assert result[0]["label"] == "person"
+
     def test_adjacent_no_overlap(self):
         dets = [self._det(0, 5), self._det(5, 10)]
         result = deduplicate_detections(dets)
