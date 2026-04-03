@@ -15,18 +15,18 @@ Protect your sensitive data before it reaches any AI model — locally, privatel
 
 <br/>
 
-[![CI](https://github.com/nishikantmandal007/Veil/actions/workflows/ci.yml/badge.svg)](https://github.com/nishikantmandal007/Veil/actions/workflows/ci.yml)
+[![CI](https://github.com/MAYA-DATA-PRIVACY/Veil/actions/workflows/ci.yml/badge.svg)](https://github.com/MAYA-DATA-PRIVACY/Veil/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
 [![Powered by GLiNER2](https://img.shields.io/badge/Powered%20by-GLiNER2-8B5CF6?style=flat-square)](https://github.com/fastino-ai/GLiNER2)
 [![MAYA DATA PRIVACY](https://img.shields.io/badge/Anonymisation%20by-MAYA%20DATA%20PRIVACY-22C55E?style=flat-square)](https://github.com/MAYA-DATA-PRIVACY)
-[![Release](https://img.shields.io/github/v/release/nishikantmandal007/Veil?style=flat-square&color=22C55E)](https://github.com/nishikantmandal007/Veil/releases)
+[![Release](https://img.shields.io/github/v/release/MAYA-DATA-PRIVACY/Veil?style=flat-square&color=22C55E)](https://github.com/MAYA-DATA-PRIVACY/Veil/releases)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange?style=flat-square)](docs/CONTRIBUTING.md)
-[![Stars](https://img.shields.io/github/stars/nishikantmandal007/Veil?style=flat-square&color=yellow)](https://github.com/nishikantmandal007/Veil/stargazers)
+[![Stars](https://img.shields.io/github/stars/MAYA-DATA-PRIVACY/Veil?style=flat-square&color=yellow)](https://github.com/MAYA-DATA-PRIVACY/Veil/stargazers)
 
 <br/>
 
-[Website](https://nishikantmandal007.github.io/Veil) · [Documentation](https://nishikantmandal007.github.io/Veil/install) · [Changelog](CHANGELOG.md) · [Report a Bug](https://github.com/nishikantmandal007/Veil/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/nishikantmandal007/Veil/issues/new?template=feature_request.md)
+[Website](https://maya-data-privacy.github.io/Veil/) · [Documentation](https://maya-data-privacy.github.io/Veil/install) · [Changelog](CHANGELOG.md) · [Report a Bug](https://github.com/MAYA-DATA-PRIVACY/Veil/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/MAYA-DATA-PRIVACY/Veil/issues/new?template=feature_request.md)
 
 <br/>
 
@@ -99,7 +99,7 @@ Detected by regex fallback: `OpenAI API keys` · `AWS credentials` · `GitHub to
 
 ```bash
 # 1. Clone
-git clone https://github.com/nishikantmandal007/Veil.git
+git clone https://github.com/MAYA-DATA-PRIVACY/Veil.git
 cd Veil
 
 # 2. Install local Python dependencies (ONNX runtime, no PyTorch)
@@ -110,8 +110,8 @@ npm run setup
 #    Note the Extension ID shown on the card
 
 # 4. Install the local server bundle + native bridge
-curl -fsSL https://github.com/nishikantmandal007/Veil/releases/latest/download/install.sh | bash -s -- --extension-id <EXTENSION_ID>   # Linux/macOS
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/nishikantmandal007/Veil/releases/latest/download/install.ps1' | iex; Install-Veil -ExtensionId '<EXTENSION_ID>'"   # Windows
+curl -fsSL https://github.com/MAYA-DATA-PRIVACY/Veil/releases/latest/download/install.sh | bash -s -- --extension-id <EXTENSION_ID>   # Linux/macOS
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://github.com/MAYA-DATA-PRIVACY/Veil/releases/latest/download/install.ps1' | iex; Install-Veil -ExtensionId '<EXTENSION_ID>'"   # Windows
 
 # 5. Start the local inference server
 npm run run-gliner2-lazy   # lazy-load: model warms on first detection
@@ -120,7 +120,7 @@ npm run run-gliner2        # eager-load: model ready immediately (~30s)
 
 The first start downloads the public GLiNER2 ONNX model into the local cache. No Hugging Face token is required for the default model.
 
-Full setup guide: [nishikantmandal007.github.io/Veil/install](https://nishikantmandal007.github.io/Veil/install)
+Full setup guide: [maya-data-privacy.github.io/Veil/install](https://maya-data-privacy.github.io/Veil/install)
 
 ---
 
@@ -193,14 +193,14 @@ npm run build:zip
 # → dist/veil-extension.zip  ready for Chrome Web Store upload
 ```
 
-Releases are cut manually from `main` with a semver tag such as `v1.2.1`.
+Releases are cut manually from `main` with a semver tag such as `v1.2.4`.
 Before tagging, make sure `package.json`, `package-lock.json`, `extension/manifest.json`, `pyproject.toml`, `uv.lock`, and `CHANGELOG.md` already contain the same release version on `main`.
 
 ```bash
 git checkout main
 git pull origin main
-git tag v1.2.1
-git push origin v1.2.1
+git tag v1.2.4
+git push upstream v1.2.4
 ```
 
 Pushing the `v*` tag triggers the release workflow, which first verifies the version metadata, then runs the JavaScript, Python, and Playwright test suites, and finally uploads the extension zip plus backend installer assets to the GitHub release for that tag.
