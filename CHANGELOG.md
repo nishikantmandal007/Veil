@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.5] - 2026-04-03
+
+### Popup and Onboarding Polish
+
+- Reworked the popup onboarding flow into a consistent Material 3 purple surface, removing the leftover amber/gold treatment and tightening the popup-sized layout.
+- Fixed the first-use mask hint so it appears after onboarding is dismissed instead of being silently consumed while the onboarding overlay is still covering the popup.
+- Updated release-state messaging so Veil no longer shows a prominent delayed-check warning when GitHub is temporarily unavailable but the installed extension and local server bundle already match locally.
+
+### Redaction UX
+
+- Cleaned up the popup/settings redaction key so it shows only currently active redactions instead of long-lived response-restore aliases and partial-name mappings.
+- Improved redaction key layout so long anonymized values wrap cleanly instead of blowing out the dropdown panel.
+- Corrected live popup/settings stats so `detected` counts all active detections on the page while `protected` continues to reflect the redacted subset.
+
+### Test and Fixture Hygiene
+
+- Replaced production-looking fixture secrets in the shared regex smoke corpus with clearly synthetic placeholders while preserving detector coverage.
+- Refreshed the regex smoke demo and shared fixture references for the `v1.2.5` follow-up and kept the JavaScript regression coverage aligned with the updated popup/content behavior.
+
 ## [1.2.4] - 2026-04-02
 
 ### Update UX and Backend Tracking
