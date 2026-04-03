@@ -356,9 +356,9 @@ test.describe('Release Status UX', () => {
             sm.renderReleaseInfo();
         });
 
-        await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Local server verified');
-        await expect(page.locator('#releaseStatusText')).toContainText('Local server verified: v1.2.5');
-        await expect(page.locator('#releaseStatusSubtext')).toContainText('cannot check for newer releases');
+        await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Everything looks current locally');
+        await expect(page.locator('#releaseStatusText')).toContainText('Everything looks current locally: v1.2.5');
+        await expect(page.locator('#releaseStatusSubtext')).toContainText('GitHub release checks are temporarily unavailable');
     });
 
     test('shows backend version unknown instead of a generic update failure when both GitHub and local metadata are unavailable', async ({ extensionOptions }) => {
