@@ -1034,28 +1034,12 @@ class VeilContentController {
       }
 
       const existingState = currentState;
-      let newDetections = detections;
-      if (existingState) {
-        newDetections = this.mergeWithExistingDetections(existingState, detections);
-      }
-
-      // Carry forward ALL existing items (already redacted/reviewed)
-      // and append only genuinely new detections.
       const existingItems = existingState ? existingState.items : [];
-
-      // Update offsets of existing items to match new sourceText
-      const updatedExistingItems = existingItems.map((item) => {
-        const newOffset = sourceText.indexOf(item.text, Math.max(0, item.start - 50));
-        if (newOffset !== -1) {
-          return { ...item, start: newOffset, end: newOffset + item.text.length };
-        }
-        // Fallback: search anywhere
-        const fallback = sourceText.indexOf(item.text);
-        if (fallback !== -1) {
-          return { ...item, start: fallback, end: fallback + item.text.length };
-        }
-        return item; // keep old offsets if text vanished
-      });
+      const updatedExistingItems = this.reconcileExistingItems(sourceText, existingItems);
+      let newDetections = detections;
+      if (updatedExistingItems.length > 0) {
+        newDetections = this.mergeWithExistingDetections(updatedExistingItems, detections);
+      }
 
       const ledger = this.getAliasLedger(element);
       const newItems = newDetections
@@ -1119,21 +1103,76 @@ class VeilContentController {
     }
   }
 
-  mergeWithExistingDetections(existingState, newDetections) {
-    // Filter out detections whose TEXT + LABEL already exists in the
-    // current state. This handles the case where the user added more
-    // text, shifting offsets of previously-redacted items.
-    const existing = existingState.items;
+  mergeWithExistingDetections(existingItems, newDetections) {
+    // Filter out fresh detections that correspond to items we already carried
+    // forward into the current source text. Matching by text+label alone is too
+    // coarse because repeated names/emails are valid independent detections.
+    const existing = Array.isArray(existingItems) ? existingItems : [];
     return newDetections.filter((nd) => {
       const textLower = String(nd.text || '').toLowerCase();
       const labelLower = String(nd.label || '').toLowerCase();
       return !existing.some((ex) => {
-        // Match by text + label (offset-independent)
         const exTextLower = String(ex.text || '').toLowerCase();
         const exLabelLower = String(ex.label || '').toLowerCase();
-        return exTextLower === textLower && exLabelLower === labelLower;
+        return (
+          exTextLower === textLower &&
+          exLabelLower === labelLower &&
+          nd.start < ex.end &&
+          nd.end > ex.start
+        );
       });
     });
+  }
+
+  findClosestOccurrence(text, needle, referenceStart = 0) {
+    const source = String(text || '');
+    const target = String(needle || '');
+    if (!source || !target) return -1;
+
+    const matches = [];
+    let startIndex = 0;
+    while (startIndex <= source.length) {
+      const found = source.indexOf(target, startIndex);
+      if (found === -1) break;
+      matches.push(found);
+      startIndex = found + Math.max(1, target.length);
+    }
+
+    if (matches.length === 0) return -1;
+    let best = matches[0];
+    let bestDistance = Math.abs(best - referenceStart);
+    for (let index = 1; index < matches.length; index += 1) {
+      const candidate = matches[index];
+      const distance = Math.abs(candidate - referenceStart);
+      if (distance < bestDistance) {
+        best = candidate;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  reconcileExistingItems(sourceText, items) {
+    const text = String(sourceText || '');
+    if (!text || !Array.isArray(items) || items.length === 0) return [];
+
+    return items
+      .map((item) => {
+        const itemText = String(item?.text || '');
+        if (!itemText) return null;
+
+        const referenceStart = Number.isInteger(item.start) ? item.start : 0;
+        const nextStart = this.findClosestOccurrence(text, itemText, referenceStart);
+        if (nextStart === -1) return null;
+
+        return {
+          ...item,
+          start: nextStart,
+          end: nextStart + itemText.length,
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.start - right.start || left.end - right.end);
   }
 
   buildSignature(sourceText, detections) {
