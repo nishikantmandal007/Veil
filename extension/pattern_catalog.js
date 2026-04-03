@@ -118,6 +118,87 @@
       score: 0.95,
       replacement: '[DL REDACTED]',
       enabled: true
+    }),
+    Object.freeze({
+      id: 'slack_token',
+      label: 'api_key',
+      pattern: '\\bxox[bporas]-[A-Za-z0-9-]{10,}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[SLACK TOKEN REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'stripe_key',
+      label: 'api_key',
+      pattern: '\\b[rs]k_(?:test|live)_[A-Za-z0-9]{20,}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[STRIPE KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'google_api_key',
+      label: 'api_key',
+      pattern: '\\bAIza[A-Za-z0-9_-]{35}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[GOOGLE KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'azure_key',
+      label: 'api_key',
+      pattern: '\\b[A-Fa-f0-9]{32}\\b',
+      flags: 'g',
+      score: 0.80,
+      replacement: '[AZURE KEY REDACTED]',
+      enabled: false
+    }),
+    Object.freeze({
+      id: 'twilio_key',
+      label: 'api_key',
+      pattern: '\\bSK[0-9a-fA-F]{32}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[TWILIO KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'maya_api_key',
+      label: 'api_key',
+      pattern: '\\bmdp_(?:dev|prod|test|live)\\|[A-Za-z0-9_-]{20,}\\|[A-Za-z0-9_-]{2,}\\b',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[MAYA KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'private_key',
+      label: 'private_key',
+      pattern: '-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY[\\s\\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----',
+      flags: 'g',
+      score: 0.99,
+      replacement: '[PRIVATE KEY REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'connection_string',
+      label: 'connection_string',
+      pattern: '\\b(?:mongodb(?:\\+srv)?|postgres(?:ql)?|mysql|redis|amqp|mssql):\\/\\/[^\\s"\'`]+\\b',
+      flags: 'g',
+      score: 0.98,
+      replacement: '[CONNECTION STRING REDACTED]',
+      enabled: true
+    }),
+    Object.freeze({
+      id: 'generic_secret',
+      label: 'api_key',
+      pattern: '(?<=(?:api[_-]?key|api[_-]?secret|access[_-]?token|auth[_-]?token|secret[_-]?key|bearer)\\s*[:=]\\s*["\']?)[A-Za-z0-9_-]{20,}',
+      flags: 'gi',
+      score: 0.92,
+      replacement: '[SECRET REDACTED]',
+      enabled: true
     })
   ]);
 
@@ -134,7 +215,16 @@
     indian_aadhaar: 'Indian Aadhaar',
     passport: 'Passport Number',
     ifsc_code: 'IFSC Code',
-    indian_driver_license: 'Indian Driver License'
+    indian_driver_license: 'Indian Driver License',
+    slack_token: 'Slack Token',
+    stripe_key: 'Stripe API Key',
+    google_api_key: 'Google API Key',
+    azure_key: 'Azure Subscription Key',
+    twilio_key: 'Twilio API Key',
+    maya_api_key: 'Maya API Key',
+    private_key: 'Private Key (PEM)',
+    connection_string: 'Database Connection String',
+    generic_secret: 'Generic Secret / Token'
   });
 
   function cloneDefaultCustomPatterns() {

@@ -2307,7 +2307,9 @@ class VeilContentController {
       mac_address: '[MAC REDACTED]',
       employee_id: '[EMPLOYEE ID REDACTED]',
       device_id: '[DEVICE ID REDACTED]',
-      session_id: '[SESSION ID REDACTED]'
+      session_id: '[SESSION ID REDACTED]',
+      private_key: '[PRIVATE KEY REDACTED]',
+      connection_string: '[CONNECTION STRING REDACTED]'
     };
     const base = map[label] || `[${String(label || 'PII').toUpperCase()} REDACTED]`;
     // Insert numeric index before REDACTED so tokens are uniquely identifiable:
@@ -3197,10 +3199,9 @@ class VeilContentController {
       if (!state || !Array.isArray(state.items)) return;
       state.items.forEach((item) => {
         if (!item) return;
+        detections += 1;
         if (item.redacted) {
           redactions += 1;
-        } else {
-          detections += 1;
         }
       });
     });
@@ -3224,7 +3225,7 @@ class VeilContentController {
 
     if (request?.action !== 'getPageStats') return false;
     if (window !== window.top) return false;
-    const redactionKeyMap = this.buildRedactionKey();
+    const redactionKeyMap = this.buildVisibleRedactionKey();
     const redactionKey = redactionKeyMap.size
       ? Object.fromEntries([...redactionKeyMap])
       : null;
@@ -3394,6 +3395,21 @@ class VeilContentController {
 
   // Build the popup/settings redaction key from currently active Veil states only.
   // Veil must never rewrite provider-owned thread history with original values.
+  buildVisibleRedactionKey() {
+    const map = new Map();
+    this.redactions.forEach((state) => {
+      if (!state?.items?.length) return;
+      state.items.forEach((item) => {
+        if (!item?.redacted) return;
+        const replacement = this.getReplacementText(item, state.mode);
+        const original = String(item.text || '').trim();
+        if (!replacement || !original || replacement === original) return;
+        if (!map.has(replacement)) map.set(replacement, original);
+      });
+    });
+    return map;
+  }
+
   buildRedactionKey() {
     const map = new Map(this.responseRestoreLedger);
     this.redactions.forEach((state) => {

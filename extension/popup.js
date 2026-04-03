@@ -268,7 +268,8 @@ class SettingsManager {
     if (!card) return;
     const isMask = this.settings.redactionMode === 'mask';
     const alreadySeen = Boolean(this.settings.maskModeHintSeen);
-    if (isMask && !alreadySeen) {
+    const onboardingVisible = Boolean(this.wizard?.overlay && !this.wizard.overlay.hidden);
+    if (isMask && !alreadySeen && !onboardingVisible) {
       card.hidden = false;
       this.settings.maskModeHintSeen = true;
       chrome.storage.local.set({ maskModeHintSeen: true });
@@ -853,6 +854,9 @@ class SettingsManager {
     const noticeBody = document.getElementById('releaseNoticeBody');
     const noticeLink = document.getElementById('releaseNoticeLink');
     const installedBundleTag = String(this.serverMeta.bundleReleaseTag || '').trim();
+    const currentVersion = chrome.runtime.getManifest()?.version || 'unknown';
+    const localInstallAligned = Boolean(installedBundleTag)
+      && this.normalizeVersionTag(installedBundleTag) === this.normalizeVersionTag(currentVersion);
 
     const resolvedReleaseLink = this.releaseInfo.htmlUrl || this.serverMeta.bundleReleaseUrl || VEIL_RELEASE_PAGE_URL;
 
@@ -900,7 +904,13 @@ class SettingsManager {
 
     if (this.releaseInfo.status === 'error') {
       if (installedBundleTag) {
-        setUpdateBlockVisible(true);
+        setUpdateBlockVisible(!localInstallAligned);
+        if (localInstallAligned) {
+          releaseText.textContent = `Everything looks current locally: v${currentVersion}`;
+          releaseSubtext.textContent = `GitHub release checks are temporarily unavailable, but both the extension and installed local server bundle report ${installedBundleTag}.`;
+          applySidebarState('is-current', 'Up to date', 'Everything looks current locally', `GitHub release checks are temporarily unavailable, but the installed extension and local server bundle both report ${installedBundleTag}.`);
+          return;
+        }
         releaseText.textContent = `Local server verified: ${installedBundleTag}`;
         releaseSubtext.textContent = `${this.releaseInfo.error || 'GitHub could not be reached right now.'} Veil can confirm the installed local server bundle on this machine, but it cannot check for newer releases at the moment.`;
         applySidebarState('is-current', 'Verified', 'Local server verified', `Installed local server bundle ${installedBundleTag} is known. Checking GitHub for newer releases is temporarily unavailable.`);
@@ -926,7 +936,6 @@ class SettingsManager {
 
     const latestTag = this.releaseInfo.latestTag || 'latest';
     const published = this.formatReleaseTimestamp(this.releaseInfo.publishedAt);
-    const currentVersion = chrome.runtime.getManifest()?.version || 'unknown';
     const bundleKnown = Boolean(installedBundleTag);
     const bundleIsCurrent = bundleKnown && installedBundleTag === latestTag;
     const bundleNeedsRefresh = bundleKnown && Boolean(latestTag) && installedBundleTag !== latestTag;
@@ -1973,6 +1982,7 @@ class OnboardingWizard {
     this._stopHostPolling();
     chrome.storage.local.set({ veilOnboardingDone: true });
     this._setVisible(false);
+    this.sm.renderMaskHint();
   }
 }
 

@@ -295,6 +295,14 @@ section('pattern catalog — expected built-in regex detectors are present');
   assert(ids.includes('ifsc_code'), 'includes IFSC pattern');
   assert(ids.includes('indian_driver_license'), 'includes Indian driver license pattern');
   assert(ids.includes('mac_address'), 'includes MAC address pattern');
+  assert(ids.includes('slack_token'), 'includes Slack token pattern');
+  assert(ids.includes('stripe_key'), 'includes Stripe key pattern');
+  assert(ids.includes('google_api_key'), 'includes Google API key pattern');
+  assert(ids.includes('twilio_key'), 'includes Twilio key pattern');
+  assert(ids.includes('maya_api_key'), 'includes Maya API key pattern');
+  assert(ids.includes('private_key'), 'includes private key pattern');
+  assert(ids.includes('connection_string'), 'includes connection string pattern');
+  assert(ids.includes('generic_secret'), 'includes generic secret pattern');
   assertEqual(PATTERN_NAMES.openai_key, 'OpenAI API Key', 'exposes display names for built-ins');
 }
 
@@ -328,7 +336,7 @@ section('pattern catalog — built-in smoke corpus patterns match the shared reg
       .map((pattern) => pattern.label)
   );
 
-  ['aadhaar', 'api_key', 'driver_license', 'ifsc', 'ip_address', 'jwt', 'pan', 'passport', 'ssn'].forEach((label) => {
+  ['aadhaar', 'api_key', 'connection_string', 'driver_license', 'ifsc', 'ip_address', 'jwt', 'pan', 'passport', 'ssn'].forEach((label) => {
     assert(defaultLabels.has(label), `shared smoke corpus hits built-in label "${label}"`);
   });
 }
