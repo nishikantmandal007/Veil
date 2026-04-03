@@ -412,6 +412,51 @@ class VeilContentController {
       }
       textNode = walker.nextNode();
     }
+
+    // Second pass: restore tokens split across syntax-highlighted spans in code blocks
+    this.restoreCodeBlockTokens(root, replacements);
+  }
+
+  restoreCodeBlockTokens(root, replacements) {
+    if (!root?.querySelectorAll) return;
+    const codeContainers = root.querySelectorAll('pre, code, .hljs, [class*="highlight-"]');
+    if (!codeContainers.length) return;
+
+    const processed = new Set();
+    codeContainers.forEach((el) => {
+      // Skip if already processed (e.g. <code> inside a <pre> we already handled)
+      if (processed.has(el)) return;
+      if (this.isEditableInputSurface(el)) return;
+      // Mark all descendants to avoid double-processing
+      el.querySelectorAll('pre, code, .hljs, [class*="highlight-"]').forEach((child) => processed.add(child));
+
+      const text = el.textContent || '';
+      let needsReplace = false;
+      for (const [replacement] of replacements) {
+        if (text.includes(replacement)) {
+          needsReplace = true;
+          break;
+        }
+      }
+      if (!needsReplace) return;
+
+      // Replace in innerHTML — tokens may span across <span> tags from syntax highlighting
+      let html = el.innerHTML;
+      replacements.forEach(([replacement, original]) => {
+        if (!text.includes(replacement)) return;
+        // Build a regex that matches the replacement token even if split by HTML tags
+        const escaped = replacement.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Allow optional HTML tags between each character of the token
+        const flexPattern = escaped.split('').join('(?:<[^>]*>)*');
+        try {
+          const regex = new RegExp(flexPattern, 'g');
+          html = html.replace(regex, original.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+        } catch { /* skip malformed regex */ }
+      });
+      if (html !== el.innerHTML) {
+        el.innerHTML = html;
+      }
+    });
   }
 
   // ═══════════════════════════════════════════════════════════

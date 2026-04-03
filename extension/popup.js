@@ -164,11 +164,13 @@ class SettingsManager {
     });
 
     if (response?.success && response.stats) {
+      this._pageActive = true;
       this.stats = {
         detections: Number(response.stats.detections) || 0,
         redactions: Number(response.stats.redactions) || 0
       };
     } else {
+      this._pageActive = false;
       this.stats = { detections: 0, redactions: 0 };
     }
 
@@ -183,6 +185,16 @@ class SettingsManager {
     if (!card || !list || !toggle) return;
 
     if (!key || Object.keys(key).length === 0) {
+      // Show a hint when items are detected but nothing is redacted yet
+      if (this.stats.detections > 0 && this.stats.redactions === 0) {
+        card.hidden = false;
+        list.innerHTML = '<div class="key-hint" style="padding:8px 0;color:#79747E;font-size:12px;">'
+          + `${this.stats.detections} item(s) detected \u2014 click items in the input or enable auto-redact to protect them.`
+          + '</div>';
+        list.hidden = false;
+        toggle.setAttribute('aria-expanded', 'true');
+        return;
+      }
       card.hidden = true;
       return;
     }
@@ -499,6 +511,13 @@ class SettingsManager {
       return;
     }
 
+    if (this.serverPhase === 'downloading') {
+      dot.classList.add('warn');
+      text.textContent = 'Downloading Model';
+      sub.textContent = 'Downloading GLiNER2 model (~1.8 GB). First install may take a few minutes...';
+      return;
+    }
+
     if (this.serverPhase === 'model-loading') {
       dot.classList.add('warn');
       text.textContent = 'Loading Model';
@@ -578,6 +597,10 @@ class SettingsManager {
   renderStats() {
     document.getElementById('detectionCount').textContent = this.formatNumber(this.stats.detections);
     document.getElementById('redactionCount').textContent = this.formatNumber(this.stats.redactions);
+    const hint = document.getElementById('statusSubtext');
+    if (hint && !this._pageActive && this.settings.enabled) {
+      hint.textContent = 'Not active on this page.';
+    }
   }
 
   renderAdvancedStates() {
@@ -1345,15 +1368,16 @@ class SettingsManager {
       running: Boolean(payload.running),
       healthy: Boolean(payload.healthy),
       pid: payload.pid || null,
-      portConflict: Boolean(payload.portConflict)
+      portConflict: Boolean(payload.portConflict),
+      processPhase: String(payload.processPhase || '')
     };
     if (!this.serverState.installed) {
       this.setServerPhase('disconnected');
     } else if (this.serverState.running && this.serverState.healthy) {
       this.setServerPhase('active');
     } else if (this.serverState.running && !this.serverState.healthy) {
-      // Server process up, but health endpoint says model not loaded yet
-      this.setServerPhase('model-loading');
+      // Distinguish downloading from general model-loading
+      this.setServerPhase(this.serverState.processPhase === 'downloading' ? 'downloading' : 'model-loading');
     } else {
       this.setServerPhase('disconnected');
     }
@@ -1396,7 +1420,8 @@ class SettingsManager {
       running: Boolean(response.running),
       healthy: Boolean(response.healthy),
       pid: response.pid,
-      portConflict: Boolean(response.portConflict)
+      portConflict: Boolean(response.portConflict),
+      processPhase: response.processPhase || ''
     });
   }
 

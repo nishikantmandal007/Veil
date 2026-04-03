@@ -271,6 +271,10 @@ else
 fi
 
 echo
+echo "Pre-downloading GLiNER2 model (this may take a few minutes on first install)..."
+"${INSTALL_DIR}/.venv/bin/python" "${INSTALL_DIR}/server/gliner2_server.py" --download-only || echo "Warning: model pre-download failed. It will download on first use."
+
+echo
 echo "Veil install complete."
 echo "Install directory: ${INSTALL_DIR}"
 echo "Extension ID: ${EXTENSION_ID}"

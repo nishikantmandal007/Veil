@@ -36,8 +36,22 @@ function Stop-VeilWindowsProcesses {
         Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
     }
 
-    if ($processes.Count -gt 0) {
-        Start-Sleep -Seconds 1
+    # Also kill any python.exe whose command line references the install directory
+    $escapedDir = [regex]::Escape($InstallDir)
+    $pythonProcs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $cmd = $_.CommandLine
+            if ([string]::IsNullOrWhiteSpace($cmd)) { return $false }
+            if ($cmd -match $escapedDir -and $_.Name -match 'python') { return $true }
+            return $false
+        } | Where-Object { $processes.ProcessId -notcontains $_.ProcessId })
+
+    foreach ($proc in $pythonProcs) {
+        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
+    $allKilled = $processes.Count + $pythonProcs.Count
+    if ($allKilled -gt 0) {
+        Start-Sleep -Seconds 3
     }
 }
 
@@ -72,9 +86,29 @@ function Uninstall-Veil {
     }
 
     Stop-VeilWindowsProcesses -InstallDir $InstallDir
-    Remove-Item -LiteralPath $InstallDir -Recurse -Force
+
+    $removed = $false
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction Stop
+            $removed = $true
+            break
+        }
+        catch {
+            if ($attempt -lt 3) {
+                Write-Host "Retry $attempt/3: directory still locked, waiting..."
+                Start-Sleep -Seconds 2
+            }
+        }
+    }
 
     Write-Host ""
-    Write-Host "Veil uninstall complete."
-    Write-Host "Removed install directory: $InstallDir"
+    if ($removed) {
+        Write-Host "Veil uninstall complete."
+        Write-Host "Removed install directory: $InstallDir"
+    }
+    else {
+        Write-Host "Warning: Could not fully remove $InstallDir (files may still be in use)."
+        Write-Host "Please close Chrome/Edge and manually delete the folder, or restart and try again."
+    }
 }

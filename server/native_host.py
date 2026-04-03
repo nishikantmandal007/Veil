@@ -569,6 +569,7 @@ def server_status() -> Dict[str, Any]:
         "host": HOST_NAME,
         "logExists": LOG_FILE.exists(),
         "portConflict": port_conflict,
+        "processPhase": str(process_state.get("phase") or "") if process_running else "",
         **runtime_meta(),
     }
 

@@ -80,6 +80,23 @@ echo.
 echo Native host installed for extension: %EXTENSION_ID%
 echo Manifest:  %MANIFEST%
 echo Launcher:  %LAUNCHER%
+
+:: Pre-download the GLiNER2 model so first use is instant
 echo.
-echo Next step: run install_autostart_windows.bat to register Veil autostart at login.
+echo Pre-downloading GLiNER2 model (this may take a few minutes on first install)...
+"%VENV_PYTHON%" "%REPO_DIR%\server\gliner2_server.py" --download-only
+if errorlevel 1 (
+    echo Warning: Model pre-download failed. It will download on first use.
+)
+
+:: Chain into autostart setup automatically
+set "AUTOSTART_SCRIPT=%REPO_DIR%\server\autostart\install_windows.bat"
+if exist "%AUTOSTART_SCRIPT%" (
+    echo.
+    echo Setting up Veil autostart...
+    call "%AUTOSTART_SCRIPT%"
+)
+
+echo.
+echo Veil setup complete.
 endlocal

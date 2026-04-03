@@ -44,7 +44,7 @@ UNSUPPORTED_MODEL_ALIASES = {
 FALLBACK_MODELS = ["fastino/gliner2-multi-v1"]
 ONNX_PRECISION_ENV_KEY = "GLINER2_ONNX_PRECISION"
 ONNX_PROVIDERS_ENV_KEY = "GLINER2_ONNX_PROVIDERS"
-DEFAULT_ONNX_PRECISION = "fp32"
+DEFAULT_ONNX_PRECISION = "fp16"
 DEFAULT_ONNX_PROVIDERS = ["CPUExecutionProvider"]
 DEFAULT_THRESHOLD = 0.42
 DEFAULT_MAX_CHARS = 9000
@@ -665,7 +665,14 @@ class GLiNERService:
                             providers=self.onnx_providers,
                         )
                     else:
-                        print(f"Loading GLiNER2 ONNX model ({self.onnx_precision}): {load_target}")
+                        print(f"Downloading/loading GLiNER2 ONNX model ({self.onnx_precision}): {load_target}")
+                        save_process_state({
+                            "pid": os.getpid(),
+                            "session_id": PROCESS_SESSION_ID,
+                            "phase": "downloading",
+                            "model": candidate,
+                            "precision": self.onnx_precision,
+                        })
                         self.model = GLiNER2ONNXRuntime.from_pretrained(
                             load_target,
                             precision=self.onnx_precision,
