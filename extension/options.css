@@ -610,8 +610,8 @@ html, body {
 
 .opt-update-notice {
   margin: 10px 0 14px;
-  background: linear-gradient(180deg, #fff8ef 0%, #fff2df 100%);
-  border-color: #e8c89d;
+  background: linear-gradient(180deg, #F7F2FA 0%, #F3EDF7 100%);
+  border-color: #D0BCFF;
   box-shadow: none;
   display: flex;
   align-items: flex-start;
@@ -630,8 +630,8 @@ html, body {
   min-height: 24px;
   padding: 0 10px;
   border-radius: var(--md-shape-full);
-  background: #7a5200;
-  color: #fff7ed;
+  background: #EADDFF;
+  color: #4F378B;
   font-size: 11px;
   font-weight: 700;
   line-height: 16px;
@@ -644,14 +644,14 @@ html, body {
   font-size: 18px;
   font-weight: 600;
   line-height: 24px;
-  color: #5c3b00;
+  color: #21005D;
 }
 
 .opt-update-notice-body {
   margin: 6px 0 0;
   font-size: 14px;
   line-height: 21px;
-  color: #76521a;
+  color: #49454F;
 }
 
 .opt-update-notice-link {
@@ -661,8 +661,8 @@ html, body {
   min-height: 40px;
   padding: 0 16px;
   border-radius: var(--md-shape-full);
-  background: rgba(122, 82, 0, 0.12);
-  color: #5c3b00;
+  background: #E8DEF8;
+  color: #4F378B;
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;

@@ -193,14 +193,14 @@ npm run build:zip
 # → dist/veil-extension.zip  ready for Chrome Web Store upload
 ```
 
-Releases are cut manually from `main` with a semver tag such as `v1.2.4`.
+Releases are cut manually from `main` with a semver tag such as `v1.2.5`.
 Before tagging, make sure `package.json`, `package-lock.json`, `extension/manifest.json`, `pyproject.toml`, `uv.lock`, and `CHANGELOG.md` already contain the same release version on `main`.
 
 ```bash
 git checkout main
 git pull origin main
-git tag v1.2.4
-git push upstream v1.2.4
+git tag v1.2.5
+git push upstream v1.2.5
 ```
 
 Pushing the `v*` tag triggers the release workflow, which first verifies the version metadata, then runs the JavaScript, Python, and Playwright test suites, and finally uploads the extension zip plus backend installer assets to the GitHub release for that tag.

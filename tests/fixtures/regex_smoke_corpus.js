@@ -28,6 +28,14 @@ MAC Address: 3C:52:82:AF:91:7B
 Employee ID: TN-EMP-20458
 Device ID: ANDR-98X2-KL45-PL09
 Session ID: SESS-a82f91d7c6b34e2f
+
+Slack Token: xoxb-1234567890-abcdefghij-ABCDEFGHIJ
+Stripe Key: stripe_test_demo_placeholder_not_real
+Google API Key: AIzaSyD1234567890abcdefghijklmnopqrstuv
+Twilio Key: twilio_demo_placeholder_not_real
+Maya API Key: mdp_test|fakeRegexSmokeToken1234567890ABCD|T1
+Connection String: postgres://admin:s3cret@db.example.com:5432/production
+Generic Secret: api_key="Xn8kP2mQ9wR4tY6vB3jL5hG7dF1cA0eZ"
 `.trim();
 
 const REGEX_SMOKE_CUSTOM_PATTERNS = Object.freeze([
@@ -91,6 +99,7 @@ const EXPECTED_BUILTIN_REGEX_LABELS = Object.freeze([
   'aadhaar',
   'address',
   'api_key',
+  'connection_string',
   'credit_card',
   'date_of_birth',
   'driver_license',

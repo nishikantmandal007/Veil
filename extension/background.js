@@ -40,6 +40,21 @@ function scoreTier(score) {
   return 'low';
 }
 
+function luhnCheck(digits) {
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = parseInt(digits[i], 10);
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
 function compareDetectionPreference(current, next) {
   const currentLabel = String(current?.label || '').toLowerCase();
   const nextLabel = String(next?.label || '').toLowerCase();
@@ -97,6 +112,11 @@ const MDP_SEED_PREFIX = 'veil_';
 const DEFAULT_LOCAL_SERVER_URL = 'http://127.0.0.1:8765';
 const LOCAL_SERVER_URL_OVERRIDE_KEY = 'veilLocalServerUrlOverride';
 
+// Maps Veil detection labels → MayaData anonymisation engine utility parameters.
+// Available MayaData UtilityParameter enum values:
+//   IBAN, MATERIAL, CONSISTENT_ID, NUMBER, NAME, CLEAR, PHONE, URL, ADDRESS,
+//   PASSPORT_NUMBER, ACCOUNT_NUMBER, EMAIL, BANK_DETAILS, ORG_NAME, SSN,
+//   IP_ADDRESS, CUSTOM_EXPRESSION, DATE, FIXED_VALUE, TAX_ID, NO_CHANGE
 const MDP_LABEL_CONFIG = Object.freeze({
   person: Object.freeze({
     columnName: 'Names',
@@ -120,12 +140,12 @@ const MDP_LABEL_CONFIG = Object.freeze({
   }),
   ssn: Object.freeze({
     columnName: 'SSN',
-    utilityParameter: 'SSN',
+    utilityParameter: 'NUMBER',
     utilityParameterConditions: Object.freeze([])
   }),
   credit_card: Object.freeze({
     columnName: 'Credit Card',
-    utilityParameter: 'CARD',
+    utilityParameter: 'BANK_DETAILS',
     utilityParameterConditions: Object.freeze([])
   }),
   date_of_birth: Object.freeze({
@@ -135,12 +155,77 @@ const MDP_LABEL_CONFIG = Object.freeze({
   }),
   location: Object.freeze({
     columnName: 'Location',
-    utilityParameter: 'LOCATION',
+    utilityParameter: 'ADDRESS',
     utilityParameterConditions: Object.freeze([])
   }),
   organization: Object.freeze({
     columnName: 'Organization',
-    utilityParameter: 'ORG',
+    utilityParameter: 'ORG_NAME',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  api_key: Object.freeze({
+    columnName: 'API Key',
+    utilityParameter: 'CONSISTENT_ID',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  ip_address: Object.freeze({
+    columnName: 'IP Address',
+    utilityParameter: 'IP_ADDRESS',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  jwt: Object.freeze({
+    columnName: 'JWT',
+    utilityParameter: 'CONSISTENT_ID',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  pan: Object.freeze({
+    columnName: 'PAN',
+    utilityParameter: 'NUMBER',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  aadhaar: Object.freeze({
+    columnName: 'Aadhaar',
+    utilityParameter: 'NUMBER',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  passport: Object.freeze({
+    columnName: 'Passport',
+    utilityParameter: 'CONSISTENT_ID',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  ifsc: Object.freeze({
+    columnName: 'IFSC',
+    utilityParameter: 'CONSISTENT_ID',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  driver_license: Object.freeze({
+    columnName: 'Driver License',
+    utilityParameter: 'CONSISTENT_ID',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  mac_address: Object.freeze({
+    columnName: 'MAC Address',
+    utilityParameter: 'CONSISTENT_ID',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  bank_account: Object.freeze({
+    columnName: 'Bank Account',
+    utilityParameter: 'BANK_DETAILS',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  private_key: Object.freeze({
+    columnName: 'Private Key',
+    utilityParameter: 'CLEAR',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  connection_string: Object.freeze({
+    columnName: 'Connection String',
+    utilityParameter: 'URL',
+    utilityParameterConditions: Object.freeze([])
+  }),
+  oauth_token: Object.freeze({
+    columnName: 'OAuth Token',
+    utilityParameter: 'CONSISTENT_ID',
     utilityParameterConditions: Object.freeze([])
   })
 });
@@ -871,7 +956,12 @@ class GLiNERDetector {
     if (enabledTypes.includes('credit_card')) {
       const regex = /\b(?:\d[ -]*?){13,16}\b/g;
       let match;
-      while ((match = regex.exec(text)) !== null) push(match, 'credit_card', 0.9);
+      while ((match = regex.exec(text)) !== null) {
+        const digits = match[0].replace(/\D/g, '');
+        if (digits.length >= 13 && digits.length <= 16 && luhnCheck(digits)) {
+          push(match, 'credit_card', 0.9);
+        }
+      }
     }
 
     if (enabledTypes.includes('date_of_birth')) {
