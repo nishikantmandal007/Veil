@@ -249,6 +249,11 @@ test.describe('Release Status UX', () => {
         await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
         await page.evaluate(() => {
             const sm = window.__VEIL_SETTINGS_MANAGER__;
+            clearInterval(sm.serverPollTimer);
+            clearInterval(sm.statsPollTimer);
+            sm.serverPollTimer = null;
+            sm.statsPollTimer = null;
+            sm.refreshServerStatus = async () => { };
             sm.refreshReleaseInfo = async () => { };
             sm.refreshReleaseSurface = async () => { };
             sm.releaseInfo = {
@@ -279,6 +284,11 @@ test.describe('Release Status UX', () => {
         await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
         await page.evaluate(() => {
             const sm = window.__VEIL_SETTINGS_MANAGER__;
+            clearInterval(sm.serverPollTimer);
+            clearInterval(sm.statsPollTimer);
+            sm.serverPollTimer = null;
+            sm.statsPollTimer = null;
+            sm.refreshServerStatus = async () => { };
             sm.refreshReleaseInfo = async () => { };
             sm.refreshReleaseSurface = async () => { };
             const manifestVersion = chrome.runtime.getManifest().version;
@@ -310,6 +320,11 @@ test.describe('Release Status UX', () => {
         await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
         await page.evaluate(() => {
             const sm = window.__VEIL_SETTINGS_MANAGER__;
+            clearInterval(sm.serverPollTimer);
+            clearInterval(sm.statsPollTimer);
+            sm.serverPollTimer = null;
+            sm.statsPollTimer = null;
+            sm.refreshServerStatus = async () => { };
             sm.refreshReleaseInfo = async () => { };
             sm.refreshReleaseSurface = async () => { };
             sm.releaseInfo = {
@@ -336,6 +351,11 @@ test.describe('Release Status UX', () => {
         await page.waitForFunction(() => Boolean(window.__VEIL_SETTINGS_MANAGER__));
         await page.evaluate(() => {
             const sm = window.__VEIL_SETTINGS_MANAGER__;
+            clearInterval(sm.serverPollTimer);
+            clearInterval(sm.statsPollTimer);
+            sm.serverPollTimer = null;
+            sm.statsPollTimer = null;
+            sm.refreshServerStatus = async () => { };
             sm.refreshReleaseInfo = async () => { };
             sm.refreshReleaseSurface = async () => { };
             sm.releaseInfo = {
