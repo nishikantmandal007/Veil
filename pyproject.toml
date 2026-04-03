@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "gliner2-onnx>=0.1.1,<0.2",
+  "python-dotenv>=1.0,<2",
 ]
 
 [dependency-groups]

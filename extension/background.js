@@ -279,9 +279,9 @@ class VeilAnonymizer {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': apiKey
+          'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({ apiKey, entries: payload }),
+        body: JSON.stringify({ entries: payload }),
         signal: controller.signal
       });
 

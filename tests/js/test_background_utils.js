@@ -155,6 +155,25 @@ function organizationLooksValid(text) {
   return true;
 }
 
+function buildResponseRestoreComponents(label, replacement, original) {
+  if (String(label || '').toLowerCase() !== 'person') return [];
+  const replacementParts = String(replacement || '').trim().split(/\s+/).filter(Boolean);
+  const originalParts = String(original || '').trim().split(/\s+/).filter(Boolean);
+  if (replacementParts.length < 2 || replacementParts.length !== originalParts.length || replacementParts.length > 4) {
+    return [];
+  }
+  return replacementParts
+    .map((part, index) => [part, originalParts[index]])
+    .filter(([part, mapped]) => (
+      part &&
+      mapped &&
+      part.length >= 3 &&
+      mapped.length >= 3 &&
+      !/\d/.test(part) &&
+      !/\d/.test(mapped)
+    ));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 section('mergeOverlapping — no overlaps');
@@ -333,6 +352,18 @@ section('organization validation — single-word title-case names are rejected a
   assertEqual(organizationLooksValid('Pranav'), false, 'single-word proper names do not qualify as organizations');
   assertEqual(organizationLooksValid('IBM'), true, 'all-caps acronym organizations can still pass');
   assertEqual(organizationLooksValid('Maya Data Privacy'), true, 'multi-word organization names remain valid');
+}
+
+section('assistant response restore — person name parts are mapped individually');
+{
+  const parts = buildResponseRestoreComponents('person', 'Alexandra Aisha', 'Nishi Kant');
+  assertEqual(parts, [['Alexandra', 'Nishi'], ['Aisha', 'Kant']], 'multi-part person names expose per-part local restore mappings');
+}
+
+section('assistant response restore — non-person labels do not create sub-word mappings');
+{
+  const parts = buildResponseRestoreComponents('organization', 'Maya Labs', 'Acme Systems');
+  assertEqual(parts, [], 'sub-word local restore remains limited to person names');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
