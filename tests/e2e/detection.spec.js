@@ -272,7 +272,6 @@ test.describe('Content-Script Detection', () => {
 
         await page.close();
     });
-
 });
 
 test.describe('Regex Fallback (no server)', () => {
@@ -365,6 +364,7 @@ test.describe('Regex Fallback (no server)', () => {
 
         await page.close();
     });
+
 });
 
 test.describe('Anchored Overlay Scroll Refresh', () => {
