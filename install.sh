@@ -102,7 +102,10 @@ EOF
   fi
 
   payload="$(tr -d '\n' < "${release_info_path}")"
-  tag="$(extract_release_field "${payload}" "tag_name")"
+  tag="$(extract_release_field "${payload}" "tag")"
+  if [[ -z "${tag}" ]]; then
+    tag="$(extract_release_field "${payload}" "tag_name")"
+  fi
   published="$(extract_release_field "${payload}" "published_at")"
   html_url="$(extract_release_field "${payload}" "html_url")"
 

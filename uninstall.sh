@@ -3,7 +3,7 @@ set -euo pipefail
 
 INSTALL_DIR="${VEIL_INSTALL_DIR:-}"
 
-kill_veil_processes() {
+collect_veil_pids() {
   local install_dir="$1"
   local -a patterns=(
     "${install_dir}/server/gliner2_server.py"
@@ -24,6 +24,12 @@ kill_veil_processes() {
     done
   done < <(ps -eo pid=,args=)
 
+  printf '%s\n' "${pids[@]}"
+}
+
+kill_veil_processes() {
+  local install_dir="$1"
+  mapfile -t pids < <(collect_veil_pids "${install_dir}")
   local pid
   for pid in "${pids[@]}"; do
     kill "${pid}" >/dev/null 2>&1 || true
@@ -32,6 +38,36 @@ kill_veil_processes() {
   for pid in "${pids[@]}"; do
     kill -0 "${pid}" >/dev/null 2>&1 && kill -KILL "${pid}" >/dev/null 2>&1 || true
   done
+}
+
+wait_for_veil_shutdown() {
+  local install_dir="$1"
+  local attempts="${2:-10}"
+  local remaining=()
+  local i
+
+  for ((i=0; i<attempts; i+=1)); do
+    mapfile -t remaining < <(collect_veil_pids "${install_dir}")
+    if [[ "${#remaining[@]}" -eq 0 ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  return 1
+}
+
+remove_install_dir() {
+  local install_dir="$1"
+  local attempt
+
+  chmod -R u+w "${install_dir}" >/dev/null 2>&1 || true
+  for attempt in 1 2 3; do
+    rm -rf "${install_dir}" && return 0
+    sleep 1
+  done
+
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -75,7 +111,8 @@ else
 fi
 
 kill_veil_processes "${INSTALL_DIR}"
-rm -rf "${INSTALL_DIR}"
+wait_for_veil_shutdown "${INSTALL_DIR}" || true
+remove_install_dir "${INSTALL_DIR}"
 
 echo
 echo "Veil uninstall complete."
