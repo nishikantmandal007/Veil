@@ -369,7 +369,7 @@ function Sync-VeilRuntime {
     }
 }
 
-function Install-Veil {
+function global:Install-Veil {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -531,11 +531,15 @@ if ($MyInvocation.InvocationName -ne '.') {
     }
 
     if ([string]::IsNullOrWhiteSpace($extId)) {
-        Write-Host "Usage: powershell -ExecutionPolicy Bypass -File install.ps1 --extension-id <EXTENSION_ID>" -ForegroundColor Yellow
+        # No extension ID — show usage and make the function available for manual call
+        Write-Host "Usage:" -ForegroundColor Yellow
+        Write-Host "  powershell -ExecutionPolicy Bypass -File install.ps1 --extension-id <EXTENSION_ID>" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "Or set the environment variable before piping:" -ForegroundColor Yellow
+        Write-Host "Or via irm (two ways):" -ForegroundColor Yellow
         Write-Host '  $env:VEIL_EXTENSION_ID="YOUR_ID"; irm .../install.ps1 | iex' -ForegroundColor Cyan
-        exit 1
+        Write-Host '  irm .../install.ps1 | iex; Install-Veil -ExtensionId "YOUR_ID"' -ForegroundColor Cyan
+        # Don't exit — let the function remain available for the user to call next
+        return
     }
 
     $params = @{ ExtensionId = $extId }
