@@ -263,10 +263,28 @@ sync_runtime
 
 cd "${INSTALL_DIR}"
 
-# Pre-download model BEFORE starting autostart service (which would hold the process lock)
+# Set cache env vars so the server and pre-download use the same location.
+export HF_HOME="${INSTALL_DIR}/.runtime/cache/hf"
+export HUGGINGFACE_HUB_CACHE="${INSTALL_DIR}/.runtime/cache/hf/hub"
+export TRANSFORMERS_CACHE="${INSTALL_DIR}/.runtime/cache/hf/transformers"
+export XDG_CACHE_HOME="${INSTALL_DIR}/.runtime/cache/xdg"
+
+# Download the pre-packaged fp16 model from the GitHub Release (much faster than
+# pulling from HuggingFace Hub). Falls back to HF download if the asset is missing.
+MODEL_ASSET="veil-model-fp16.tar.gz"
+MODEL_ARCHIVE="${TMP_DIR}/${MODEL_ASSET}"
+MODEL_DEST="${INSTALL_DIR}/.runtime/cache/model"
+
 echo
-echo "Pre-downloading GLiNER2 model (this may take a few minutes on first install)..."
-"${INSTALL_DIR}/.venv/bin/python" "${INSTALL_DIR}/server/gliner2_server.py" --download-only || echo "Warning: model pre-download failed. It will download on first use."
+echo "Downloading GLiNER2 model..."
+if curl -fsSL "${RELEASE_BASE}/${MODEL_ASSET}" -o "${MODEL_ARCHIVE}" 2>/dev/null; then
+  mkdir -p "${MODEL_DEST}"
+  tar -xzf "${MODEL_ARCHIVE}" -C "${MODEL_DEST}"
+  echo "Model extracted to ${MODEL_DEST}"
+else
+  echo "Bundled model not found in release; downloading from HuggingFace Hub..."
+  "${INSTALL_DIR}/.venv/bin/python" "${INSTALL_DIR}/server/gliner2_server.py" --download-only || echo "Warning: model download failed. It will download on first use."
+fi
 
 if [[ "${PLATFORM}" == "linux" ]]; then
   bash server/native-host/install_linux.sh "${EXTENSION_ID}"

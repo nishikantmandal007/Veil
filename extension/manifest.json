@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Veil — AI Privacy Guard",
+  "name": "Veil \u2014 AI Privacy Guard",
   "short_name": "Veil",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "Real-time PII detection and redaction for AI chat interfaces. Powered by GLiNER2. Your data never leaves your machine.",
   "permissions": [
     "storage",
@@ -41,7 +41,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Veil — AI Privacy Guard",
+    "default_title": "Veil \u2014 AI Privacy Guard",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

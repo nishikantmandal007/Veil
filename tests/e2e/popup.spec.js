@@ -348,16 +348,18 @@ test.describe('Release Status UX', () => {
                 status: 'error',
                 error: 'GitHub release check failed (403).',
             };
+            const v = chrome.runtime.getManifest().version;
             sm.serverMeta = {
                 ...sm.serverMeta,
-                bundleReleaseTag: 'v1.2.6',
-                bundleReleaseUrl: 'https://github.com/Maya-Data-Privacy/Veil/releases/tag/v1.2.6',
+                bundleReleaseTag: `v${v}`,
+                bundleReleaseUrl: `https://github.com/Maya-Data-Privacy/Veil/releases/tag/v${v}`,
             };
             sm.renderReleaseInfo();
         });
 
+        const extVersion = await page.evaluate(() => chrome.runtime.getManifest().version);
         await expect(page.locator('#sidebarUpdateTitle')).toHaveText('Everything looks current locally');
-        await expect(page.locator('#releaseStatusText')).toContainText('Everything looks current locally: v1.2.6');
+        await expect(page.locator('#releaseStatusText')).toContainText(`Everything looks current locally: v${extVersion}`);
         await expect(page.locator('#releaseStatusSubtext')).toContainText('GitHub release checks are temporarily unavailable');
     });
 

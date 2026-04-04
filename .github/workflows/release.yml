@@ -72,6 +72,12 @@ jobs:
             exit 1
           fi
 
+          PYPROJECT_VERSION=$(python3 -c "import re; print(re.search(r'version\s*=\s*\"([^\"]+)\"', open('pyproject.toml').read()).group(1))")
+          if [[ "$PYPROJECT_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "pyproject.toml version $PYPROJECT_VERSION does not match release version $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
       - name: Verify changelog section exists
         env:
           RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
@@ -191,6 +197,9 @@ jobs:
           export VEIL_RELEASE_PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           uv run --no-sync python scripts/build_backend_bundle.py
 
+      - name: Build model bundle (fp16 ONNX from HuggingFace)
+        run: uv run --no-sync python scripts/build_model_bundle.py
+
       - name: Rename extension ZIP with version
         run: mv dist/veil-extension.zip "dist/veil-extension-${{ needs.verify-release-version.outputs.release_version }}.zip"
 
@@ -253,3 +262,4 @@ jobs:
             dist/uninstall.ps1
             dist/veil-backend-unix.tar.gz
             dist/veil-backend-windows.zip
+            dist/veil-model-fp16.tar.gz

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.7] - 2026-04-04
+
+### Improvements
+
+- Bundled GLiNER2 fp16 ONNX model in GitHub Release assets, eliminating the slow HuggingFace Hub download during install. Model downloads are now served from GitHub CDN.
+- Fixed double model download caused by mismatched cache paths between the install script pre-download and the systemd/launchd service.
+- Added cache environment variables to the Windows scheduled task and immediate server start, ensuring the model is found in the correct location.
+- Moved installer scripts (`install.sh`, `install.ps1`, `uninstall.sh`, `uninstall.ps1`) from the repository root to `scripts/installers/` for a cleaner project structure.
+- Added `scripts/sync_version.py` for single-source versioning: edit `package.json` once, then run `npm run version:sync` to propagate to `manifest.json` and `pyproject.toml`. CI checks for drift automatically.
+- Made e2e test version assertions dynamic, reading from the extension manifest instead of hardcoded values.
+
+---
+
 ## [1.2.6] - 2026-04-04
 
 ### Bug Fixes

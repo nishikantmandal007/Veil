@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 
-INSTALLER_PATH = Path(__file__).resolve().parents[2] / "install.ps1"
+INSTALLER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "installers" / "install.ps1"
 AUTOSTART_INSTALLER_PATH = Path(__file__).resolve().parents[2] / "server" / "autostart" / "install_windows.bat"
 
 

@@ -126,6 +126,12 @@ function Start-VeilServerNow {
         return $false
     }
 
+    # Set cache env vars so the server finds the pre-downloaded model
+    $env:HF_HOME = Join-Path $InstallDir ".runtime\cache\hf"
+    $env:HUGGINGFACE_HUB_CACHE = Join-Path $InstallDir ".runtime\cache\hf\hub"
+    $env:TRANSFORMERS_CACHE = Join-Path $InstallDir ".runtime\cache\hf\transformers"
+    $env:XDG_CACHE_HOME = Join-Path $InstallDir ".runtime\cache\xdg"
+
     try {
         Start-Process -FilePath $venvPython -ArgumentList @($serverScript, "--host", "127.0.0.1", "--port", "8765") -WorkingDirectory $InstallDir -WindowStyle Hidden | Out-Null
     }
@@ -433,6 +439,40 @@ function Install-Veil {
 
         $uvExe = Ensure-VeilUv -InstallDir $InstallDir -UvVersion $UvVersion -TempRoot $tempRoot -UvPath $UvPath
         Sync-VeilRuntime -InstallDir $InstallDir -UvExe $uvExe -PythonVersion $pinnedPythonVersion -RecreateVenv:$RecreateVenv
+
+        # Set cache env vars so the server and pre-download use the same location.
+        $env:HF_HOME = Join-Path $InstallDir ".runtime\cache\hf"
+        $env:HUGGINGFACE_HUB_CACHE = Join-Path $InstallDir ".runtime\cache\hf\hub"
+        $env:TRANSFORMERS_CACHE = Join-Path $InstallDir ".runtime\cache\hf\transformers"
+        $env:XDG_CACHE_HOME = Join-Path $InstallDir ".runtime\cache\xdg"
+
+        # Download pre-packaged fp16 model from GitHub Release (faster than HF Hub).
+        $modelAsset = "veil-model-fp16.tar.gz"
+        $modelUrl = "$releaseBase/$modelAsset"
+        $modelArchive = Join-Path $tempRoot $modelAsset
+        $modelDest = Join-Path $InstallDir ".runtime\cache\model"
+
+        Write-Host ""
+        Write-Host "Downloading GLiNER2 model..."
+        $modelDownloaded = $false
+        try {
+            Invoke-WebRequest -Uri $modelUrl -OutFile $modelArchive -UseBasicParsing -ErrorAction Stop
+            New-Item -ItemType Directory -Force -Path $modelDest | Out-Null
+            tar -xzf $modelArchive -C $modelDest
+            Write-Host "Model extracted to $modelDest"
+            $modelDownloaded = $true
+        }
+        catch {
+            Write-Host "Bundled model not found in release; downloading from HuggingFace Hub..."
+            $venvPythonPreDl = Join-Path $InstallDir ".venv\Scripts\python.exe"
+            $serverScriptPreDl = Join-Path $InstallDir "server\gliner2_server.py"
+            try {
+                & $venvPythonPreDl $serverScriptPreDl --download-only
+            }
+            catch {
+                Write-Host "Warning: model download failed. It will download on first use."
+            }
+        }
 
         Invoke-VeilCommand -Command @((Join-Path $InstallDir "server\native-host\install_windows.bat"), $ExtensionId) -FailureMessage "Failed to register the Veil native host"
 

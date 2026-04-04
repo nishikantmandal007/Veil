@@ -19,10 +19,10 @@ WINDOWS_ARCHIVE = DIST / "veil-backend-windows.zip"
 REPO_SLUG = "Maya-Data-Privacy/Veil"
 BUNDLE_RELEASE_ARCNAME = ".runtime/bundle_release.json"
 INSTALLER_FILES = [
-    ROOT / "install.sh",
-    ROOT / "install.ps1",
-    ROOT / "uninstall.sh",
-    ROOT / "uninstall.ps1",
+    ROOT / "scripts" / "installers" / "install.sh",
+    ROOT / "scripts" / "installers" / "install.ps1",
+    ROOT / "scripts" / "installers" / "uninstall.sh",
+    ROOT / "scripts" / "installers" / "uninstall.ps1",
 ]
 INCLUDE_PATHS = [
     ROOT / "server",

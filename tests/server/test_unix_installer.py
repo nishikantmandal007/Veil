@@ -4,8 +4,8 @@ Regression tests for the Unix installer metadata stamping path.
 from pathlib import Path
 
 
-INSTALLER_PATH = Path(__file__).resolve().parents[2] / "install.sh"
-UNINSTALLER_PATH = Path(__file__).resolve().parents[2] / "uninstall.sh"
+INSTALLER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "installers" / "install.sh"
+UNINSTALLER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "installers" / "uninstall.sh"
 
 
 def test_release_metadata_uses_field_extraction_instead_of_greedy_html_url_matching():

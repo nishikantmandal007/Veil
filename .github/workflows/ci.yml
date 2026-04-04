@@ -18,6 +18,12 @@ jobs:
       - run: npm ci
       - run: npm run test:unit
 
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 scripts/sync_version.py --check
+
   test-python:
     runs-on: ubuntu-latest
     steps:

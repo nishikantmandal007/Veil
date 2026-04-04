@@ -20,9 +20,22 @@ if not exist "%VENV_PYTHON%" (
 schtasks /delete /tn "%LEGACY_TASK_NAME%" /f >nul 2>&1
 schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1
 
+:: Create a wrapper script that sets cache env vars before starting the server.
+:: This ensures the model cache lives inside the Veil install directory, matching
+:: the location used by the pre-download step during install.
+set "WRAPPER=%REPO_DIR%\server\autostart\start_server.cmd"
+(
+  echo @echo off
+  echo set "HF_HOME=%REPO_DIR%\.runtime\cache\hf"
+  echo set "HUGGINGFACE_HUB_CACHE=%REPO_DIR%\.runtime\cache\hf\hub"
+  echo set "TRANSFORMERS_CACHE=%REPO_DIR%\.runtime\cache\hf\transformers"
+  echo set "XDG_CACHE_HOME=%REPO_DIR%\.runtime\cache\xdg"
+  echo "%VENV_PYTHON%" "%SERVER_SCRIPT%" --host 127.0.0.1 --port 8765
+) > "%WRAPPER%"
+
 :: Create scheduled task to run at logon
 schtasks /create /tn "%TASK_NAME%" ^
-  /tr "\"%VENV_PYTHON%\" \"%SERVER_SCRIPT%\" --host 127.0.0.1 --port 8765" ^
+  /tr "\"%WRAPPER%\"" ^
   /sc onlogon /ru "%USERNAME%" /f >nul
 
 if errorlevel 1 (

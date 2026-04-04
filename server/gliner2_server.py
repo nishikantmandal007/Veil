@@ -620,6 +620,12 @@ class GLiNERService:
             others.sort(key=lambda path: path.stat().st_mtime, reverse=True)
             preferred.extend(others)
 
+        # Also check the bundled model path (extracted from GitHub Release asset)
+        repo_dir = Path(__file__).resolve().parent.parent
+        bundled = repo_dir / ".runtime" / "cache" / "model" / "model"
+        if bundled.is_dir():
+            preferred.insert(0, bundled)
+
         required = ("config.json", "gliner2_config.json")
         for candidate in preferred:
             if all((candidate / item).exists() for item in required):

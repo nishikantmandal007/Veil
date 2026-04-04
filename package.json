@@ -1,6 +1,6 @@
 {
   "name": "veil",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "Real-time PII detection and redaction for AI chat interfaces. Powered by a local GLiNER2 model — your data never leaves your machine.",
   "scripts": {
     "setup": "uv sync --frozen --dev --no-install-project --python 3.11",
@@ -15,6 +15,9 @@
     "build": "echo 'No build step — load extension/ folder directly in Chrome'",
     "build:zip": "bash scripts/build_crx.sh",
     "build:backend-bundle": "uv run --no-sync python scripts/build_backend_bundle.py",
+    "build:model-bundle": "uv run --no-sync python scripts/build_model_bundle.py",
+    "version:sync": "uv run --no-sync python scripts/sync_version.py",
+    "version:check": "uv run --no-sync python scripts/sync_version.py --check",
     "lint": "eslint 'extension/*.js'",
     "format": "prettier --write 'extension/**/*.{js,json,css,html}'",
     "test": "node tests/js/test_background_utils.js",

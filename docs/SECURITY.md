@@ -10,7 +10,7 @@
 
 **Please do not open a public GitHub issue for security vulnerabilities.**
 
-Email **security@veil-extension.dev** with:
+Email **nishikant.mandal@mayadataprivacy.eu** with:
 
 1. A clear description of the vulnerability.
 2. Steps to reproduce (proof-of-concept if possible).
